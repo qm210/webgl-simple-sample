@@ -3,13 +3,14 @@ import generatePage from "./generate.js";
 import './style/index.css';
 import './style/app.css';
 
-// choose wisely :)
+import showcase1 from "./showcases/1_PlainColor.js";
+import showcase2a from "./showcases/2_HelloShadertoy_broken.js";
+import showcase2b from "./showcases/2_HelloShadertoy_fixed_static.js";
+import showcase2c from "./showcases/2_HelloShadertoy_fixed.js";
+import showcase3 from "./showcases/3_SimpleGeometry.js";
 
-// import showcase from "./showcases/1_PlainColor.js";
-// import showcase from "./showcases/2_HelloShadertoy_broken.js";
-// import showcase from "./showcases/2_HelloShadertoy_fixed_static.js";
-// import showcase from "./showcases/2_HelloShadertoy_fixed.js";
-import showcase from "./showcases/3_SimpleGeometry.js";
+// choose wisely :)
+const showcase = showcase1;
 
 const autoRenderOnLoad = true;
 

@@ -61,7 +61,11 @@ function render(gl, state) {
     gl.useProgram(state.program);
 
     gl.uniform1f(state.location.iTime, state.time);
-    gl.uniform2fv(state.location.iResolution, state.resolution);
+    try {
+        gl.uniform2fv(state.location.iResolution, state.resolution);
+    } catch (err) {
+        console.log(err, state);
+    }
 
     gl.drawArrays(gl.TRIANGLES, 0, 6);
 }
