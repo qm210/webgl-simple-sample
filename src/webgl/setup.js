@@ -108,18 +108,16 @@ export function compile(gl, vertexSrc, fragmentSrc) {
 
     result.program = program;
 
-    console.log("initBasics() =", result);
+    console.log("What we have after initialization:", result);
 
     return result;
 }
 
 
 export function initVertices(gl, state, variableName) {
-    if (!state.program) {
-        return;
-    }
+    // Note: state.program needs to exist here!
 
-    // ... more of that stuff with all the parameters and the stuff?
+    // ... now... more of that stuff with all the parameters and the stuff?
     state.location.aPosition = gl.getAttribLocation(state.program, variableName);
     gl.enableVertexAttribArray(state.location.aPosition);
     gl.vertexAttribPointer(

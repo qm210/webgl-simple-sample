@@ -1,7 +1,7 @@
 import {compile, createStaticVertexBuffer, initVertices} from "../webgl/setup.js";
 
-import vertexShaderSource from "../shaders/basicVertex.glsl";
-import fragmentShaderSource from "../shaders/fragmentShadertoyFixed.glsl";
+import vertexShaderSource from "../shaders/basic.vertex.glsl";
+import fragmentShaderSource from "../shaders/shadertoyFixed.glsl";
 
 
 export default {
@@ -11,11 +11,11 @@ export default {
             gl,
             [-1, -1, +1, -1, -1, +1, -1, +1, +1, -1, +1, +1]
         );
-        const state = compile(
-            gl,
-            vertexShaderSource,
-            fragmentShaderSource
-        );
+
+        const state = compile(gl, vertexShaderSource, fragmentShaderSource);
+        if (!state.program) {
+            return state;
+        }
 
         initVertices(gl, state, "aPosition");
 

@@ -1,11 +1,11 @@
 import {compile, createStaticVertexBuffer, initVertices} from "../webgl/setup.js";
 
 import vertexShaderSource from "../shaders/basic.vertex.glsl";
-import fragmentShaderSource from "../shaders/shadertoyFixed.glsl";
+import fragmentShaderSource from "../shaders/circles.glsl";
 
 
 export default {
-    title: "Hello Shadertoy (fixed)",
+    title: "Simple Geometry",
     init: (gl) => {
         createStaticVertexBuffer(
             gl,
@@ -14,6 +14,7 @@ export default {
 
         const state = compile(gl, vertexShaderSource, fragmentShaderSource);
         if (!state.program) {
+            // remember: need to exist because otherwise we cannot display any errors...
             return state;
         }
 
@@ -45,19 +46,22 @@ export default {
         type: "label",
         name: "iTime",
     }]
-}
+};
 
 function renderLoop(gl, state, elements) {
     state.time = 0.001 * (performance.now() - state.startTime);
 
+    render(gl, state);
+
+    elements.iTime.innerHTML = state.time.toFixed(2) + " sec";
+    requestAnimationFrame(() => renderLoop(gl, state, elements))
+}
+
+function render(gl, state) {
     gl.useProgram(state.program);
 
     gl.uniform1f(state.location.iTime, state.time);
     gl.uniform2fv(state.location.iResolution, state.resolution);
 
     gl.drawArrays(gl.TRIANGLES, 0, 6);
-
-    elements.iTime.innerHTML = state.time.toFixed(2) + " sec";
-
-    requestAnimationFrame(() => renderLoop(gl, state, elements))
 }

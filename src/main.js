@@ -4,10 +4,12 @@ import './style/index.css';
 import './style/app.css';
 
 // choose wisely :)
+
 // import showcase from "./showcases/1_PlainColor.js";
 // import showcase from "./showcases/2_HelloShadertoy_broken.js";
 // import showcase from "./showcases/2_HelloShadertoy_fixed_static.js";
-import showcase from "./showcases/2_HelloShadertoy_fixed.js";
+// import showcase from "./showcases/2_HelloShadertoy_fixed.js";
+import showcase from "./showcases/3_SimpleGeometry.js";
 
 const autoRenderOnLoad = true;
 
@@ -50,8 +52,6 @@ const glContext = setupWebGl(
 const state = showcase.init(glContext);
 
 const controls = showcase.generateControls(glContext, state, elements);
-
-console.log(glContext, state, controls);
 
 generatePage(elements, state, controls);
 
