@@ -51,6 +51,8 @@ const state = showcase.init(glContext);
 
 const controls = showcase.generateControls(glContext, state, elements);
 
+console.log(glContext, state, controls);
+
 generatePage(elements, state, controls);
 
 if (autoRenderOnLoad) {

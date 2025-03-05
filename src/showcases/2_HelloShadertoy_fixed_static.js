@@ -31,7 +31,7 @@ export default {
 
         return state;
     },
-    generateControls: (gl, state) => [{
+    generateControls: (gl, state, elements) => [{
         type: "renderButton",
         title: "Render",
         onClick: () => {

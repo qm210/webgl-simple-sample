@@ -115,6 +115,10 @@ export function compile(gl, vertexSrc, fragmentSrc) {
 
 
 export function initVertices(gl, state, variableName) {
+    if (!state.program) {
+        return;
+    }
+
     // ... more of that stuff with all the parameters and the stuff?
     state.location.aPosition = gl.getAttribLocation(state.program, variableName);
     gl.enableVertexAttribArray(state.location.aPosition);

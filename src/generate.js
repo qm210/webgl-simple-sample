@@ -1,9 +1,7 @@
-import {addButton} from "./controls.js";
+import {addButton, addValueLabel} from "./controls.js";
 
 
 const generatePage = (elements, state, controls) => {
-
-    // >>> boilerplate for generating the page...
 
     elements.fragment.classList.add("code");
     elements.fragment.innerHTML = `
@@ -43,8 +41,6 @@ const generatePage = (elements, state, controls) => {
         elements.console.innerHTML += locationHTML;
     }
 
-    // <<< end of boilerplate
-
     addControlsToPage(elements, state, controls);
 };
 
@@ -53,30 +49,35 @@ export default generatePage;
 export const addControlsToPage = (elements, state, controls) => {
     if (!state.program) {
         elements.controls.innerHTML = `
-        <div class="error rightnote">
-            Nothing to render, because compilation failed.
-        </div>
-    `;
-    } else {
-        for (const control of controls) {
-            switch (control.type) {
-                case "renderButton":
-                    addButton(elements.controls, {
-                        title: control.title,
-                        onClick: () => {
-                            control.onClick();
-                        },
-                    });
-                    break;
-                case "label":
-                    elements.controls.innerHTML +=
-                        `<label>${control.name} = <span id=${control.name}></span></label>`;
-                    elements[control.name] =
-                        document.getElementById(control.name);
-                    break;
-                default:
-                    console.warn("Undefined Control", control);
-            }
-        }
+            <div class="error rightnote">
+                Nothing to render, because compilation failed.
+            </div>
+        `;
+        return;
     }
+
+    for (const control of controls) {
+
+        switch (control.type) {
+            case "renderButton":
+                addButton(elements.controls, {
+                    title: control.title,
+                    onClick: control.onClick,
+                });
+                break;
+
+            case "label":
+                elements[control.name] =
+                    addValueLabel(elements.controls, {
+                        label: control.name + " = ",
+                        id: control.name
+                    });
+                break;
+
+            default:
+                console.warn("Undefined Control", control);
+        }
+
+    }
+
 };

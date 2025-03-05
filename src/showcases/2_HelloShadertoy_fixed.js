@@ -35,8 +35,11 @@ export default {
         type: "renderButton",
         title: "Render",
         onClick: () => {
+            cancelAnimationFrame(state.animationFrame);
             state.startTime = performance.now();
-            requestAnimationFrame(() => renderLoop(gl, state, elements))
+            state.animationFrame = requestAnimationFrame(
+                () => renderLoop(gl, state, elements)
+            )
         }
     }, {
         type: "label",
