@@ -31,16 +31,30 @@ export default {
 
         return state;
     },
-    generateControls: (gl, state) => [{
+    generateControls: (gl, state, elements) => [{
         type: "renderButton",
         title: "Render",
         onClick: () => {
-            gl.useProgram(state.program);
-
-            gl.uniform1f(state.location.iTime, 0);
-            gl.uniform2fv(state.location.iResolution, state.resolution);
-
-            gl.drawArrays(gl.TRIANGLES, 0, 6);
+            state.startTime = performance.now();
+            requestAnimationFrame(() => renderLoop(gl, state, elements))
         }
+    }, {
+        type: "label",
+        name: "iTime",
     }]
+}
+
+function renderLoop(gl, state, elements) {
+    state.time = 0.001 * (performance.now() - state.startTime);
+
+    gl.useProgram(state.program);
+
+    gl.uniform1f(state.location.iTime, state.time);
+    gl.uniform2fv(state.location.iResolution, state.resolution);
+
+    gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+    elements.iTime.innerHTML = state.time.toFixed(2) + " sec";
+
+    requestAnimationFrame(() => renderLoop(gl, state, elements))
 }

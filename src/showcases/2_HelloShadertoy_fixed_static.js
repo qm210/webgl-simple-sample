@@ -5,7 +5,7 @@ import fragmentShaderSource from "../shaders/fragmentShadertoyFixed.glsl";
 
 
 export default {
-    title: "Hello Shadertoy (fixed)",
+    title: "Hello Shadertoy (static)",
     init: (gl) => {
         createStaticVertexBuffer(
             gl,

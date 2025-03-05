@@ -80,3 +80,9 @@ button:focus-visible {
 pre {
   margin: 0;
 }
+
+label {
+  font-family: monospace;
+  margin: 0.5rem 0;
+  font-size: large;
+}

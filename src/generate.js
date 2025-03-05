@@ -59,13 +59,23 @@ export const addControlsToPage = (elements, state, controls) => {
     `;
     } else {
         for (const control of controls) {
-            if (control.type === "button") {
-                addButton(elements.controls, {
-                    title: control.title,
-                    onClick: () => {
-                        control.onClick();
-                    },
-                });
+            switch (control.type) {
+                case "renderButton":
+                    addButton(elements.controls, {
+                        title: control.title,
+                        onClick: () => {
+                            control.onClick();
+                        },
+                    });
+                    break;
+                case "label":
+                    elements.controls.innerHTML +=
+                        `<label>${control.name} = <span id=${control.name}></span></label>`;
+                    elements[control.name] =
+                        document.getElementById(control.name);
+                    break;
+                default:
+                    console.warn("Undefined Control", control);
             }
         }
     }
