@@ -1,10 +1,15 @@
-import {initShaders, setupWebGl} from "./webgl/setup.js";
+import {setupWebGl} from "./webgl/setup.js";
+import generatePage from "./generate.js";
+import './style/index.css';
+import './style/app.css';
 
-import vertexShaderSource from "./shaders/basicVertex.glsl";
-import fragmentShaderSource from "./shaders/fragment1.glsl";
+// choose wisely :)
+// import showcase from "./showcases/1_PlainColor.js";
+// import showcase from "./showcases/2_HelloShadertoy_broken.js";
+import showcase from "./showcases/2_HelloShadertoy_fixed_static.js";
 
-import './style.css';
-import {render} from "./webgl/render.js";
+const autoRenderOnLoad = true;
+
 
 document.querySelector('#app').innerHTML = `
   <div id="layout">
@@ -17,66 +22,38 @@ document.querySelector('#app').innerHTML = `
       <div id="canvas-frame">
         <canvas id="canvas"></canvas>
       </div>
-      <div id="controls">
-        <button id="render-button">
-          Render
-        </button>
-      </div>
+      <div id="controls"></div>
     </div>
   </div>
 `;
 
-const element = {
+if (showcase.title) {
+    document.title = showcase.title;
+}
+
+const elements = {
     fragment: document.getElementById("fragment-source"),
     vertex: document.getElementById("vertex-source"),
     console: document.getElementById("console"),
+    canvasFrame: document.getElementById("canvas-frame"),
     canvas: document.getElementById("canvas"),
     controls: document.getElementById("controls"),
-    button: {
-        render: document.getElementById("render-button"),
-    }
 };
 
 const glContext = setupWebGl(
-    element.canvas,
+    elements.canvas,
     800,
     16/9
 );
 
-const state = initShaders(glContext, vertexShaderSource, fragmentShaderSource);
-console.log("initShader() =", state);
+const state = showcase.init(glContext);
 
-if (!!state.program) {
-    element.button.render.addEventListener(
-        "click",
-        () => render(glContext, state)
-    );
-} else {
-    element.button.render.innerText = "Can not render - we have errors.";
-    element.button.render.disabled = true;
+const controls = showcase.generateControls(glContext, state);
+
+generatePage(elements, state, controls);
+
+if (autoRenderOnLoad) {
+    controls
+        .find(it => it.type === "renderButton")
+        ?.onClick();
 }
-
-element.fragment.classList.add("code");
-element.fragment.innerHTML = `
-  <pre>${fragmentShaderSource}</pre>
-`;
-
-element.vertex.classList.add("code");
-element.vertex.innerHTML = `
-  <pre>${vertexShaderSource}</pre>
-`;
-
-element.console.innerHTML = `
-    <h4>Fragment Shader</h4>
-    <div>Compile Status: ${state.compileStatus.fragment}</div>
-    <div class="error">${state.error.fragment}</div>
-    <div></div>
-    <h4>Vertex Shader</h4>
-    <div>Compile Status: ${state.compileStatus.vertex}</div>
-    <div class="error">${state.error.vertex}</div>
-    <div></div>
-    <h4>Shader Program</h4>
-    <div>Link Status: ${state.compileStatus.linker}</div>
-    <div class="error">${state.error.linker}</div>
-    <div></div>
-`;

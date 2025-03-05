@@ -1,9 +1,14 @@
-export function setupCounter(element) {
-  let counter = 0
-  const setCounter = (count) => {
-    counter = count
-    element.innerHTML = `count is ${counter}`
-  }
-  element.addEventListener('click', () => setCounter(counter + 1))
-  setCounter(0)
+
+export function addButton(parent, {onClick, onRightClick, title = "", className = ""}) {
+    const b = document.createElement("button");
+    b.textContent = title;
+    b.className = className;
+    if (onClick) {
+      b.addEventListener("click", onClick);
+    }
+    if (onRightClick) {
+      b.addEventListener("contextmenu", onRightClick);
+    }
+    parent.appendChild(b);
+    return b;
 }

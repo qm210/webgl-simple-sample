@@ -4,7 +4,10 @@
  *                 Also, your browser needs to support this.
  *                 See: https://caniuse.com/webgl2
  *                 Fallback: https://caniuse.com/webgl
+ * @param width - canvas width in pixels
+ * @param aspectRatio - rather than height, specify aspect ratio because we're so hip
  */
+
 export function setupWebGl(canvas, width, aspectRatio) {
 
     const gl = canvas.getContext("webgl2");
@@ -15,25 +18,31 @@ export function setupWebGl(canvas, width, aspectRatio) {
     gl.canvas.height = height;
     gl.viewport(0, 0, width, height);
 
-    // QUESTION: what the hell is this?
-    const positions = new Float32Array([
-        -1, -1, +1, -1, -1, +1, -1, +1, +1, -1, +1, +1
-    ]);
-    const positionBuffer = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
-    gl.bufferData(gl.ARRAY_BUFFER, positions, gl.STATIC_DRAW);
-
     return gl;
 }
 
-/**
- *
- * @param gl - the WebGl context (browser needs to support this)
- * @param vertexSrc - the Vertex Shader Source
- * @param fragmentSrc - the Fragment Shader Source
- */
-export function initShaders(gl, vertexSrc, fragmentSrc) {
-    const result = {
+export function createStaticVertexBuffer(gl, vertexArray) {
+    const positions = new Float32Array(vertexArray);
+    const buffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+    gl.bufferData(gl.ARRAY_BUFFER, positions, gl.STATIC_DRAW);
+    return buffer;
+}
+
+export function createStaticIndexBuffer(gl, indexArray) {
+    const indices = new Uint16Array(indexArray);
+    const buffer = gl.createBuffer();
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, buffer);
+    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, indices, gl.STATIC_DRAW);
+    return buffer;
+}
+
+function createInitialState(vertexSrc, fragmentSrc) {
+    return {
+        source: {
+            vertex: vertexSrc,
+            fragment: fragmentSrc,
+        },
         error: {
             vertex: "",
             fragment: "",
@@ -47,6 +56,16 @@ export function initShaders(gl, vertexSrc, fragmentSrc) {
         program: undefined,
         location: {},
     };
+}
+
+/**
+ *
+ * @param gl - the WebGl context (browser needs to support this)
+ * @param vertexSrc - the Vertex Shader Source
+ * @param fragmentSrc - the Fragment Shader Source
+ */
+export function compile(gl, vertexSrc, fragmentSrc) {
+    const result = createInitialState(vertexSrc, fragmentSrc);
 
     // we do it as verbose as it's usually done - i.e. yes, this could be cleaner.
 
@@ -70,9 +89,14 @@ export function initShaders(gl, vertexSrc, fragmentSrc) {
         gl.deleteShader(fragmentShader);
     }
 
+    // Note: these single error checks are only useful for demonstration, we wouldn't get far anyway
     const program = gl.createProgram();
-    gl.attachShader(program, vertexShader);
-    gl.attachShader(program, fragmentShader);
+    if (!result.error.vertex) {
+        gl.attachShader(program, vertexShader);
+    }
+    if (!result.error.fragment) {
+        gl.attachShader(program, fragmentShader);
+    }
     gl.linkProgram(program);
     result.compileStatus.linker = gl.getProgramParameter(program, gl.LINK_STATUS);
     result.error.linker = gl.getProgramInfoLog(program);
@@ -82,12 +106,24 @@ export function initShaders(gl, vertexSrc, fragmentSrc) {
     }
     // Note: usually, we only read the getProgramInfoLog when one of the parameters is false
 
-    result.location.aPosition = gl.getAttribLocation(program, "a_position");
-    gl.enableVertexAttribArray(result.location.aPosition);
-    gl.vertexAttribPointer(result.location.aPosition, 2, gl.FLOAT, false, 0, 0);
-
-    gl.useProgram(program);
     result.program = program;
 
+    console.log("initBasics() =", result);
+
     return result;
+}
+
+
+export function initVertices(gl, state, variableName) {
+    // ... more of that stuff with all the parameters and the stuff?
+    state.location.aPosition = gl.getAttribLocation(state.program, variableName);
+    gl.enableVertexAttribArray(state.location.aPosition);
+    gl.vertexAttribPointer(
+        state.location.aPosition,
+        2,
+        gl.FLOAT,
+        false,
+        0,
+        0
+    );
 }

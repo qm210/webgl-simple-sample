@@ -1,4 +1,5 @@
-// we'll get to that
+// we'll get to that, but let's not use these for less confusion
+// even though, of course, we all love clean code.
 
 export function createShader(gl, type, source) {
     const shader = gl.createShader(type);
@@ -27,4 +28,11 @@ export function createProgram(gl, vertexShader, fragmentShader) {
     }
 
     return program;
+}
+
+
+export function initUniformLocations(gl, state, uniformNames) {
+    for (const name of uniformNames) {
+        state.location[name] = gl.getUniformLocation(state.program, name);
+    }
 }

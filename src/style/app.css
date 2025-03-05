@@ -1,0 +1,92 @@
+#app {
+    margin: 0 auto;
+    display: flex;
+}
+
+#layout {
+    display: flex;
+    flex-direction: row;
+    justify-content: stretch;
+    align-items: stretch;
+    width: 90vw;
+    height: 100vh;
+}
+
+#layout > div {
+    margin: 2rem;
+    flex: 1;
+}
+
+.code {
+    text-align: left;
+    font-size: large;
+    line-height: 1.25;
+    font-weight: bold;
+}
+
+.error {
+    color: #AA0000;
+    font-weight: bold;
+}
+
+.rightnote {
+    text-align: right;
+}
+
+#console {
+    text-align: left;
+    font-family: monospace;
+    font-size: larger;
+    line-height: 2;
+    background-color: #ddd;
+    padding: 1rem;
+    overflow-y: auto;
+    border: 2px solid grey;
+    box-shadow: 2px 2px 2px inset #0002;
+}
+
+#console > h4:not(:first-of-type) {
+    margin-top: 2rem;
+}
+
+#shaders {
+    flex: 1;
+
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+    overflow: auto;
+}
+
+#shaders > div {
+    padding: 1rem;
+    border: 2px solid black;
+    box-shadow: 2px 2px 2px #0003;
+}
+
+#panels {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    justify-content: stretch;
+}
+
+#panels > div {
+    flex: 1;
+}
+
+#canvas-frame {
+    border: 1px dashed #ddd;
+}
+
+#controls {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+}
+
+#controls > button {
+    width: 100%;
+    min-height: 3rem;
+    font-size: large;
+}

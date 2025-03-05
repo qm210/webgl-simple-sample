@@ -1,17 +1,12 @@
 import {compile, createStaticVertexBuffer, initVertices} from "../webgl/setup.js";
 
-/**
- * Hint about usage: every showcase file must have a default export like this
- */
-
 import vertexShaderSource from "../shaders/basicVertex.glsl";
-import fragmentShaderSource from "../shaders/singleColor.glsl";
+import fragmentShaderSource from "../shaders/fragmentShadertoyAsIs.glsl";
 
 
 export default {
-    title: "Very simple example",
+    title: "Hello Shadertoy (broken)",
     init: (gl) => {
-        // QUESTION: what the... is this?
         createStaticVertexBuffer(
             gl,
             [-1, -1, +1, -1, -1, +1, -1, +1, +1, -1, +1, +1]
@@ -29,8 +24,6 @@ export default {
         title: "Render",
         onClick: () => {
             gl.useProgram(state.program);
-
-            // QUESTION: triangles?
             gl.drawArrays(gl.TRIANGLES, 0, 6);
         }
     }]
