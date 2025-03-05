@@ -103,6 +103,19 @@ button:focus-visible {
   font-weight: bold;
 }
 
+.error {
+  color: #AA0000;
+  font-weight: bold;
+}
+
+.rightnote {
+  text-align: right;
+}
+
+pre {
+  margin: 0;
+}
+
 #console {
   text-align: left;
   font-family: monospace;
@@ -115,10 +128,6 @@ button:focus-visible {
   box-shadow: 2px 2px 2px inset #0002;
 }
 
-#console.error {
-  color: darkred;
-}
-
 #console > h4:not(:first-of-type) {
   margin-top: 2rem;
 }
@@ -128,8 +137,8 @@ button:focus-visible {
 
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
   gap: 2rem;
+  overflow: auto;
 }
 
 #shaders > div {
@@ -159,7 +168,8 @@ button:focus-visible {
   justify-content: flex-start;
 }
 
-#render-button {
+#controls > button {
   width: 100%;
   min-height: 3rem;
-  font-size: large;}
+  font-size: large;
+}
