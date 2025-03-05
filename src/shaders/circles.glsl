@@ -8,12 +8,12 @@ uniform float iTime;
 vec3 c = vec3(1., 0., -1.);
 
 void circle(in vec2 uv, inout vec3 col, inout float d) {
-    vec2 pos = vec2(0.5, 0.3) +
-        0.2 * vec2(sin(3. * iTime), cos(3. * iTime));
+    vec2 pos = vec2(0.5, 0.3);
+        // + 0.2 * vec2(sin(3. * iTime), cos(3. * iTime));
 
-    d = 10. * abs(length(uv - pos) - 0.9);
-    // d = clamp(6. * length(uv - pos) - 1., 0., 1.);
+    d = 10. * abs(length(uv - pos) - 0.4);
 }
+// d = clamp(6. * length(uv - pos) - 1., 0., 1.);
 
 /*
 void basicIdea(in vec2 uv, inout vec3 col, inout float d) {
@@ -32,13 +32,15 @@ void main() {
     circle(uv, col2, d);
     col = mix(col2, col, d);
 
-    float scale = 1.;
-    // float scale = 0.8 + 0.5 * sin(iTime);
     col2 = c.yxy;
 
-    circle(scale * uv - vec2(0.6, 0.3), col2, d);
-    // d *= d;
     col = mix(col2, col, d);
 
     fragColor = vec4(col, 1.0);
 }
+
+//uv.x = fract(10. * uv.x) * 0.1; //uv.y = abs(0.5 - uv.y);
+
+// float scale = 0.8 + 0.5 * sin(iTime);
+// circle(scale * uv - vec2(0.6, 0.3), col2, d);
+// d *= d;
