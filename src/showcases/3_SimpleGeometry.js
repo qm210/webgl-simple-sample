@@ -1,8 +1,7 @@
 import {compile, createStaticVertexBuffer, initVertices} from "../webgl/setup.js";
 
 import vertexShaderSource from "../shaders/basic.vertex.glsl";
-import fragmentShaderSource from "../shaders/circles.glsl";
-
+import fragmentShaderSource from "../shaders/simpleGeometry.glsl";
 
 export default {
     title: "Simple Geometry",
