@@ -37,9 +37,10 @@ export function renderAsIs(shaderSource) {
     return `<pre>${shaderSource}</pre>`;
 }
 
-// this holds for WebGl2, as of March 2025 - e.g. errors are lines like:
+// this holds for WebGl2, as of March 2025 - e.g. error logs look like:
 // ERROR: 0:12: '=' : dimension mismatch
-const ERROR_LINE = /ERROR:\s*([0-9]*):([0-9]*):\s*(.*)/g;
+// -> parse accordingly: /<ignore>: <number>:<number>: <rest>/
+const ERROR_LINE = /:\s*([0-9]*):([0-9]*):\s*(.*)/g;
 
 function parseErrors(errorLog) {
     const errors = {};
