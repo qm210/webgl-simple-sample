@@ -1,80 +1,75 @@
 #version 300 es
 precision highp float;
-out vec4 fragColor;
+out vec4 farbe;
 uniform vec2 iResolution;
 uniform float iTime;
 
-// nice abbreviation for concise but uneasily readable code
+// somewhat-common abbreviation for concise but uneasily readable code
 vec4 c = vec4(1., 0., -1., 0.5);
 
-void circle(in vec2 uv, inout vec3 col, inout float d) {
-    vec2 pos = vec2(0.6, 0.1);
-        // + 0.2 * vec2(sin(2. * iTime), cos(5. * iTime));
-        // <-- uncomment to see an example of animation
+// note: "in" is the default qualifier, so could be left out.
+float circle_sdf(in vec2 uv) {
+    float wrappedTime = mod(iTime, 2.);
+    // uv.y = uv.y - 1.0 + 2.0 * wrappedTime;
+    //uv.y += -1.;
 
-    // d = clamp(3. * length(uv - pos) - 1., 0., 1.);
-    // <-- uncomment to see what d is for.
+    float d = length(0.5 * uv);
+    d = length(0.5 * uv) - 0.4;
+    // d = length(0.5 * uv) - mod(0.5 * iTime, 2.);
 
-    // c.... swizzling of this vector is a fast way to get basic colors
-    col = c.yxy;
+    // d = 1. - abs(d);
 
-    // circle:
-    if (length(uv - pos) < 0.5) {
-        col = vec3(1., 0.6, 0.2);
-    }
-    // square:
-    if (max(uv.x - pos.x, uv.y - pos.y) < 0.25) {
-        // max() is one way, && is another.
-        // (abs(uv.x - pos.x) < 0.3 && abs(uv.y - pos.y) < 0.3) {
-        col = c.yyx;
-    }
-    // hyperbolic shape:
-    if (abs(uv.x - pos.x) * abs(uv.y - 1.5* pos.x) < 0.025) {
-        col = c.yxx;
-    }
-    // might move the pos constant, but also the uv coordinate
-    // see above: "in vec2 uv" - does not change outside "uv".
-    pos.x += 0.7;
-    // diamond:
-    if (abs(uv.x - pos.x - 0.3) + abs(uv.y - pos.y - 0.3) < 0.5) {
-        col = c.xxx;
-    }
-    pos.y += 0.5;
-    // ring:
-    if (abs(length(uv - pos) - 0.55) < 0.05) {
-        col = c.yyy;
-        // example of a gradient
-        col = mix(c.yyy, c.ywx, uv.y);
-    }
-    return;
+    return d;
 }
-// d = clamp(6. * length(uv - pos) - 1., 0., 1.);
-// d = 10. * abs(length(uv - pos) - 0.4);
 
-/*
-void basicIdea(in vec2 uv, inout vec3 col, inout float d) {
-    col = c.yyx;
-    d = 0.;
+// compare above: why return vec3 when we can return float?
+// -> uses less memory bandwidth
+// but remember: "out float" exists, too, but for float -> usually negligible
+float pentagram_sdf(in vec2 uv) {
+    // cf. sdStar5 from iq https://iquilezles.org/articles/distfunctions2d/
+    float r = 0.7;
+    float rf = 0.4; // 0.55 + .45 * sin(2. * iTime);
+
+    // now THAT is something to think about :)
+    const vec2 k1 = vec2(0.809016994375, -0.587785252292);
+    const vec2 k2 = vec2(-k1.x,k1.y);
+    uv.x = abs(uv.x);
+    uv -= 2.0*max(dot(k1,uv),0.0)*k1;
+    uv -= 2.0*max(dot(k2,uv),0.0)*k2;
+    uv.x = abs(uv.x);
+    uv.y -= r;
+    vec2 ba = rf*vec2(-k1.y,k1.x) - vec2(0,1);
+    float h = clamp( dot(uv,ba)/dot(ba,ba), 0.0, r );
+
+    return length(uv - ba*h) * sign(uv.y * ba.x - uv.x * ba.y);
 }
-*/
+
+void apply_distance_structure(inout float d) {
+    // "gamma correction" - nonlinear perception
+    // d = pow(d, 3.);
+    // use to give distance some scale
+    d = 1. - 0.5 * abs(d);
+    d = pow(d, 3. + 0.5 * cos(200. * d)); //  + 30. * iTime
+}
 
 void main() {
-    // Normalize y to [-0.5; +0.5], and x to [-0.5 * aspectRatio; +0.5 * aspectRatio]
-    vec2 uv = 2. * gl_FragCoord.xy/iResolution.y - vec2(iResolution.x/iResolution.y, 1.);
-    vec3 col = vec3(0.2, 0.015, 0.1);
-    vec3 col2;
-    float d = 0.;
-    col2 = c.yyx;
-    circle(uv, col2, d);
-    col = mix(col2, col, d);
+    // Normalize y to [-1.; +1.], and x to [-aspectRatio; +aspectRatio]
+    vec2 uv = (2. * gl_FragCoord.xy - iResolution.xy) / iResolution.y;
+    // <-- is the same as:
+    //   vec2 uv = 2. * gl_FragCoord.xy/iResolution.xy - 1.;
+    //   uv.x *= iResolution.x/iResolution.y;
 
-    fragColor = vec4(col, 1.0);
+    float d = circle_sdf(uv - vec2(.7, .25));
+    apply_distance_structure(d);
+    vec3 col = vec3(d);
+
+    // reset
+    col = c.xxx;
+
+    d = pentagram_sdf(uv); // -vec2(0.5, 0.);
+    apply_distance_structure(d);
+
+    col *= vec3(d);
+
+    farbe = vec4(col, 1.0);
 }
-
-//uv.x = fract(10. * uv.x) * 0.1; //uv.y = abs(0.5 - uv.y);
-
-// col2 = c.yxy;
-// float scale = 0.8 + 0.5 * sin(iTime);
-// circle(scale * uv - vec2(0.6, 0.3), col2, d);
-// d *= d;
-// col = mix(col2, col, d);

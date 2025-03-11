@@ -93,7 +93,8 @@
     margin: auto;
 
     @media (min-width: 800px) {
-        height: 50vh;
+        /* width: 50vw; */
+        height: 60vh;
         min-height: 400px;
     }
 }
