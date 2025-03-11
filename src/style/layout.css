@@ -16,7 +16,7 @@
     padding: var(--page-pad);
     gap: var(--page-pad);
 
-    @media screen and (max-width: 1400px) {
+    @media (max-width: 1400px) {
         flex-direction: column-reverse;
     }
 }
@@ -48,7 +48,7 @@
     border: 2px solid grey;
     box-shadow: 1px 1px 3px inset #b00b;
 
-    @media screen and (min-width: 800px) and (max-width: 1399px) {
+    @media (min-width: 800px) and (max-width: 1400px) {
         flex-direction: row;
     }
 }
@@ -65,8 +65,10 @@
     padding: 0.5rem;
     border: 2px solid black;
     box-shadow: 2px 2px 2px #0003;
+}
+
+#shaders > div div {
     overflow-x: auto;
-    overflow-y: visible;
 }
 
 #working-program {
@@ -75,7 +77,7 @@
     gap: 1rem;
     justify-content: stretch;
 
-    @media screen and (min-width: 1000px) and (max-width: 1400px) {
+    @media (min-width: 1000px) and (max-width: 1400px) {
         flex-direction: row;
     }
 }
@@ -90,7 +92,7 @@
     max-width: calc(100vw - 2 * var(--page-pad));
     margin: auto;
 
-    @media screen and (min-width: 800px) {
+    @media (min-width: 800px) {
         height: 50vh;
         min-height: 400px;
     }

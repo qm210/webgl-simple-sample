@@ -8,9 +8,10 @@ import showcase2a from "./showcases/2_HelloShadertoy_broken.js";
 import showcase2b from "./showcases/2_HelloShadertoy_fixed_static.js";
 import showcase2c from "./showcases/2_HelloShadertoy_fixed.js";
 import showcase3 from "./showcases/3_SimpleGeometry.js";
+import showcase4 from "./showcases/4_More2DGeometry.js";
 
 // choose wisely :)
-const showcase = showcase3;
+const showcase = showcase4;
 
 const autoRenderOnLoad = true;
 

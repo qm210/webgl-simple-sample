@@ -1,11 +1,12 @@
 import {compile, createStaticVertexBuffer, initVertices} from "../webgl/setup.js";
 
 import vertexShaderSource from "../shaders/basic.vertex.glsl";
-import fragmentShaderSource from "../shaders/simpleGeometry.glsl";
+import defaultFragmentShaderSource from "../shaders/simpleGeometry.glsl";
+import {startRenderLoop} from "../webgl/render.js";
 
 export default {
     title: "Simple Geometry",
-    init: (gl) => {
+    init: (gl, fragmentShaderSource = defaultFragmentShaderSource) => {
         createStaticVertexBuffer(
             gl,
             [-1, -1, +1, -1, -1, +1, -1, +1, +1, -1, +1, +1]
@@ -35,26 +36,17 @@ export default {
         type: "renderButton",
         title: "Render",
         onClick: () => {
-            cancelAnimationFrame(state.animationFrame);
-            state.startTime = performance.now();
-            state.animationFrame = requestAnimationFrame(
-                () => renderLoop(gl, state, elements)
-            )
+            startRenderLoop(
+                state => render(gl, state),
+                state,
+                elements
+            );
         }
     }, {
         type: "label",
         name: "iTime",
     }]
 };
-
-function renderLoop(gl, state, elements) {
-    state.time = 0.001 * (performance.now() - state.startTime);
-
-    render(gl, state);
-
-    elements.iTime.innerHTML = state.time.toFixed(2) + " sec";
-    requestAnimationFrame(() => renderLoop(gl, state, elements))
-}
 
 function render(gl, state) {
     gl.useProgram(state.program);

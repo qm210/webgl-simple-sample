@@ -59,7 +59,8 @@ void basicIdea(in vec2 uv, inout vec3 col, inout float d) {
 */
 
 void main() {
-    vec2 uv = gl_FragCoord.xy/iResolution.y;
+    // Normalize y to [-0.5; +0.5], and x to [-0.5 * aspectRatio; +0.5 * aspectRatio]
+    vec2 uv = 2. * gl_FragCoord.xy/iResolution.y - vec2(iResolution.x/iResolution.y, 1.);
     vec3 col = vec3(0.2, 0.015, 0.1);
     vec3 col2;
     float d = 0.;
