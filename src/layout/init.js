@@ -19,6 +19,9 @@ export default function init({rootId}) {
       </div>
     `;
 
+    // allow setting the font size via ?fontsize=1.5em URL param
+    setFromUrlParameter("--font-size-large", "fontsize");
+
     return {
         console: document.getElementById("console"),
         workingShader: document.getElementById("working-program"),
@@ -30,4 +33,13 @@ export default function init({rootId}) {
         controls: document.getElementById("controls"),
     };
 
+}
+
+function setFromUrlParameter(cssProperty, paramName) {
+    const paramValue = (new URLSearchParams(window.location.search)).get(paramName);
+    if (!paramValue) {
+        return;
+    }
+    const rootStyle = document.documentElement.style;
+    rootStyle.setProperty(cssProperty, paramValue);
 }
