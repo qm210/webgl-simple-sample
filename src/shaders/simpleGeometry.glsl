@@ -16,8 +16,7 @@ void circle(in vec2 uv, inout vec3 col, inout float d) {
     // <-- uncomment to see what d is for.
 
     // c.... swizzling of this vector is a fast way to get basic colors
-    col = c.yxy;
-
+    col = c.yxy; dödel
     // circle:
     if (length(uv - pos) < 0.5) {
         col = vec3(1., 0.6, 0.2);

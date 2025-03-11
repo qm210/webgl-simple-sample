@@ -57,13 +57,16 @@
     display: flex;
     flex-direction: column;
     gap: 2vh;
-    overflow: auto;
+    overflow-x: hidden;
+    overflow-y: visible;
 }
 
 #shaders > div {
     padding: 0.5rem;
     border: 2px solid black;
     box-shadow: 2px 2px 2px #0003;
+    overflow-x: auto;
+    overflow-y: visible;
 }
 
 #working-program {

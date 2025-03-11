@@ -4,7 +4,6 @@
     line-height: 1.2;
     font-weight: bold;
     background-color: #ebebeb;
-    overflow: auto;
 }
 
 .source {
@@ -18,6 +17,17 @@
     white-space: pre-wrap;
 }
 
-.rightnote {
-    text-align: right;
+.error.line {
+    background-color: #F002;
+}
+
+.annotation {
+    font-size: 0.7rem;
+    height: 0.7rem;
+    position: absolute;
+    right: 0.25rem;
+    top: 0;
+    bottom: 0;
+    margin: auto;
+    color: mediumvioletred;
 }

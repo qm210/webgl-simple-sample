@@ -52,7 +52,7 @@ export default generatePage;
 export const addControlsToPage = (elements, state, controls) => {
     if (!state.program) {
         elements.controls.innerHTML = `
-            <div class="error rightnote">
+            <div class="error" style="text-align: right;">
                 Nothing to render, because compilation failed.
             </div>
         `;

@@ -16,13 +16,16 @@ export function renderWithErrors(shaderSource, errorLog) {
     `;
 }
 
-function renderLineWithError(line, lineErrors) {
-    if (!lineErrors) {
+function renderLineWithError(line, errors) {
+    if (!errors) {
         return renderAsIs(line);
     }
-    const allErrors = lineErrors.lines.join('; ');
+    const allErrors = errors.lines.join('; ');
     return `
-        <pre style="color: red" title="${allErrors}">${line}</pre>
+        <div style="position: relative">
+            <pre class="error line" title="${allErrors}">${line}</pre>
+            <div class="annotation">${errors.lineNumber}</div>
+        </div>
     `;
 }
 
@@ -47,12 +50,15 @@ function parseErrors(errorLog) {
             continue;
         }
 
+        // note: row counting is 1-based in the OpenGL error logs.
         const column = parseInt(parsed[1]);
-        const row = parseInt(parsed[2]) - 1;
+        const lineNumber = parseInt(parsed[2]);
+        const row = lineNumber - 1;
         const message = parsed[3];
 
         if (!errors[row]) {
             errors[row] = {
+                lineNumber,
                 lines: [],
                 inRow: []
             }
