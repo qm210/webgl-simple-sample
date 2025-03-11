@@ -20,7 +20,6 @@ const elements = initLayout({
 });
 
 const glContext = setupWebGl(elements.canvas, {
-    height: Math.max(400, 0.5 * window.innerHeight),
     aspectRatio: 16 / 9,
 });
 

@@ -13,6 +13,10 @@ export function setupWebGl(canvas, geometry) {
     const gl = canvas.getContext("webgl2");
     // LEFT OUT: one would check here whether WebGL2 is even supported
 
+    const canvasRect = canvas.getBoundingClientRect();
+    if (!geometry.height) {
+        geometry.height = canvasRect.height;
+    }
     const {width, height} = asResolution(geometry);
     canvas.width = width;
     canvas.height = height;

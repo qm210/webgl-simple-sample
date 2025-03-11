@@ -43,6 +43,12 @@ export function initUniformLocations(gl, state, uniformNames) {
  * @return {{width, height}} - the resolution in integer pixels.
  */
 export function asResolution({width, height, aspectRatio}) {
+    if (aspectRatio) {
+        return {
+            width: Math.round(height * aspectRatio),
+            height: Math.round(height),
+        };
+    }
     return {
         width: Math.round(width || height * aspectRatio),
         height: Math.round(height ?? width / aspectRatio),
