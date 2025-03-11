@@ -20,12 +20,13 @@ export default function init({rootId}) {
     `;
 
     // allow setting the font size via ?fontsize=1.5em URL param
-    setFromUrlParameter("--font-size-large", "fontsize");
+    setFromUrlParameters({
+        "fontsize": "--font-size-large"
+    });
 
     return {
         console: document.getElementById("console"),
         workingShader: document.getElementById("working-program"),
-
         fragment: document.getElementById("fragment-source"),
         vertex: document.getElementById("vertex-source"),
         canvasFrame: document.getElementById("canvas-frame"),
@@ -35,11 +36,16 @@ export default function init({rootId}) {
 
 }
 
-function setFromUrlParameter(cssProperty, paramName) {
-    const paramValue = (new URLSearchParams(window.location.search)).get(paramName);
-    if (!paramValue) {
-        return;
+function setFromUrlParameters(paramMap) {
+    const urlParams = new URLSearchParams(window.location.search);
+    console.log(paramMap);
+    for (const paramName in paramMap) {
+        const paramValue = urlParams.get(paramName);
+        if (!paramValue) {
+            // not given in url
+            continue;
+        }
+        const cssProperty = paramMap[paramName];
+        document.documentElement.style.setProperty(cssProperty, paramValue);
     }
-    const rootStyle = document.documentElement.style;
-    rootStyle.setProperty(cssProperty, paramValue);
 }
