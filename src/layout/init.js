@@ -10,7 +10,7 @@ export default function init({rootId}) {
           <div id="vertex-source"></div>
         </div>
         <div id="console"></div>
-        <div id="working-shader">
+        <div id="working-program">
           <div id="canvas-frame">
             <canvas id="canvas"></canvas>
           </div>
@@ -21,7 +21,7 @@ export default function init({rootId}) {
 
     return {
         console: document.getElementById("console"),
-        workingShader: document.getElementById("working-shader"),
+        workingShader: document.getElementById("working-program"),
 
         fragment: document.getElementById("fragment-source"),
         vertex: document.getElementById("vertex-source"),

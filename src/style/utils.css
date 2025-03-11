@@ -3,6 +3,7 @@
     font-size: large;
     line-height: 1.25;
     font-weight: bold;
+    background-color: #ebebeb;
 }
 
 .source {
@@ -13,7 +14,7 @@
 .error {
     color: #CC0000;
     font-weight: bold;
-    white-space: pre;
+    white-space: pre-wrap;
 }
 
 .rightnote {

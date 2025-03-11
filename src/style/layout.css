@@ -1,6 +1,7 @@
 #app {
     margin: 0 auto;
     display: flex;
+    background-color: #fff;
 }
 
 #layout {
@@ -8,10 +9,18 @@
     flex-direction: row;
     justify-content: stretch;
     align-items: stretch;
-    width: calc(100vw - 4vh);
-    height: 96vh;
-    padding: 2vh;
-    gap: 2vh;
+    width: calc(100vw - 4vmin);
+    height: calc(100vh - 4vmin);
+    padding: 2vmin;
+    gap: 2vmin;
+
+    @media screen and (max-width: 1400px) {
+        flex-direction: column-reverse;
+
+        #console {
+            margin-right: 1rem;
+        }
+    }
 }
 
 #layout > #console {
@@ -19,37 +28,40 @@
 }
 
 #layout > #shaders {
-    flex: 1;
+    flex: 2;
 }
 
-#layout > #working-shader {
+#layout > #working-program {
     flex: 0;
 }
 
 #console {
-    text-align: left;
-    font-family: monospace;
-    font-size: larger;
-    line-height: 2;
-    background-color: #ddd;
-    padding: 1rem;
-    overflow-y: auto;
-    border: 2px solid grey;
-    box-shadow: 2px 2px 2px inset #0002;
-}
-
-#console > h4:not(:first-of-type) {
-    margin-top: 2rem;
-}
-
-#shaders {
-    flex: 1;
-
     display: flex;
     flex-direction: column;
     gap: 2rem;
+
+    text-align: left;
+    font-family: monospace;
+    font-size: var(--font-size-large);
+    line-height: 2;
+    background-color: #fcc;
+    padding: 1rem;
+    overflow-y: auto;
+    border: 2px solid grey;
+    box-shadow: 1px 1px 3px inset #b00b;
+
+    @media screen and (min-width: 800px) and (max-width: 1399px) {
+        flex-direction: row;
+    }
+}
+
+#shaders {
+    display: flex;
+    flex-direction: column;
+    gap: 2vh;
     overflow: auto;
     padding-right: 1rem;
+    padding-bottom: 1rem;
 }
 
 #shaders > div {
@@ -58,11 +70,15 @@
     box-shadow: 2px 2px 2px #0003;
 }
 
-#working-shader {
+#working-program {
     display: flex;
     flex-direction: column;
     gap: 1rem;
     justify-content: stretch;
+
+    @media screen and (min-width: 1000px) and (max-width: 1400px) {
+        flex-direction: row;
+    }
 }
 
 #canvas-frame {
@@ -70,6 +86,7 @@
 }
 
 #controls {
+    flex: 1;
     display: flex;
     flex-direction: column;
     justify-content: flex-start;
@@ -78,5 +95,5 @@
 #controls > button {
     width: 100%;
     min-height: 3rem;
-    font-size: large;
+    font-size: var(--font-size-large);
 }

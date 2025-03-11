@@ -14,18 +14,21 @@ const generatePage = (elements, state, controls) => {
 
     elements.console.innerHTML = `
         <h2>Compilation failed.</h2>
-        <h4>Fragment Shader</h4>
-        <div>Compile Status: ${state.compileStatus.fragment}</div>
-        <div class="error">${state.error.fragment}</div>
-        <div></div>
-        <h4>Vertex Shader</h4>
-        <div>Compile Status: ${state.compileStatus.vertex}</div>
-        <div class="error">${state.error.vertex}</div>
-        <div></div>
-        <h4>Shader Program</h4>
-        <div>Link Status: ${state.compileStatus.linker}</div>
-        <div class="error">${state.error.linker}</div>
-        <div></div>
+        <div>
+            <h4>Fragment Shader</h4>
+            <div>Compile Status: ${state.compileStatus.fragment}</div>
+            <div class="error">${state.error.fragment}</div>
+        </div>
+        <div>
+            <h4>Vertex Shader</h4>
+            <div>Compile Status: ${state.compileStatus.vertex}</div>
+            <div class="error">${state.error.vertex}</div>
+        </div>
+        <div>
+            <h4>Shader Program</h4>
+            <div>Link Status: ${state.compileStatus.linker}</div>
+            <div class="error">${state.error.linker}</div>
+        </div>
     `;
 
     const locations = Object.entries(state.location);
