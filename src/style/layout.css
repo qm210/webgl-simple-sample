@@ -5,21 +5,19 @@
 }
 
 #layout {
+    --page-pad: 2vmin;
+
     display: flex;
     flex-direction: row;
     justify-content: stretch;
     align-items: stretch;
-    width: calc(100vw - 4vmin);
-    height: calc(100vh - 4vmin);
-    padding: 2vmin;
-    gap: 2vmin;
+    width: calc(100vw - 2 * var(--page-pad));
+    height: calc(100vh - 2 * var(--page-pad));
+    padding: var(--page-pad);
+    gap: var(--page-pad);
 
     @media screen and (max-width: 1400px) {
         flex-direction: column-reverse;
-
-        #console {
-            margin-right: 1rem;
-        }
     }
 }
 
@@ -60,12 +58,10 @@
     flex-direction: column;
     gap: 2vh;
     overflow: auto;
-    padding-right: 1rem;
-    padding-bottom: 1rem;
 }
 
 #shaders > div {
-    padding: 1rem;
+    padding: 0.5rem;
     border: 2px solid black;
     box-shadow: 2px 2px 2px #0003;
 }
@@ -83,12 +79,15 @@
 
 #canvas-frame {
     border: 1px dashed #ddd;
+    display: flex;
+    place-items: center;
 }
 
 #canvas {
-    max-width: 100vw;
+    max-width: calc(100vw - 2 * var(--page-pad));
+    margin: auto;
 
-    @media screen and (min-width: 400px) {
+    @media screen and (min-width: 800px) {
         height: 50vh;
         min-height: 400px;
     }

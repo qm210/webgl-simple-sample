@@ -1,9 +1,10 @@
 .code {
     text-align: left;
-    font-size: large;
-    line-height: 1.25;
+    font-size: var(--font-size-large);
+    line-height: 1.2;
     font-weight: bold;
     background-color: #ebebeb;
+    overflow: auto;
 }
 
 .source {

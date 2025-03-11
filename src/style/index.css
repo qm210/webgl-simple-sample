@@ -15,7 +15,7 @@
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 
-  --font-size-large: 1.25em;
+  --font-size-large: 1.2em;
 
   @media screen and (max-width: 400px) {
     font-size: 8pt;
