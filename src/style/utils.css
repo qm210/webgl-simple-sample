@@ -1,0 +1,21 @@
+.code {
+    text-align: left;
+    font-size: large;
+    line-height: 1.25;
+    font-weight: bold;
+}
+
+.source {
+    display: flex;
+    flex-direction: column;
+}
+
+.error {
+    color: #CC0000;
+    font-weight: bold;
+    white-space: pre;
+}
+
+.rightnote {
+    text-align: right;
+}

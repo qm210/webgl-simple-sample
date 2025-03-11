@@ -4,19 +4,21 @@
  *                 Also, your browser needs to support this.
  *                 See: https://caniuse.com/webgl2
  *                 Fallback: https://caniuse.com/webgl
- * @param width - canvas width in pixels
- * @param aspectRatio - rather than height, specify aspect ratio because we're so hip
+ * @param geometry {width, height, aspectRatio} - canvas dimensions, specify either two
  */
+import {asResolution} from "./helpers.js";
 
-export function setupWebGl(canvas, width, aspectRatio) {
+export function setupWebGl(canvas, geometry) {
 
     const gl = canvas.getContext("webgl2");
     // LEFT OUT: one would check here whether WebGL2 is even supported
 
-    const height = Math.round(width / aspectRatio);
-    gl.canvas.width = width;
-    gl.canvas.height = height;
+    const {width, height} = asResolution(geometry);
+    canvas.width = width;
+    canvas.height = height;
     gl.viewport(0, 0, width, height);
+
+    // note: canvas is now also passed as gl.canvas
 
     return gl;
 }
@@ -107,9 +109,6 @@ export function compile(gl, vertexSrc, fragmentSrc) {
     // Note: usually, we only read the getProgramInfoLog when one of the parameters is false
 
     result.program = program;
-
-    console.log("What we have after initialization:", result);
-
     return result;
 }
 

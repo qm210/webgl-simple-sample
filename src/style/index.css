@@ -1,3 +1,6 @@
+@import "layout.css";
+@import "utils.css";
+
 :root {
   font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.5;
@@ -35,6 +38,11 @@ body {
 h1 {
   font-size: 3.2em;
   line-height: 1.1;
+}
+
+h2 {
+  margin: 0 0 1rem 0;
+  font-size: 1.6em;
 }
 
 h4 {

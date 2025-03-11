@@ -63,7 +63,7 @@ function render(gl, state) {
     try {
         gl.uniform2fv(state.location.iResolution, state.resolution);
     } catch (err) {
-        console.log(err, state);
+        console.warn(err, state);
     }
 
     gl.drawArrays(gl.TRIANGLES, 0, 6);

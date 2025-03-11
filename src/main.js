@@ -1,7 +1,7 @@
 import {setupWebGl} from "./webgl/setup.js";
-import generatePage from "./generate.js";
+import generatePage from "./layout/generate.js";
+import initLayout from "./layout/init.js";
 import './style/index.css';
-import './style/app.css';
 
 import showcase1 from "./showcases/1_PlainColor.js";
 import showcase2a from "./showcases/2_HelloShadertoy_broken.js";
@@ -14,43 +14,25 @@ const showcase = showcase3;
 
 const autoRenderOnLoad = true;
 
+const elements = initLayout({
+    rootId: "app",
+    reducedView: true,
+});
 
-document.querySelector('#app').innerHTML = `
-  <div id="layout">
-    <div id="shaders">
-      <div id="fragment-source"></div>
-      <div id="vertex-source"></div>
-    </div>
-    <div id="console"></div>
-    <div id="panels">
-      <div id="canvas-frame">
-        <canvas id="canvas"></canvas>
-      </div>
-      <div id="controls"></div>
-    </div>
-  </div>
-`;
-
-if (showcase.title) {
-    document.title = showcase.title;
-}
-
-const elements = {
-    fragment: document.getElementById("fragment-source"),
-    vertex: document.getElementById("vertex-source"),
-    console: document.getElementById("console"),
-    canvasFrame: document.getElementById("canvas-frame"),
-    canvas: document.getElementById("canvas"),
-    controls: document.getElementById("controls"),
-};
-
-const glContext = setupWebGl(
-    elements.canvas,
-    800,
-    16/9
-);
+const glContext = setupWebGl(elements.canvas, {
+    height: Math.max(400, 0.5 * window.innerHeight),
+    aspectRatio: 16 / 9,
+});
 
 const state = showcase.init(glContext);
+
+if (!state.program) {
+    elements.workingShader.remove();
+} else {
+    elements.console.remove();
+}
+
+console.log("WebGL objects initialized:", state);
 
 const controls = showcase.generateControls(glContext, state, elements);
 
@@ -60,4 +42,8 @@ if (autoRenderOnLoad) {
     controls
         .find(it => it.type === "renderButton")
         ?.onClick();
+}
+
+if (showcase.title) {
+    document.title = showcase.title;
 }

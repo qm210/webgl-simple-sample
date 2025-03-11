@@ -36,3 +36,15 @@ export function initUniformLocations(gl, state, uniformNames) {
         state.location[name] = gl.getUniformLocation(state.program, name);
     }
 }
+
+/**
+ * Helper function for aspectRatio
+ * @param geometry {width, height, aspectRatio} - canvas dimensions, specify either two
+ * @return {{width, height}} - the resolution in integer pixels.
+ */
+export function asResolution({width, height, aspectRatio}) {
+    return {
+        width: Math.round(width || height * aspectRatio),
+        height: Math.round(height ?? width / aspectRatio),
+    };
+}

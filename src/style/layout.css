@@ -8,29 +8,22 @@
     flex-direction: row;
     justify-content: stretch;
     align-items: stretch;
-    width: 90vw;
-    height: 100vh;
+    width: calc(100vw - 4vh);
+    height: 96vh;
+    padding: 2vh;
+    gap: 2vh;
 }
 
-#layout > div {
-    margin: 2rem;
+#layout > #console {
     flex: 1;
 }
 
-.code {
-    text-align: left;
-    font-size: large;
-    line-height: 1.25;
-    font-weight: bold;
+#layout > #shaders {
+    flex: 1;
 }
 
-.error {
-    color: #AA0000;
-    font-weight: bold;
-}
-
-.rightnote {
-    text-align: right;
+#layout > #working-shader {
+    flex: 0;
 }
 
 #console {
@@ -65,15 +58,11 @@
     box-shadow: 2px 2px 2px #0003;
 }
 
-#panels {
+#working-shader {
     display: flex;
     flex-direction: column;
     gap: 1rem;
     justify-content: stretch;
-}
-
-#panels > div {
-    flex: 1;
 }
 
 #canvas-frame {
