@@ -1,3 +1,5 @@
+import {asResolution} from "./helpers.js";
+
 /**
  *
  * @param canvas - You need a <canvas> element to initialize WebGl context
@@ -6,7 +8,6 @@
  *                 Fallback: https://caniuse.com/webgl
  * @param geometry {width, height, aspectRatio} - canvas dimensions, specify either two
  */
-import {asResolution} from "./helpers.js";
 
 export function setupWebGl(canvas, geometry) {
 

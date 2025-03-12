@@ -43,6 +43,10 @@ export function renderAsIs(shaderSource) {
 const ERROR_LINE = /:\s*([0-9]*):([0-9]*):\s*(.*)/g;
 
 function parseErrors(errorLog) {
+    if (!errorLog) {
+        return {};
+    }
+
     const errors = {};
 
     for (const line of errorLog.split('\n')) {

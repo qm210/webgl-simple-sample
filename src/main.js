@@ -1,6 +1,6 @@
 import {setupWebGl} from "./webgl/setup.js";
 import generatePage from "./layout/generate.js";
-import initLayout from "./layout/init.js";
+import initLayout, {setFromUrlParameters} from "./layout/init.js";
 import './style/index.css';
 
 import showcase1 from "./showcases/1_PlainColor.js";
@@ -18,6 +18,11 @@ const autoRenderOnLoad = true;
 const elements = initLayout({
     rootId: "app",
     reducedView: true,
+});
+
+// allow setting the font size via ?fontsize=1.5em URL param
+setFromUrlParameters({
+    "fontsize": "--font-size-large"
 });
 
 const glContext = setupWebGl(elements.canvas, {
