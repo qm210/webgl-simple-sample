@@ -2,20 +2,25 @@
 // even though, of course, we all love clean code.
 
 export function createShader(gl, type, source) {
+    // this is the usual short form, we do it more verbosely due to educational reasons
+
     const shader = gl.createShader(type);
     gl.shaderSource(shader, source);
     gl.compileShader(shader);
 
     if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-        console.error('Error compiling shader:', gl.getShaderInfoLog(shader));
+        const error = gl.getShaderInfoLog(shader);
+        console.error('Error compiling shader:', gl.getShaderInfoLog(shader), "; Source:", source);
         gl.deleteShader(shader);
-        return null;
+        return {shader: null, error};
     }
 
-    return shader;
+    return {shader, error: null};
 }
 
 export function createProgram(gl, vertexShader, fragmentShader) {
+    // this is the usual short form, we do it more verbosely due to educational reasons
+
     const program = gl.createProgram();
     gl.attachShader(program, vertexShader);
     gl.attachShader(program, fragmentShader);

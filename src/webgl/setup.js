@@ -1,13 +1,12 @@
+import {asResolution} from "./helpers.js";
+
 /**
- *
  * @param canvas - You need a <canvas> element to initialize WebGl context
  *                 Also, your browser needs to support this.
  *                 See: https://caniuse.com/webgl2
  *                 Fallback: https://caniuse.com/webgl
  * @param geometry {width, height, aspectRatio} - canvas dimensions, specify either two
  */
-import {asResolution} from "./helpers.js";
-
 export function setupWebGl(canvas, geometry) {
 
     const gl = canvas.getContext("webgl2");
@@ -43,20 +42,27 @@ export function createStaticIndexBuffer(gl, indexArray) {
     return buffer;
 }
 
-function createInitialState(vertexSrc, fragmentSrc) {
+export function createInitialState(vertexSrc, fragmentSrc) {
+    // note: as of 2025/03/11, fragmentSrc can now be either one or an array of multiple fragment shader sources
+    // this is for compatibility of the old versions:
+    if (!(fragmentSrc instanceof Array)) {
+        fragmentSrc = [fragmentSrc];
+    }
+
     return {
+        numberFragmentShaders: fragmentSrc.length,
         source: {
             vertex: vertexSrc,
             fragment: fragmentSrc,
         },
         error: {
             vertex: "",
-            fragment: "",
+            fragment: [],
             linker: "",
         },
         compileStatus: {
             vertex: undefined,
-            fragment: undefined,
+            fragment: [],
             linker: undefined,
         },
         program: undefined,
@@ -71,49 +77,52 @@ function createInitialState(vertexSrc, fragmentSrc) {
  * @param fragmentSrc - the Fragment Shader Source
  */
 export function compile(gl, vertexSrc, fragmentSrc) {
-    const result = createInitialState(vertexSrc, fragmentSrc);
+    const state = createInitialState(vertexSrc, fragmentSrc);
 
-    // we do it as verbose as it's usually done - i.e. yes, this could be cleaner.
+    // we do it as verbose as it's usually done - i.e. yes, this could be cleaner. is not, on purpose.
 
     const vertexShader = gl.createShader(gl.VERTEX_SHADER);
     gl.shaderSource(vertexShader, vertexSrc);
     gl.compileShader(vertexShader);
-    result.compileStatus.vertex = gl.getShaderParameter(vertexShader, gl.COMPILE_STATUS);
-    result.error.vertex = gl.getShaderInfoLog(vertexShader);
-    if (!result.compileStatus.vertex) {
+    state.compileStatus.vertex = gl.getShaderParameter(vertexShader, gl.COMPILE_STATUS);
+    state.error.vertex = gl.getShaderInfoLog(vertexShader);
+    if (!state.compileStatus.vertex) {
         gl.deleteShader(vertexShader);
         // NOTE: vertexShader is now unusuable ...
     }
-    // NOTE: ... but we don't need it further anyway ;)
+    // ... but we wouldn't need it further anyway ;)
 
+    // Note -- changed after VL3:
+    // state now supports multiple fragment shaders, but this routine still uses just one.
     const fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
     gl.shaderSource(fragmentShader, fragmentSrc);
     gl.compileShader(fragmentShader);
-    result.compileStatus.fragment = gl.getShaderParameter(fragmentShader, gl.COMPILE_STATUS);
-    result.error.fragment = gl.getShaderInfoLog(fragmentShader);
-    if (!result.compileStatus.fragment) {
+    state.compileStatus.fragment[0] = gl.getShaderParameter(fragmentShader, gl.COMPILE_STATUS);
+    state.error.fragment[0] = gl.getShaderInfoLog(fragmentShader);
+    if (!state.compileStatus.fragment[0]) {
         gl.deleteShader(fragmentShader);
     }
 
-    // Note: these single error checks are only useful for demonstration, we wouldn't get far anyway
+    // Note: these single error checks are only useful for demonstration
+    // usually, one would throw an error earlier.
     const program = gl.createProgram();
-    if (!result.error.vertex) {
+    if (!state.error.vertex) {
         gl.attachShader(program, vertexShader);
     }
-    if (!result.error.fragment) {
+    if (!state.error.fragment[0]) {
         gl.attachShader(program, fragmentShader);
     }
     gl.linkProgram(program);
-    result.compileStatus.linker = gl.getProgramParameter(program, gl.LINK_STATUS);
-    result.error.linker = gl.getProgramInfoLog(program);
-    if (!result.compileStatus.linker) {
+    state.compileStatus.linker = gl.getProgramParameter(program, gl.LINK_STATUS);
+    state.error.linker = gl.getProgramInfoLog(program);
+    if (!state.compileStatus.linker) {
         gl.deleteProgram(program);
-        return result;
+        return state;
     }
     // Note: usually, we only read the getProgramInfoLog when one of the parameters is false
 
-    result.program = program;
-    return result;
+    state.program = program;
+    return state;
 }
 
 
@@ -132,3 +141,4 @@ export function initVertices(gl, state, variableName) {
         0
     );
 }
+
