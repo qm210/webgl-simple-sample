@@ -52,17 +52,17 @@ vec3 cubeNml(vec3 i, vec3 bmin, vec3 bmax) {
     float fz = abs(i.z - bmax.z);
 
     if(cx < epsilon)
-        return vec3(-1.0, 0.0, 0.0);
+    return vec3(-1.0, 0.0, 0.0);
     else if (fx < epsilon)
-        return vec3(1.0, 0.0, 0.0);
+    return vec3(1.0, 0.0, 0.0);
     else if (cy < epsilon)
-        return vec3(0.0, -1.0, 0.0);
+    return vec3(0.0, -1.0, 0.0);
     else if (fy < epsilon)
-        return vec3(0.0, 1.0, 0.0);
+    return vec3(0.0, 1.0, 0.0);
     else if (cz < epsilon)
-        return vec3(0.0, 0.0, -1.0);
+    return vec3(0.0, 0.0, -1.0);
     else if (fz < epsilon)
-        return vec3(0.0, 0.0, 1.0);
+    return vec3(0.0, 0.0, 1.0);
 
     return vec3(0.0, 0.0, 0.0);
 }
@@ -72,9 +72,9 @@ vec3 background(float t, vec3 rd, vec3 lightSource) {
     float sun = max(0., dot(rd, light));
     float sky = max(0.0, dot(rd, vec3(0.0, 1.0, 0.0)));
     float ground = max(0.0, -dot(rd, vec3(0.0, 1.0, 0.0)));
-    return (pow(sun, 1000.0) + 0.2 * pow(sun, 2.0)) * vec3(2.0, 1.6, 1.0) +
-        pow(ground, 0.5) * vec3(0.4, 0.3, 0.2) +
-        pow(sky, 1.0) * vec3(0.5, 0.6, 0.7);
+    return (pow(sun, 256.0) + 0.2 * pow(sun, 2.0)) * vec3(2.0, 1.6, 1.0) +
+    pow(ground, 0.5) * vec3(0.4, 0.3, 0.2) +
+    pow(sky, 1.0) * vec3(0.5, 0.6, 0.7);
 }
 
 void main() {
@@ -84,12 +84,15 @@ void main() {
     vec2 uv = (-1.0 + 2.0 * gl_FragCoord.xy / iResolution.xy) * vec2(iResolution.x / iResolution.y, 1.0);
     // vec3 ro = vec3(0.0, sin(time * 1.6478), -3.0);
     // <-- original, let's first fixate camera:
-    vec3 ro = vec3(1., 1.5, -3.0);
+    vec3 ro = vec3(1.5, 1.25, -3.0);
 
     vec3 rd = normalize(vec3(uv, 1.0));
 
-    vec3 cmin = vec3(-0.5,-0.5,-0.5);
-    vec3 cmax = vec3(0.5, 0.5, 0.5);
+    // float change = sin(time * 1.2847) * 2.0;
+    // <-- also fixate the box
+    float change = 0.;
+    vec3 cmin = vec3(-0.5 + change, -0.5, -0.5);
+    vec3 cmax = vec3(0.5 + change, 0.5, 0.5);
 
     float t = cube(ro, rd, cmin, cmax);
 
