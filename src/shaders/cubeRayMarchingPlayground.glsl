@@ -11,10 +11,10 @@ mat3 rotateX(float theta) {
     float c = cos(theta);
     float s = sin(theta);
     return mat3(
-    vec3(1, 0, 0),
-    vec3(0, c, -s),
-    vec3(0, s, c)
-    );
+        vec3(1, 0, 0),
+        vec3(0, c, -s),
+        vec3(0, s, c)
+        );
 }
 
 const int MAX_MARCHING_STEPS = 255;
@@ -27,10 +27,10 @@ mat3 rotateY(float theta) {
     float c = cos(theta);
     float s = sin(theta);
     return mat3(
-    vec3(c, 0, s),
-    vec3(0, 1, 0),
-    vec3(-s, 0, c)
-    );
+        vec3(c, 0, s),
+        vec3(0, 1, 0),
+        vec3(-s, 0, c)
+        );
 }
 
 // Rotation matrix around the Z axis.
@@ -38,18 +38,18 @@ mat3 rotateZ(float theta) {
     float c = cos(theta);
     float s = sin(theta);
     return mat3(
-    vec3(c, -s, 0),
-    vec3(s, c, 0),
-    vec3(0, 0, 1)
-    );
+        vec3(c, -s, 0),
+        vec3(s, c, 0),
+        vec3(0, 0, 1)
+        );
 }
 
 
 mat3 diagonalMatrix(float x, float y, float z) {
     return mat3(
-    vec3(x, 0, 0),
-    vec3(0, y, 0),
-    vec3(0, 0, z)
+        vec3(x, 0, 0),
+        vec3(0, y, 0),
+        vec3(0, 0, z)
     );
 }
 
@@ -73,17 +73,17 @@ float checkerboard(vec2 p, float scale) {
 
 float blurredCheckerPattern(vec3 p, float blurRadius, float checkerSize) {
     vec2 surface = vec2(
-    atan(p.z, p.x) / (2. * 3.14159) + 0.5,
-    p.y / 2. + 0.5
+        atan(p.z, p.x) / (2. * 3.14159) + 0.5,
+        p.y / 2. + 0.5
     );
 
     // Gaussian weights for 5x5 kernel
     float weights[25] = float[](
-    0.003765, 0.015019, 0.023792, 0.015019, 0.003765,
-    0.015019, 0.059912, 0.094907, 0.059912, 0.015019,
-    0.023792, 0.094907, 0.150644, 0.094907, 0.023792,
-    0.015019, 0.059912, 0.094907, 0.059912, 0.015019,
-    0.003765, 0.015019, 0.023792, 0.015019, 0.003765
+        0.003765, 0.015019, 0.023792, 0.015019, 0.003765,
+        0.015019, 0.059912, 0.094907, 0.059912, 0.015019,
+        0.023792, 0.094907, 0.150644, 0.094907, 0.023792,
+        0.015019, 0.059912, 0.094907, 0.059912, 0.015019,
+        0.003765, 0.015019, 0.023792, 0.015019, 0.003765
     );
 
     float sum;
@@ -144,15 +144,15 @@ Surface sdScene(vec3 p) {
     co = takeCloser(co, box);
     box = sdBox(p, vec3(1.2), vec3(3, floorLevel + 1.2, -3.), vec3(0.2, 0.65, 0.9), rotateY(0.25 * pi));
 
-    //    wobbleDistort(box, p, 0.03, vec3(20., 10., 16. + 0. * 3. * iTime));
+//    wobbleDistort(box, p, 0.03, vec3(20., 10., 16. + 0. * 3. * iTime));
 
     co = takeCloser(co, box);
 
-    //    ball = sdPatternSphere(p, vec3(1.), vec3(-2., floorLevel + 1., -2.), vec3(1, 0.1, 0.8), identity(), vec3(0.5, 0.2, 0.8), 8., 0.5);
+//    ball = sdPatternSphere(p, vec3(1.), vec3(-2., floorLevel + 1., -2.), vec3(1, 0.1, 0.8), identity(), vec3(0.5, 0.2, 0.8), 8., 0.5);
 
-    //    mat3 ballTransform = rotateY(0.5 * iTime);
-    //    ball = sdSphere(p, vec3(1.), vec3(-2., floorLevel + 1., -2.), vec3(1, 0.6, 0.8), ballTransform);
-    //    co = takeCloser(co, ball);
+//    mat3 ballTransform = rotateY(0.5 * iTime);
+//    ball = sdSphere(p, vec3(1.), vec3(-2., floorLevel + 1., -2.), vec3(1, 0.6, 0.8), ballTransform);
+//    co = takeCloser(co, ball);
 
     return co;
 }
@@ -206,10 +206,10 @@ float rayMarchShadow( in vec3 ro, in vec3 rd)
 vec3 calcNormal(in vec3 p) {
     vec2 epsilon = vec2(1.0, -1.0) * 0.0005;
     return normalize(
-    epsilon.xyy * sdScene(p + epsilon.xyy).sd +
-    epsilon.yyx * sdScene(p + epsilon.yyx).sd +
-    epsilon.yxy * sdScene(p + epsilon.yxy).sd +
-    epsilon.xxx * sdScene(p + epsilon.xxx).sd
+        epsilon.xyy * sdScene(p + epsilon.xyy).sd +
+        epsilon.yyx * sdScene(p + epsilon.yyx).sd +
+        epsilon.yxy * sdScene(p + epsilon.yxy).sd +
+        epsilon.xxx * sdScene(p + epsilon.xxx).sd
     );
 }
 
@@ -218,7 +218,6 @@ void main() {
 
     vec3 backgroundColor = vec3(0.8, 0.3 + uv.y, 1.);
     vec3 col = vec3(0.);
-    float d;
 
     vec3 ro = vec3(0., 0., 1.);
     vec3 rd = normalize(vec3(uv, -1.));
@@ -232,13 +231,10 @@ void main() {
     } else {
         vec3 p = ro + rd * co.sd;
         vec3 normal = calcNormal(p);
-        vec3 lightPosition = vec3(4., 7., 2.);
+        vec3 lightPosition = vec3(0., 4., 5.);
+        // Surface box = sdBox(p, vec3(1), vec3(-2., floorLevel + 1., -2.), vec3(1, 0.1, 0.4), identity());
+        lightPosition = vec3(+4., floorLevel + 6., -2.);
         vec3 lightDirection = normalize(lightPosition - p);
-
-        // Erinnerung: _irgendwie_ muss Abstand "d" zu einer Farbe werden.
-        // wie, sind quasi nur noch die Details :)
-        // d = co.sd;
-        d = clamp(co.sd, 0., 1.);
 
         // could also have parallel light
         // lightDirection = normalize(vec3(0., 1., 0.));
@@ -246,38 +242,39 @@ void main() {
         // Lambertian reflection:
         // proportional to amount of light hitting the surface
         // i.e. dot(normal, lightDir) ~ large if Angle between normal and light is low
-        // Quasi "perfekte" Diffusion, warum?
-        float diffuse = dot(normal, lightDirection);
-        diffuse = clamp(diffuse, 0., 1.);
-        d = mix(d, diffuse, 1.);
+        // why would this be "perfect diffusion"?
+        float dif = dot(normal, lightDirection);
+        dif = clamp(dif, 0., 1.);
+        col = dif * co.col;
 
-        // sekundäres Ray Marching für Schatten
-        //        float shadow = rayMarchShadow(p, lightDirection);
-        //        d = mix(d, shadow, 0.);
+        // Mische Bild mit Bild-mit-Schatten (diffus)
+//        float shadow = rayMarchShadow(p, lightDirection);
+//        dif = mix(dif, shadow, 0.8);
 
         // Specular reflection:
         // proportional to angle between ray and reflections
-        //        vec3 refl = reflect(lightDirection, normal);
-        //        float specular = dot(refl, normalize(p));
-        //        specular = clamp(specular, 0., 1.);
-        //        specular = pow(specular, 3.);
-        //        d = mix(d, specular, 0.);
+//        vec3 refl = reflect(lightDirection, normal);
+//        float spec = dot(refl, normalize(p));
+//        spec = clamp(spec, 0., 1.);
+//        spec = pow(spec, 3.);
+//        dif = mix(dif, spec, 0.6);
 
         // verschiedenartiges Color Grading
-        col = d * co.col;
+//        dif = mix(dif, co.sd, 0.03);
+//        dif = mix(dif, dif * co.sd, 0.24);
 
-        //        dif = mix(dif, co.sd, 0.03);
-        //        dif = mix(dif, dif * co.sd, 0.24);
-        //        float clamped_dif = clamp(dif, 0., 1.);
-        //        float graded_dif = atan(dif);
-        //        dif = mix(clamped_dif, graded_dif, 1.);
-        //        dif = pow(dif, 2.);
+//        float clamped_dif = clamp(dif, 0., 1.);
+//        float graded_dif = atan(dif);
+//        dif = mix(clamped_dif, graded_dif, 1.);
+//          dif = pow(dif, 2.);
 
-        // Distance Fog: Abschwächen je nach durchlaufenem Abstand
-        col *= exp(-0.0001 * pow(co.sd, 3.)) * vec3(0.9, 0.8, 0.7);
+        col = dif * co.col;
+        // col += 0.1 * backgroundColor; // why would we do that??
+
+        // Diminishing according to marched distance ~ Fog
+        // col *= exp(-0.0001 * pow(co.sd, 3.)) * vec3(0.9, 0.8, 0.7);
     }
 
-    // Beispiel Post-Processing (transformiert nur noch Farbe -> Farbe, nicht mehr Geometrie)
     // col = atan(8. * pow(col, vec3(5.)));
 
     fragColor = vec4(col, 1.0);

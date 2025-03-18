@@ -11,9 +11,9 @@ mat3 rotateX(float theta) {
     float c = cos(theta);
     float s = sin(theta);
     return mat3(
-    vec3(1, 0, 0),
-    vec3(0, c, -s),
-    vec3(0, s, c)
+        vec3(1, 0, 0),
+        vec3(0, c, -s),
+        vec3(0, s, c)
     );
 }
 
@@ -27,9 +27,9 @@ mat3 rotateY(float theta) {
     float c = cos(theta);
     float s = sin(theta);
     return mat3(
-    vec3(c, 0, s),
-    vec3(0, 1, 0),
-    vec3(-s, 0, c)
+        vec3(c, 0, s),
+        vec3(0, 1, 0),
+        vec3(-s, 0, c)
     );
 }
 
@@ -38,18 +38,18 @@ mat3 rotateZ(float theta) {
     float c = cos(theta);
     float s = sin(theta);
     return mat3(
-    vec3(c, -s, 0),
-    vec3(s, c, 0),
-    vec3(0, 0, 1)
+        vec3(c, -s, 0),
+        vec3(s, c, 0),
+        vec3(0, 0, 1)
     );
 }
 
 
 mat3 diagonalMatrix(float x, float y, float z) {
     return mat3(
-    vec3(x, 0, 0),
-    vec3(0, y, 0),
-    vec3(0, 0, z)
+        vec3(x, 0, 0),
+        vec3(0, y, 0),
+        vec3(0, 0, z)
     );
 }
 
@@ -217,31 +217,27 @@ void main() {
     vec2 uv = (-1.0 + 2.0 * gl_FragCoord.xy / iResolution.xy) * vec2(iResolution.x / iResolution.y, 1.0);
 
     vec3 backgroundColor = vec3(0.8, 0.3 + uv.y, 1.);
-    vec3 col = vec3(0.);
-    float d;
 
     vec3 ro = vec3(0., 0., 1.);
     vec3 rd = normalize(vec3(uv, -1.));
     rd *= rotateX(-0.3 * pi);
-    // rd *= rotateY(0.02 * sin(3. * iTime));
 
     Surface co = rayMarch(ro, rd, MIN_DIST, MAX_DIST);
+    vec3 col = co.col;
+    float d = co.sd;
 
     if (co.sd > MAX_DIST) {
         col = backgroundColor;
     } else {
         vec3 p = ro + rd * co.sd;
         vec3 normal = calcNormal(p);
-        vec3 lightPosition = vec3(4., 7., 2.);
+        vec3 lightPosition = vec3(3., 3., -3.);
         vec3 lightDirection = normalize(lightPosition - p);
-
-        // Erinnerung: _irgendwie_ muss Abstand "d" zu einer Farbe werden.
-        // wie, sind quasi nur noch die Details :)
-        // d = co.sd;
-        d = clamp(co.sd, 0., 1.);
 
         // could also have parallel light
         // lightDirection = normalize(vec3(0., 1., 0.));
+
+        d = clamp(d, 0., 1.);
 
         // Lambertian reflection:
         // proportional to amount of light hitting the surface
@@ -249,29 +245,24 @@ void main() {
         // Quasi "perfekte" Diffusion, warum?
         float diffuse = dot(normal, lightDirection);
         diffuse = clamp(diffuse, 0., 1.);
-        d = mix(d, diffuse, 1.);
+        d = mix(d, diffuse, 0.1);
 
         // sekundäres Ray Marching für Schatten
-        //        float shadow = rayMarchShadow(p, lightDirection);
-        //        d = mix(d, shadow, 0.);
+        float shadow = rayMarchShadow(p, lightDirection);
+        d = mix(d, shadow, 0.8);
 
         // Specular reflection:
         // proportional to angle between ray and reflections
-        //        vec3 refl = reflect(lightDirection, normal);
-        //        float specular = dot(refl, normalize(p));
-        //        specular = clamp(specular, 0., 1.);
-        //        specular = pow(specular, 3.);
-        //        d = mix(d, specular, 0.);
+        vec3 refl = reflect(lightDirection, normal);
+        float specular = dot(refl, normalize(p));
+        specular = clamp(specular, 0., 1.);
+        specular = 1.4 * pow(specular, 1.);
+        d = mix(d, specular, 0.6);
 
         // verschiedenartiges Color Grading
+        d = mix(d, pow(co.sd, 1.8), 0.01);
+        d = clamp(d, 0., 1.);
         col = d * co.col;
-
-        //        dif = mix(dif, co.sd, 0.03);
-        //        dif = mix(dif, dif * co.sd, 0.24);
-        //        float clamped_dif = clamp(dif, 0., 1.);
-        //        float graded_dif = atan(dif);
-        //        dif = mix(clamped_dif, graded_dif, 1.);
-        //        dif = pow(dif, 2.);
 
         // Distance Fog: Abschwächen je nach durchlaufenem Abstand
         col *= exp(-0.0001 * pow(co.sd, 3.)) * vec3(0.9, 0.8, 0.7);
