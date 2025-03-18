@@ -25,10 +25,11 @@ float circle_sdf(in vec2 uv) {
 // compare above: why return vec3 when we can return float?
 // -> uses less memory bandwidth
 // but remember: "out float" exists, too, but for float -> usually negligible
-float star_sdf(in vec2 uv) {
+float star_sdf(vec2 uv) {
+
     // cf. sdStar5 from iq https://iquilezles.org/articles/distfunctions2d/
     float r = 1.;
-    float rf = 0.4; // 0.55 + .45 * sin(2. * iTime);
+    float rf = 0.55; // + .45 * sin(2. * iTime);
 
     // now THAT is something to think about :)
     const vec2 k1 = vec2(0.809016994375, -0.587785252292);
@@ -49,7 +50,9 @@ void apply_distance_structure(inout float d) {
     // d = pow(d, 3.);
     // use to give distance some scale
     d = 1. - abs(d);
-    d = pow(d, 3. + 0.5 * cos(200. * d)); //  + 20. * iTime
+    d = pow(d, 8.2);
+    // d = pow(d, 3. + 0.5 * cos(200. * d)); //  + 20. * iTime
+
 }
 
 void main() {
@@ -85,14 +88,15 @@ void main() {
     // d = min(d_circle, d_star);
 
     // simply adding to different channels
-    apply_distance_structure(d_circle);
+    // apply_distance_structure(d_circle);
     apply_distance_structure(d_star);
 
     // make it exact.
 //    d_circle = step(.9, d_circle);
 //    d_star = step(.9, d_star);
 
-    col = vec3(d_circle, d_star, d_star);
+    // col = vec3(d_circle, d_star, d_star);
+    col = vec3(d_star);
 
 //    d = d_circle;
 //     d = d_star;
