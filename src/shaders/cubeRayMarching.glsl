@@ -66,8 +66,10 @@ Surface sdBox( vec3 p, vec3 b, vec3 offset, vec3 col, mat3 transform)
     return Surface(d, col);
 }
 
+float floorLevel = -4.;
+
 Surface sdFloor(vec3 p, vec3 col) {
-    float d = p.y;
+    float d = p.y - floorLevel;
     return Surface(d, col);
 }
 
@@ -79,48 +81,59 @@ Surface takeCloser(Surface obj1, Surface obj2) {
 }
 
 Surface sdScene(vec3 p) {
-    vec3 floorColor = (0.5 + 0.15 * mod(floor(0.5 * p.x) + floor(p.z), 4.0)) * vec3(0.9, 1., .95);
+    vec3 floorColor = (0.5 + 0.15 * mod(floor(p.x) + floor(p.z), 4.0)) * vec3(0.9, 1., .95);
     Surface co = sdFloor(p, floorColor);
-    Surface box = sdBox(p, vec3(1), vec3(-3., 1., -3.), vec3(1, 0.1, 0.4), identity());
+    Surface box = sdBox(p, vec3(1), vec3(-2., floorLevel + 1., -2.), vec3(1, 0.1, 0.4), identity());
     co = takeCloser(co, box);
-    box = sdBox(p, vec3(1), vec3(3.5, 1., -4.5), vec3(0.2, 0.6, 0.7), rotateY(0.4 * pi));
+    box = sdBox(p, vec3(1.2), vec3(3, floorLevel + 1.2, -3.), vec3(0.2, 0.65, 0.9), rotateY(0.25 * pi));
     co = takeCloser(co, box);
     return co;
 }
 
 Surface rayMarch(vec3 ro, vec3 rd, float start, float end) {
-    float depth = start;
+    float rayLength = start;
     Surface co;
 
     for (int i = 0; i < MAX_MARCHING_STEPS; i++) {
-        vec3 p = ro + depth * rd;
-        co = sdScene(p);
-        depth += co.sd;
-        if (co.sd < PRECISION || depth > end)
+        co = sdScene(ro + rayLength * rd);
+        rayLength += co.sd;
+
+        if (co.sd < PRECISION || rayLength > end) {
             break;
+        }
     }
 
-    co.sd = depth;
+    co.sd = rayLength;
     return co;
 }
 
-float calcSoftshadow( in vec3 ro, in vec3 rd, in float mint, in float tmax, in float w)
+float rayMarchShadow( in vec3 ro, in vec3 rd)
 {
-    float res = 1.0;
-    float t = mint;
-    float ph = 1e10; // big, such that y = 0 on the first iteration
+    float tMin = 0.05;
+    float tMax = 2.;
+    float w = 0.1;
 
-    for( int i=0; i<100; i++ )
+    float d = 1.0;
+    float t = tMin;
+
+    for (int i=0; i < MAX_MARCHING_STEPS; i++)
     {
         float h = sdScene( ro + rd*t ).sd;
-        res = min( res, h/(w*t) );
+        d = min( d, h/(w*t) );
         t += h;
 
-        if( res<0.0001 || t>tmax )
+        if (d < PRECISION || t > tMax ) {
             break;
+        }
     }
-    res = clamp( res, 0.0, 1.0 );
-    return res*res*(3.0-2.0*res);
+
+    //return res;
+
+    d = clamp( d, 0.0, 1.0 );
+    //return res;
+
+    d = smoothstep(0., 1., d);
+    return d;
 }
 
 vec3 calcNormal(in vec3 p) {
@@ -141,10 +154,10 @@ void main() {
     vec3 backgroundColor = vec3(0.8, 0.3 + uv.y, 1.);
 
     vec3 col = vec3(0.);
-    vec3 ro = vec3(0., 4., 1.);
+    vec3 ro = vec3(0., 0., 1.);
     vec3 rd = normalize(vec3(uv, -1.));
 
-    rd *= rotateX(-0.3 * pi + 0.0 * sin(2. * iTime));
+    rd *= rotateX(-0.3 * pi + 0.00 * sin(2. * iTime));
 
     Surface co = rayMarch(ro, rd, MIN_DIST, MAX_DIST);
 
@@ -153,54 +166,47 @@ void main() {
     } else {
         vec3 p = ro + rd * co.sd;
         vec3 normal = calcNormal(p);
-        vec3 lightPosition = vec3(5., 2., 0.5);
+        vec3 lightPosition = vec3(0., 4., 5.);
+        // Surface box = sdBox(p, vec3(1), vec3(-2., floorLevel + 1., -2.), vec3(1, 0.1, 0.4), identity());
+        lightPosition = vec3(+4., floorLevel + 6., -2.); // directly over the cube
         vec3 lightDirection = normalize(lightPosition - p);
         // switch from point light to parallel light
-        // lightDirection = normalize(vec3(-1., 1., -1.));
+        // lightDirection = normalize(vec3(0., 1., 0.));
 
-        // Lambertian reflection
+        // Lambertian reflection:
+        // proportional to amount of light hitting the surface
+        // i.e. dot(normal, lightDir) ~ large if Angle between normal and light is low
+        // -> orthogonal: nothing
+        // -> parallel: full amount
         // why would this be "perfect diffusion"?
-        float dif = dot(normal, lightDirection) * (
-            1. + 0.8 * calcSoftshadow(p, lightDirection, 0.02, 2., 0.1)
-        );
+        float dif = dot(normal, lightDirection);
         dif = clamp(dif, 0., 1.);
 
-        // wofür könnte das gut sein?
-        dif = mix(dif, co.sd, 0.0);
+        // Mische Bild mit Bild-mit-Schatten (diffus)
+        float shadow = rayMarchShadow(p, lightDirection);
+        dif = mix(dif, shadow, 0.8);
+
+        // Specular reflection:
+        // proportional to angle between ray and _reflection_
+        vec3 refl = reflect(lightDirection, normal);
+        float spec = dot(refl, normalize(p));
+        spec = clamp(spec, 0., 1.);
+        spec = pow(spec, 3.);
+        dif = mix(dif, spec, 0.6);
+
+        // könnte Schatten aufhellen
+        dif = mix(dif, co.sd, 0.1);
 
         // scale for better visuals
-        dif = pow(dif, 1.);
         dif = clamp(dif, 0., 1.);
         col = dif * co.col;
-        col += 0.0 * backgroundColor; // why would we do that??
+        // col += 0.1 * backgroundColor; // why would we do that??
 
         // Diminishing according to marched distance ~ Fog
-        col *= exp(-0.0005 * co.sd * co.sd);
+        col *= exp(-0.0001 * co.sd * co.sd * co.sd) * vec3(0.9, 0.8, 0.7);
     }
 
-    // Output to screen
+    // col = atan(8. * pow(col, vec3(5.)));
+
     fragColor = vec4(col, 1.0);
-    /*
-    vec2 uv = (-1.0 + 2.0 * gl_FragCoord.xy / iResolution.xy) * vec2(iResolution.x / iResolution.y, 1.0);
-    vec3 ro = vec3(2., 1.5, -2.5);
-    vec3 rd = normalize(vec3(uv, 1.));
-
-    rd *= rotateX(0.125 * pi);
-
-    float d;
-    vec3 bgColor, cube1Color, cube2Color, cube1Normals, cube2Normals;
-
-    vec3 lightDir = vec3(0.2, 0.5, 1.);
-    background(bgColor, iTime, rd, lightDir);
-
-    cube(d, cube1Normals, ro, rd, vec3(0., -3., 0.), 1.);
-    rd = reflect(rd, cube1Normals);
-    background(cube1Color, iTime, rd, lightDir);
-    cube1Color *= vec3(0.9, 0.8, 0.5);
-
-    // draw the cube where the cube is and the background where the cube is not
-    fragColor = vec4(mix(bgColor, cube1Color, step(0., d)), 1.0);
-
-    fragColor = pow(fragColor, vec4(vec3(1.5), 1.));
-    */
 }
