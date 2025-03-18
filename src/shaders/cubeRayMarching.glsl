@@ -11,9 +11,9 @@ mat3 rotateX(float theta) {
     float c = cos(theta);
     float s = sin(theta);
     return mat3(
-    vec3(1, 0, 0),
-    vec3(0, c, -s),
-    vec3(0, s, c)
+        vec3(1, 0, 0),
+        vec3(0, c, -s),
+        vec3(0, s, c)
     );
 }
 
@@ -27,9 +27,9 @@ mat3 rotateY(float theta) {
     float c = cos(theta);
     float s = sin(theta);
     return mat3(
-    vec3(c, 0, s),
-    vec3(0, 1, 0),
-    vec3(-s, 0, c)
+        vec3(c, 0, s),
+        vec3(0, 1, 0),
+        vec3(-s, 0, c)
     );
 }
 
@@ -38,18 +38,18 @@ mat3 rotateZ(float theta) {
     float c = cos(theta);
     float s = sin(theta);
     return mat3(
-    vec3(c, -s, 0),
-    vec3(s, c, 0),
-    vec3(0, 0, 1)
+        vec3(c, -s, 0),
+        vec3(s, c, 0),
+        vec3(0, 0, 1)
     );
 }
 
 
 mat3 diagonalMatrix(float x, float y, float z) {
     return mat3(
-    vec3(x, 0, 0),
-    vec3(0, y, 0),
-    vec3(0, 0, z)
+        vec3(x, 0, 0),
+        vec3(0, y, 0),
+        vec3(0, 0, z)
     );
 }
 
@@ -71,47 +71,26 @@ float checkerboard(vec2 p, float scale) {
     return mod(ip.x + ip.y, 2.0);
 }
 
-float blurredCheckerPattern(vec3 p, float blurRadius, float checkerSize) {
+float surfaceCheckerPattern(vec3 p, float checkerSize) {
     vec2 surface = vec2(
-    atan(p.z, p.x) / (2. * 3.14159) + 0.5,
-    p.y / 2. + 0.5
+        atan(p.z, p.x) / (2. * 3.14159) + 0.5,
+        p.y / 2. + 0.5
     );
-
-    // Gaussian weights for 5x5 kernel
-    float weights[25] = float[](
-    0.003765, 0.015019, 0.023792, 0.015019, 0.003765,
-    0.015019, 0.059912, 0.094907, 0.059912, 0.015019,
-    0.023792, 0.094907, 0.150644, 0.094907, 0.023792,
-    0.015019, 0.059912, 0.094907, 0.059912, 0.015019,
-    0.003765, 0.015019, 0.023792, 0.015019, 0.003765
-    );
-
-    float sum;
-    float pixelScale = 1./iResolution.y;
-    int index = 0;
-    for(float y = -2.0; y <= 2.0; y++) {
-        for(float x = -2.0; x <= 2.0; x++) {
-            vec2 offset = vec2(x, y) * pixelScale * blurRadius;
-            sum += checkerboard(surface + offset, checkerSize) * weights[index];
-            index++;
-        }
-    }
-    return sum;
+    return checkerboard(surface, checkerSize);
 }
 
+Surface sdPatternSphere( vec3 p, vec3 b, vec3 offset, vec3 col, mat3 transform, vec3 checkerCol, float nSegments) {
+    p = (p - offset) * transform;
+    vec3 q = abs(p) - b;
+    float d = length(p / b) - 1.;
+    col = mix(col, checkerCol, surfaceCheckerPattern(p, nSegments));
+    return Surface(d, col);
+}
 
 Surface sdSphere( vec3 p, vec3 b, vec3 offset, vec3 col, mat3 transform) {
     p = (p - offset) * transform;
     vec3 q = abs(p) - b;
     float d = length(p / b) - 1.;
-    return Surface(d, col);
-}
-
-Surface sdPatternSphere( vec3 p, vec3 b, vec3 offset, vec3 col, mat3 transform, vec3 checkerCol, float nSegments, float blurRadius) {
-    p = (p - offset) * transform;
-    vec3 q = abs(p) - b;
-    float d = length(p / b) - 1.;
-    col = mix(col, checkerCol, blurredCheckerPattern(p, blurRadius, nSegments));
     return Surface(d, col);
 }
 
@@ -282,3 +261,4 @@ void main() {
 
     fragColor = vec4(col, 1.0);
 }
+
