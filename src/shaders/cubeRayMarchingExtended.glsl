@@ -6,7 +6,9 @@ uniform float iTime;
 
 const float pi = 3.141593;
 
-// Rotation matrix around the X axis.
+// Rotationmatrix um X-Achse
+// d.h. als würde man eine Walze abrollen die an der X-Achse ausgerichtet ist.
+// neigt also nach vorne und hinten, wenn x von links nach rechts zeigt.
 mat3 rotateX(float theta) {
     float c = cos(theta);
     float s = sin(theta);
@@ -63,6 +65,7 @@ struct Surface {
 };
 
 void wobbleDistort(inout Surface surface, vec3 p, float amp, vec3 scale) {
+    // hint: this is only a nice distortion for small values of scale.
     surface.sd += amp * sin(scale.x*p.x) * sin(scale.y*p.y) * sin(scale.z*p.z);
 }
 
@@ -73,7 +76,7 @@ float checkerboard(vec2 p, float scale) {
 
 float surfaceCheckerPattern(vec3 p, float checkerSize) {
     vec2 surface = vec2(
-        atan(p.z, p.x) / (2. * 3.14159) + 0.5,
+        atan(p.z, p.x) / (2. * 3.1) + 0.5,
         p.y / 2. + 0.5
     );
     return checkerboard(surface, checkerSize);
@@ -83,7 +86,7 @@ Surface sdPatternSphere( vec3 p, vec3 b, vec3 offset, vec3 col, mat3 transform, 
     p = (p - offset) * transform;
     vec3 q = abs(p) - b;
     float d = length(p / b) - 1.;
-    col = mix(col, checkerCol, surfaceCheckerPattern(p, nSegments));
+    col = mix(col, checkerCol, surfaceCheckerPattern(p, (4. + 5. * floor(mod(iTime, 4.)))));
     return Surface(d, col);
 }
 
@@ -119,20 +122,27 @@ Surface sdScene(vec3 p) {
     vec3 floorColor = (0.5 + 0.15 * mod(floor(p.x) + floor(p.z), 4.0)) * vec3(0.9, 1., .95);
     Surface co = sdFloor(p, floorColor);
     Surface box, ball;
-     box = sdBox(p, vec3(1.), vec3(-2., floorLevel + 1., -2.), vec3(1, 0.1, 0.4), identity());
-//     co = takeCloser(co, box);
+    box = sdBox(p, vec3(1.), vec3(-2., floorLevel + 1., -2.), vec3(1, 0.1, 0.4), identity());
+    co = takeCloser(co, box);
     box = sdBox(p, vec3(1.2), vec3(4., floorLevel + 1.2, -3.), vec3(0.2, 0.65, 0.9), rotateY(0.25 * pi));
-    wobbleDistort(box, p, 0.03, vec3(20., 10., 16. + 0. * 3. * iTime));
+    wobbleDistort(box, p, 0.06, vec3(10., 10., 16. + sin(3. * iTime)));
 
     co = takeCloser(co, box);
 
-    ball = sdPatternSphere(p, vec3(1.), vec3(-2., floorLevel + 1., -2.), vec3(1, 0.1, 0.8), identity(), vec3(0.5, 0.2, 0.8), 8.);
+    ball = sdPatternSphere(p, vec3(1.), vec3(0.5, floorLevel + 1., -2.), vec3(1, 0.1, 0.8), identity(), vec3(0.5, 0.2, 0.8), 8.);
     co = takeCloser(co, ball);
 
-    mat3 ballTransform = rotateY(0.5 * iTime);
-    ball = sdSphere(p, vec3(1.), vec3(0.5, floorLevel + 1., 0.), vec3(1, 0.6, 0.8), ballTransform);
-    wobbleDistort(ball, p, 0.1, vec3(10.));
-     co = takeCloser(co, ball);
+    // why does that wobble-sphere not seems rotating?
+    mat3 ballTransform = rotateY(3. * iTime);
+    vec3 wobbleSphereRay = p + 0.05 * vec3(sin(10.*p.x), sin(10.*p.y), sin(10.*p.z));
+    vec3 wobbleSpherePos = vec3(-1.8, floorLevel + 2.8, -2.);
+    ball = sdSphere(wobbleSphereRay, vec3(.8), vec3(0.), vec3(1, 0.6, 0.8), ballTransform);
+
+    wobbleSphereRay = ballTransform * (wobbleSphereRay - wobbleSpherePos);
+    ball = sdSphere(wobbleSphereRay, vec3(.8), vec3(0.), vec3(1, 0.6, 0.8), identity());
+
+
+    co = takeCloser(co, ball);
 
     return co;
 }
@@ -200,7 +210,7 @@ void main() {
 
     vec3 ro = vec3(0., 0., 1.);
     vec3 rd = normalize(vec3(uv, -1.));
-    rd *= rotateX(-0.3 * pi);
+    rd *= rotateX(-0.23 * pi + 0.02 * sin(2.2 * iTime));
 
     Surface co = rayMarch(ro, rd, MIN_DIST, MAX_DIST);
     vec3 col = co.col;
@@ -212,7 +222,7 @@ void main() {
     else {
         vec3 p = ro + rd * co.sd;
         vec3 normal = calcNormal(p);
-        vec3 lightPosition = vec3(3., 3., -3.);
+        vec3 lightPosition = vec3(3., 3., -4.);
         vec3 lightDirection = normalize(lightPosition - p);
 
         // could also have parallel light
@@ -226,7 +236,7 @@ void main() {
         // Quasi "perfekte" Diffusion, warum?
         float diffuse = dot(normal, lightDirection);
         diffuse = clamp(diffuse, 0., 1.);
-        d = mix(d, diffuse, 0.1);
+        d = mix(d, diffuse, 0.7);
 
         // sekundäres Ray Marching für Schatten
         float shadow = rayMarchShadow(p, lightDirection);
@@ -234,19 +244,22 @@ void main() {
 
         // Specular reflection:
         // proportional to angle between ray and reflections
+        // wenn der Effekt nicht herauskommt - mal oben die Lichtquelle umherschieben
         vec3 refl = reflect(lightDirection, normal);
-        float specular = dot(refl, normalize(p));
+        float specular = dot(refl, p);
         specular = clamp(specular, 0., 1.);
-        specular = 1.4 * pow(specular, 1.);
+        specular = 1.4 * pow(specular, 2.);
         d = mix(d, specular, 0.6);
 
         // verschiedenartiges Color Grading
-        d = mix(d, pow(co.sd, 1.8), 0.01);
+        d = mix(d, pow(co.sd, 2.1), 0.01);
         d = clamp(d, 0., 1.);
-        col = d * co.col;
+        col = d * co.col * vec3(0.9, 0.8, 0.7);
 
         // Distance Fog: Abschwächen je nach durchlaufenem Abstand
-        col *= exp(-0.0001 * pow(co.sd, 3.)) * vec3(0.9, 0.8, 0.7);
+        // col *= exp(-0.0001 * pow(co.sd, 3.)) * vec3(0.9, 0.8, 0.7);
+        // oder auch: mischen mit Hintergrund (der in einer anderen Welt lebt, aber egal)
+        col = mix(backgroundColor, col, exp(-0.0001 * pow(co.sd, 3.)));
     }
 
     // Beispiel Post-Processing (transformiert nur noch Farbe -> Farbe, nicht mehr Geometrie)

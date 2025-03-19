@@ -127,7 +127,7 @@ Surface sdScene(vec3 p) {
 
     co = takeCloser(co, box);
 
-    //    ball = sdPatternSphere(p, vec3(1.), vec3(-2., floorLevel + 1., -2.), vec3(1, 0.1, 0.8), identity(), vec3(0.5, 0.2, 0.8), 8., 0.5);
+    //    ball = sdPatternSphere(p, vec3(1.), vec3(-2., floorLevel + 1., -2.), vec3(1, 0.1, 0.8), identity(), vec3(0.5, 0.2, 0.8), 8.);
 
     //    mat3 ballTransform = rotateY(0.5 * iTime);
     //    ball = sdSphere(p, vec3(1.), vec3(-2., floorLevel + 1., -2.), vec3(1, 0.6, 0.8), ballTransform);
