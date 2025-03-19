@@ -1,18 +1,87 @@
 import {addButton, addValueLabel} from "./controls.js";
-import {renderWithErrors} from "./shaderCode.js";
+import {displayCode} from "./shaderCode.js";
 
 
-const generatePage = (elements, state, controls) => {
+const generatePage = (elements, state, controls, autoRenderOnLoad) => {
 
-    elements.fragment.classList.add("code");
-    elements.fragment.innerHTML = renderWithErrors(state.source.fragment, state.error.fragment);
+    if (!state.program) {
+        elements.workingShader.remove();
+        elements.console.innerHTML = renderErrorConsole(state);
+    } else {
+        elements.console.remove();
+    }
 
-    elements.vertex.classList.add("code");
-    elements.vertex.innerHTML = `
-        <pre>${state.source.vertex}</pre>
-    `;
+    displayCode(
+        elements.fragment,
+        state.source.fragment,
+        state.error.fragment,
+        "fragment.source"
+    );
 
-    elements.console.innerHTML = `
+    displayCode(
+        elements.vertex,
+        state.source.vertex,
+        state.error.vertex,
+        "vertex.source"
+    );
+
+    document.addEventListener("DOMContentLoaded", () => {
+        const firstChangedLine = document.querySelector(".line.changed");
+        if (firstChangedLine) {
+            firstChangedLine.scrollIntoView({
+                behaviour: "smooth",
+                block: "center"
+            });
+        }
+    });
+
+    addControlsToPage(elements, state, controls, autoRenderOnLoad);
+};
+
+export default generatePage;
+
+export const addControlsToPage = (elements, state, controls, autoRenderOnLoad) => {
+    if (!state.program) {
+        elements.controls.innerHTML = `
+            <div class="error" style="text-align: right;">
+                Nothing to render, because compilation failed.
+            </div>
+        `;
+        return;
+    }
+
+    for (const control of controls) {
+
+        switch (control.type) {
+            case "renderButton":
+                if (autoRenderOnLoad) {
+                    control.onClick();
+                } else {
+                    addButton(elements.controls, {
+                        title: control.title,
+                        onClick: control.onClick,
+                    });
+                }
+                break;
+
+            case "label":
+                elements[control.name] =
+                    addValueLabel(elements.controls, {
+                        label: control.name + " = ",
+                        id: control.name
+                    });
+                break;
+
+            default:
+                console.warn("Undefined Control", control);
+        }
+
+    }
+
+};
+
+function renderErrorConsole(state) {
+    let result = `
         <h2>Compilation failed.</h2>
         <div>
             <h4>Fragment Shader</h4>
@@ -33,54 +102,15 @@ const generatePage = (elements, state, controls) => {
 
     const locations = Object.entries(state.location);
     if (locations.length > 0) {
-        let locationHTML =
+        result +=
             `<h4>Locations (whatever these are)</h4>`
             + "<pre>";
         for (const [name, location] of locations) {
-            locationHTML +=
+            result +=
                 `${name.padEnd(20)} -> ${location}\n`;
         }
-        locationHTML += "</pre>";
-        elements.console.innerHTML += locationHTML;
+        result += "</pre>";
     }
 
-    addControlsToPage(elements, state, controls);
-};
-
-export default generatePage;
-
-export const addControlsToPage = (elements, state, controls) => {
-    if (!state.program) {
-        elements.controls.innerHTML = `
-            <div class="error" style="text-align: right;">
-                Nothing to render, because compilation failed.
-            </div>
-        `;
-        return;
-    }
-
-    for (const control of controls) {
-
-        switch (control.type) {
-            case "renderButton":
-                addButton(elements.controls, {
-                    title: control.title,
-                    onClick: control.onClick,
-                });
-                break;
-
-            case "label":
-                elements[control.name] =
-                    addValueLabel(elements.controls, {
-                        label: control.name + " = ",
-                        id: control.name
-                    });
-                break;
-
-            default:
-                console.warn("Undefined Control", control);
-        }
-
-    }
-
-};
+    return result;
+}

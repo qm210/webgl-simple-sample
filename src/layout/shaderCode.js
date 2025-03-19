@@ -1,40 +1,92 @@
-export function renderWithErrors(shaderSource, errorLog) {
+import {diffLines} from "diff";
+
+export function displayCode(element, shaderSource, errorLog, storageKey) {
+
+    const lines = enrichedParse(shaderSource, storageKey, errorLog);
+
+    const rendered = lines.map(renderEnrichedLine).join("");
+
+    element.classList.add("code");
+    element.innerHTML = `
+        <div class="source">
+            ${rendered}
+        </div>
+    `;
+}
+
+function renderEnrichedLine(line) {
+    if (!line.code) {
+        return `<div class="emptyline"></div>`;
+    }
+
+    let classes = "line";
+    let title = "";
+    let annotation = "";
+
+    if (line.added) {
+        classes += " changed";
+        annotation = "changed";
+    }
+    if (line.removedBefore.length > 0) {
+        classes += " removed-before";
+        title = "Removed: " + line.removedBefore.join("\n");
+    }
+    if (line.error) {
+        classes += " error";
+        title = line.error.lines.join('; ') ?? "";
+        annotation = line.error.lineNumber;
+    }
+
+    let attributes = "";
+    if (title) {
+        attributes += `title="${title}"`;
+    }
+
+    const elements = [
+        `<div class="${classes}" ${attributes}>${line.code}</div>`
+    ];
+    if (annotation) {
+        elements.push(
+            `<div class="annotation">${annotation}</div>`
+        );
+    }
+
+    return `
+        <div style="position: relative">
+            ${elements.join("")}
+        </div>
+    `;
+}
+
+function enrichedParse(source, storageKey, errorLog) {
+    const stored = sessionStorage.getItem(storageKey) ?? "";
+    if (storageKey) {
+        sessionStorage.setItem(storageKey, source);
+    }
 
     const errors = parseErrors(errorLog);
 
-    const lines = shaderSource
-        .split('\n')
-        .map((line, row) =>
-            renderLineWithError(line, errors[row])
-        )
-        .join('\n');
+    const differences = diffLines(stored, source, {
+        oneChangePerToken: true
+    });
 
-    return `
-        <div class="source">
-            ${lines}
-        </div>
-    `;
-}
-
-function renderLineWithError(line, errors) {
-    if (!errors) {
-        return renderAsIs(line);
+    const result = [];
+    let removedBefore = [];
+    for (const diff of differences) {
+        if (!diff.removed) {
+            result.push({
+                code: diff.value,
+                added: stored === "" ? false : diff.added,
+                removedBefore,
+                error: errors[result.length],
+            });
+            removedBefore = [];
+        } else {
+            removedBefore.push(diff.value);
+        }
     }
-    const allErrors = errors.lines.join('; ');
-    return `
-        <div style="position: relative">
-            <pre class="error line" title="${allErrors}">${line}</pre>
-            <div class="annotation">${errors.lineNumber}</div>
-        </div>
-    `;
-}
 
-export function renderAsIs(shaderSource) {
-    // render empty lines a bit smaller to allow for more content
-    if (!shaderSource) {
-        return "<div style='height: 0.7em'></div>";
-    }
-    return `<pre>${shaderSource}</pre>`;
+    return result;
 }
 
 // this holds for WebGl2, as of March 2025 - e.g. error logs look like:

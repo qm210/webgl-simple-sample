@@ -1,6 +1,6 @@
 
 
-export default function init({rootId}) {
+export default function init(rootId) {
 
     const root = document.getElementById(rootId);
     root.innerHTML = `
@@ -19,7 +19,11 @@ export default function init({rootId}) {
       </div>
     `;
 
+    const shaders = document.getElementById("shaders");
+    keepScrollPosition(shaders, "shaders.scroll");
+
     return {
+        shaders,
         console: document.getElementById("console"),
         workingShader: document.getElementById("working-program"),
         fragment: document.getElementById("fragment-source"),
@@ -42,4 +46,21 @@ export function setFromUrlParameters(paramMap) {
         const cssProperty = paramMap[paramName];
         document.documentElement.style.setProperty(cssProperty, paramValue);
     }
+}
+
+function keepScrollPosition(element, storageKey) {
+    let debounceTimer;
+    element.addEventListener("scroll", () => {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => {
+            sessionStorage.setItem(storageKey, element.scrollTop.toString());
+        }, 200);
+    });
+    document.addEventListener("DOMContentLoaded", () => {
+        const scrollPosition = sessionStorage.getItem(storageKey);
+        if (scrollPosition) {
+            element.scrollTop = parseInt(scrollPosition);
+            sessionStorage.removeItem(storageKey);
+        }
+    });
 }

@@ -16,7 +16,7 @@
     padding: var(--page-pad);
     gap: var(--page-pad);
 
-    @media (max-width: 1400px) {
+    @media (max-width: 1300px) {
         flex-direction: column-reverse;
     }
 }
@@ -48,7 +48,7 @@
     border: 2px solid grey;
     box-shadow: 1px 1px 3px inset #b00b;
 
-    @media (min-width: 800px) and (max-width: 1400px) {
+    @media (min-width: 800px) and (max-width: 1300px) {
         flex-direction: row;
     }
 }
@@ -67,17 +67,13 @@
     box-shadow: 2px 2px 2px #0003;
 }
 
-#shaders > div div {
-    overflow-x: auto;
-}
-
 #working-program {
     display: flex;
     flex-direction: column;
     gap: 1rem;
     justify-content: stretch;
 
-    @media (min-width: 1000px) and (max-width: 1400px) {
+    @media (min-width: 1000px) and (max-width: 1300px) {
         flex-direction: row;
     }
 }

@@ -15,11 +15,25 @@
 .error {
     color: #CC0000;
     font-weight: bold;
+}
+
+.line {
+    font-family: monospace;
     white-space: pre-wrap;
 }
 
-.error.line {
+.line.changed {
+    background-color: powderblue;
+    color: blue;
+}
+
+.line.error {
     background-color: #F002;
+    color: #CC0000;
+}
+
+.line.removed-before:not(.changed) {
+    border-top: 3px solid powderblue;
 }
 
 .annotation {
@@ -31,4 +45,9 @@
     bottom: 0;
     margin: auto;
     color: mediumvioletred;
+    overflow: visible;
+}
+
+.emptyline {
+    height: 0.7em;
 }

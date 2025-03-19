@@ -11,16 +11,14 @@ import showcase3 from "./showcases/3_SimpleGeometry.js";
 import showcase4 from "./showcases/4_More2DGeometry.js";
 import showcase5a from "./showcases/5a_RayTracingCubeBeginning.js";
 import showcase5b from "./showcases/5b_RayTracingCubeExtended.js";
+import showcase6 from "./showcases/6_Texture.js";
 
 // choose wisely :)
-const showcase = showcase5b;
+const showcase = showcase6;
 
 const autoRenderOnLoad = true;
 
-const elements = initLayout({
-    rootId: "app",
-    reducedView: true,
-});
+const elements = initLayout("app");
 
 // allow setting the font size via ?fontsize=1.5em URL param
 setFromUrlParameters({
@@ -33,23 +31,11 @@ const glContext = setupWebGl(elements.canvas, {
 
 const state = showcase.init(glContext);
 
-if (!state.program) {
-    elements.workingShader.remove();
-} else {
-    elements.console.remove();
-}
-
 console.log("WebGL objects initialized:", state);
 
 const controls = showcase.generateControls(glContext, state, elements);
 
-generatePage(elements, state, controls);
-
-if (autoRenderOnLoad) {
-    controls
-        .find(it => it.type === "renderButton")
-        ?.onClick();
-}
+generatePage(elements, state, controls, autoRenderOnLoad);
 
 if (showcase.title) {
     document.title = showcase.title;
