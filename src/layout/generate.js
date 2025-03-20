@@ -26,9 +26,9 @@ const generatePage = (elements, state, controls, autoRenderOnLoad) => {
     );
 
     document.addEventListener("DOMContentLoaded", () => {
-        const firstChangedLine = document.querySelector(".line.changed");
-        if (firstChangedLine) {
-            firstChangedLine.scrollIntoView({
+        const firstAnnotatedLine = document.querySelector(".line.annotated");
+        if (firstAnnotatedLine) {
+            firstAnnotatedLine.scrollIntoView({
                 behaviour: "smooth",
                 block: "center"
             });

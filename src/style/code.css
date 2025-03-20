@@ -1,4 +1,4 @@
-.code {
+.code-block {
     text-align: left;
     font-size: var(--font-size-large);
     line-height: 1.2;
@@ -17,9 +17,16 @@
     font-weight: bold;
 }
 
-.line {
+.code {
     font-family: monospace;
     white-space: pre-wrap;
+}
+
+.line {
+    position: relative;
+    display: flex;
+    flex-flow: row wrap;
+    align-items: baseline;
 }
 
 .line.changed {
@@ -37,17 +44,30 @@
 }
 
 .annotation {
-    font-size: 0.7rem;
+    font-size: 0.8rem;
     height: 0.7rem;
     position: absolute;
     right: 0.25rem;
     top: 0;
     bottom: 0;
     margin: auto;
-    color: mediumvioletred;
     overflow: visible;
 }
 
-.emptyline {
+.empty-line {
     height: 0.7em;
+}
+
+.line-number {
+    font-size: 0.5em;
+    width: 1.2rem;
+    font-weight: normal;
+    text-align: right;
+    margin-right: 2rem;
+    opacity: 0.7;
+}
+
+.annotated > .line-number {
+    font-weight: bold;
+    font-size: 0.7em;
 }

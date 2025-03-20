@@ -3,12 +3,13 @@ precision highp float;
 out vec4 fragColor;
 uniform vec2 iResolution;
 uniform float iTime;
+uniform sampler2D iTexture;
 
 const float pi = 3.141593;
 
 const int MAX_MARCHING_STEPS = 255;
-const float MAX_DIST = 100.0;
 const float MIN_DIST = 0.0;
+const float MAX_DIST = 100.0;
 const float PRECISION = 0.001;
 
 // Rotation matrix around the X axis.
@@ -16,9 +17,9 @@ mat3 rotateX(float theta) {
     float c = cos(theta);
     float s = sin(theta);
     return mat3(
-    vec3(1, 0, 0),
-    vec3(0, c, -s),
-    vec3(0, s, c)
+        vec3(1, 0, 0),
+        vec3(0, c, -s),
+        vec3(0, s, c)
     );
 }
 
@@ -101,7 +102,45 @@ Surface sdBox( vec3 p, vec3 b, vec3 offset, vec3 col, mat3 transform) {
     return Surface(d, col);
 }
 
-float floorLevel = -4.;
+Surface sdSpaceBox( vec3 p, vec3 b, vec3 offset, vec3 col, mat3 transform) {
+    p = (p - offset) * transform;
+    vec3 q = abs(p) - b;
+    float d = length(max(q,0.0)) + min(max(q.x,max(q.y,q.z)),0.0);
+
+    col = mix(vec3(1,0,0), vec3(1,1,0), 0.5 * (1. + p.x / b.x));
+
+    vec3 a = 0.5 * p / b;
+    vec2 uv;
+    if (d < 0.001) {
+        if (abs(a.z) > 0.5) {
+            uv = 0.5 - a.xy;
+            col = texture(iTexture, uv).xyz;
+        } else if (abs(a.y) > 0.5) {
+            // oben
+            uv = 0.5 + a.xz;
+            col = texture(iTexture, uv).xyz;
+        } else if (abs(a.x) > 0.5) {
+            uv = vec2(0.5 - a.z * sign(a.x), 0.5 - a.y);
+            col = texture(iTexture, uv).rgb;
+            col.r = 0.;
+        }
+    }
+
+//
+//    if (p.z > b.z - 0.01) {
+//        col = vec3(0,1,0);
+//    }
+//    if (p.z < -b.z + 0.01) {
+//        col = vec3(0,0,1);
+//    }
+
+    // check execution time (query?)
+    // check memory usage - texture and uniforms
+
+    return Surface(d, col);
+}
+
+float floorLevel = -3.;
 
 Surface sdFloor(vec3 p, vec3 col) {
     float d = p.y - floorLevel;
@@ -119,13 +158,15 @@ Surface sdScene(vec3 p) {
     vec3 floorColor = (0.5 + 0.15 * mod(floor(p.x) + floor(p.z), 4.0)) * vec3(0.9, 1., .95);
     Surface co = sdFloor(p, floorColor);
     Surface box, ball;
-    box = sdBox(p, vec3(1.), vec3(-2., floorLevel + 1., -2.), vec3(1, 0.1, 0.4), identity());
+//    box = sdBox(p, vec3(1.), vec3(-2., floorLevel + 1., -2.), vec3(1, 0.1, 0.4), identity());
+//    co = takeCloser(co, box);
+    box = sdSpaceBox(p, vec3(0.9), vec3(1.5, floorLevel + 1.2, -1.5), vec3(0.3, 0.65, 0.9), rotateY(-0.2 * pi));
     co = takeCloser(co, box);
-    box = sdBox(p, vec3(1.2), vec3(3, floorLevel + 1.2, -3.), vec3(0.2, 0.65, 0.9), rotateY(0.25 * pi));
 
-    //    wobbleDistort(box, p, 0.03, vec3(20., 10., 16. + 0. * 3. * iTime));
-
+    // 0.5 pi = 90°
+    box = sdSpaceBox(p, vec3(0.9), vec3(-1.5, floorLevel + 1.2, -1.5), vec3(0.3, 0.65, 0.9), rotateY(+0.3 * pi));
     co = takeCloser(co, box);
+
 
     //    ball = sdPatternSphere(p, vec3(1.), vec3(-2., floorLevel + 1., -2.), vec3(1, 0.1, 0.8), identity(), vec3(0.5, 0.2, 0.8), 8.);
 
@@ -185,23 +226,23 @@ float rayMarchShadow( in vec3 ro, in vec3 rd)
 vec3 calcNormal(in vec3 p) {
     vec2 epsilon = vec2(1.0, -1.0) * 0.0005;
     return normalize(
-    epsilon.xyy * sdScene(p + epsilon.xyy).sd +
-    epsilon.yyx * sdScene(p + epsilon.yyx).sd +
-    epsilon.yxy * sdScene(p + epsilon.yxy).sd +
-    epsilon.xxx * sdScene(p + epsilon.xxx).sd
+        epsilon.xyy * sdScene(p + epsilon.xyy).sd +
+        epsilon.yyx * sdScene(p + epsilon.yyx).sd +
+        epsilon.yxy * sdScene(p + epsilon.yxy).sd +
+        epsilon.xxx * sdScene(p + epsilon.xxx).sd
     );
 }
 
 void main() {
     vec2 uv = (-1.0 + 2.0 * gl_FragCoord.xy / iResolution.xy) * vec2(iResolution.x / iResolution.y, 1.0);
 
-    vec3 backgroundColor = vec3(0.8, 0.3 + uv.y, 1.);
+    vec3 backgroundColor = vec3(0); // vec3(0.8, 0.3 + uv.y, 1.);
     vec3 col = vec3(0.);
     float d;
 
     vec3 ro = vec3(0., 0., 1.);
     vec3 rd = normalize(vec3(uv, -1.));
-    rd *= rotateX(-0.3 * pi);
+    rd *= rotateX(-0.2 * pi);
     // rd *= rotateY(0.02 * sin(3. * iTime));
 
     Surface co = rayMarch(ro, rd, MIN_DIST, MAX_DIST);
@@ -243,7 +284,7 @@ void main() {
         //        d = mix(d, specular, 0.);
 
         // verschiedenartiges Color Grading
-        col = d * co.col;
+        col = pow(co.sd, 0.1) * co.col;
 
         //        dif = mix(dif, co.sd, 0.03);
         //        dif = mix(dif, dif * co.sd, 0.24);
@@ -253,12 +294,14 @@ void main() {
         //        dif = pow(dif, 2.);
 
         // Distance Fog: Abschwächen je nach durchlaufenem Abstand
-        col *= exp(-0.0001 * pow(co.sd, 3.)) * vec3(0.9, 0.8, 0.7);
+        col *= exp(-0.0001 * pow(co.sd, 3.));
     }
 
     // Beispiel Post-Processing (transformiert nur noch Farbe -> Farbe, nicht mehr Geometrie)
     // col = atan(8. * pow(col, vec3(5.)));
 
     fragColor = vec4(col, 1.0);
-}
 
+    // quick check: so sähe das direkt gemappt aus.
+//     fragColor = texture(iTexture, uv);
+}

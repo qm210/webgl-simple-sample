@@ -5,9 +5,8 @@ import fragmentShaderSource from "../shaders/cubeRayMarchingBeginning.glsl";
 
 export default {
     title: "Ray Tracing",
-    init: (gl) => {
-        return simpleGeometrySetup.init(gl, fragmentShaderSource);
-    },
+    init: (gl) =>
+        simpleGeometrySetup.init(gl, fragmentShaderSource),
     generateControls:
-    simpleGeometrySetup.generateControls
+        simpleGeometrySetup.generateControls
 };

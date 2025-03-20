@@ -54,3 +54,11 @@ export function asResolution({width, height, aspectRatio}) {
         height: Math.round(height ?? width / aspectRatio),
     };
 }
+
+
+export function loadImage(imageSource, onLoad) {
+    const img = new Image();
+    img.onload = () => onLoad(img);
+    img.src = imageSource;
+    return img;
+}
