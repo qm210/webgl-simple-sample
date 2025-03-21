@@ -1,37 +1,89 @@
 // we now take the end state of VL3 as a basis
 import standardSetup from "./3_SimpleGeometry.js";
-import {loadImage} from "../webgl/helpers.js";
+import {createTextureFromImage} from "../webgl/helpers.js";
 
 import fragmentShaderSource from "../shaders/texturesBeginning.glsl";
-// import image from "../textures/hubble_extreme_deep_field.jpg";
-import image from "../textures/frame.png";
+import image0 from "../textures/frame.png";
+import image1 from "../textures/hubble_extreme_deep_field.jpg";
+import image2 from "../textures/Wood066_1K-JPG_Color.jpg";
+import {startRenderLoop} from "../webgl/render.js";
 
 export default {
     title: "Textures",
     init: (gl) => {
         const state = standardSetup.init(gl, fragmentShaderSource);
 
-        const texture = gl.createTexture();
-        gl.bindTexture(gl.TEXTURE_2D, texture);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR); // <-- what else there is?
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-        // wir lass hier Mipmaps aus, aber es sei erwähnt, dass sie existieren.
+        if (!state.program) {
+            return state;
+        }
 
-        loadImage(image, (img) => {
-            gl.bindTexture(gl.TEXTURE_2D, texture);
-            gl.texImage2D(
-                gl.TEXTURE_2D,
-                0,
-                gl.RGBA,
-                gl.RGBA,
-                gl.UNSIGNED_BYTE,
-                img
-            )
+        // createTextureFromImage ist unsere eigene Hilfsfunktion
+        // sie nimmt uns ab, was OpenGL immer brauch:
+        // gl.createTexture()
+        // gl.bindTexture()
+        // gl.texParameteri() für WRAP_S, WRAP_T, MIN_FILTER, optional: MAG_FILTER
+        // gl.texImage2D();
+
+        state.texture0 = createTextureFromImage(gl, image0, {
+            wrapS: gl.CLAMP_TO_EDGE,
+            wrapT: gl.CLAMP_TO_EDGE,
+            minFilter: gl.LINEAR,
+            magFilter: gl.LINEAR,
         });
+        state.texture1 = createTextureFromImage(gl, image1, {
+            wrapS: gl.CLAMP_TO_EDGE,
+            wrapT: gl.CLAMP_TO_EDGE,
+            minFilter: gl.LINEAR,
+        });
+        state.texture2 = createTextureFromImage(gl, image2, {
+            wrapS: gl.CLAMP_TO_EDGE,
+            wrapT: gl.CLAMP_TO_EDGE,
+            minFilter: gl.LINEAR,
+        });
+
+        state.location.texture0 = gl.getUniformLocation(state.program, "iTexture0");
+        state.location.texture1 = gl.getUniformLocation(state.program, "iTexture1");
+        state.location.texture2 = gl.getUniformLocation(state.program, "iTexture2");
 
         return state;
     },
-    generateControls:
-        standardSetup.generateControls
+    generateControls: (gl, state, elements) => [{
+        type: "renderButton",
+        title: "Render",
+        onClick: () => {
+            startRenderLoop(
+                state => render(gl, state),
+                state,
+                elements
+            );
+        }
+    }, {
+        type: "label",
+        name: "iTime",
+    }]
 };
+
+function render(gl, state) {
+    gl.useProgram(state.program);
+
+    gl.uniform1f(state.location.iTime, state.time);
+    gl.uniform2fv(state.location.iResolution, state.resolution);
+
+    // generell: getUniformLocation kann auch hier aufgerufen werden, optimiert vielleicht ein paar epsilons...
+
+    // Was ist die Texture Unit? (i.e. TEXTURE0)
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, state.texture0);
+    gl.uniform1i(state.location.texture0, 0);
+    // <-- hint: 0 entspricht gl.TEXTURE0 unit
+
+    gl.activeTexture(gl.TEXTURE1);
+    gl.bindTexture(gl.TEXTURE_2D, state.texture1);
+    gl.uniform1i(state.location.texture1, 1);
+
+    gl.activeTexture(gl.TEXTURE2);
+    gl.bindTexture(gl.TEXTURE_2D, state.texture2);
+    gl.uniform1i(state.location.texture2, 2);
+
+    gl.drawArrays(gl.TRIANGLES, 0, 6);
+}

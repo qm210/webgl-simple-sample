@@ -3,7 +3,14 @@ precision highp float;
 out vec4 fragColor;
 uniform vec2 iResolution;
 uniform float iTime;
-uniform sampler2D iTexture;
+
+uniform sampler2D iTexture0;
+uniform sampler2D iTexture1;
+uniform sampler2D iTexture2;
+
+#define MATERIAL_CONST 0
+#define MATERIAL_BOX 1
+#define MATERIAL_FLOOR 2
 
 const float pi = 3.141593;
 
@@ -61,6 +68,8 @@ mat3 identity() {
 struct Surface {
     float sd;
     vec3 col;
+    int material;
+    vec2 st;
 };
 
 void wobbleDistort(inout Surface surface, vec3 p, float amp, vec3 scale) {
@@ -85,66 +94,74 @@ Surface sdPatternSphere( vec3 p, vec3 b, vec3 offset, vec3 col, mat3 transform, 
     vec3 q = abs(p) - b;
     float d = length(p / b) - 1.;
     col = mix(col, checkerCol, surfaceCheckerPattern(p, nSegments));
-    return Surface(d, col);
+    return Surface(d, col, 0, vec2(0.));
 }
 
 Surface sdSphere( vec3 p, vec3 b, vec3 offset, vec3 col, mat3 transform) {
     p = (p - offset) * transform;
     vec3 q = abs(p) - b;
     float d = length(p / b) - 1.;
-    return Surface(d, col);
+    return Surface(d, col, 0, vec2(0));
 }
 
 Surface sdBox( vec3 p, vec3 b, vec3 offset, vec3 col, mat3 transform) {
     p = (p - offset) * transform;
     vec3 q = abs(p) - b;
     float d = length(max(q,0.0)) + min(max(q.x,max(q.y,q.z)),0.0);
-    return Surface(d, col);
+    return Surface(d, col, 0, vec2(0));
 }
 
-Surface sdSpaceBox( vec3 p, vec3 b, vec3 offset, vec3 col, mat3 transform) {
+Surface sdTexturedBox( vec3 p, vec3 b, vec3 offset, vec3 col, mat3 transform) {
     p = (p - offset) * transform;
     vec3 q = abs(p) - b;
     float d = length(max(q,0.0)) + min(max(q.x,max(q.y,q.z)),0.0);
 
-    col = mix(vec3(1,0,0), vec3(1,1,0), 0.5 * (1. + p.x / b.x));
-
     vec3 a = 0.5 * p / b;
+
+    col = vec3(
+        0.5 + a.z,
+        0.5 + a.x,
+        0.5 - a.z // B mirrors R because we want bright colors for clarity
+    );
+    // col = mix(vec3(1,0,0), vec3(1,1,0), 0.5 * (1. + p.x / b.x));
+
     vec2 uv;
-    if (d < 0.001) {
-        if (abs(a.z) > 0.5) {
-            uv = 0.5 - a.xy;
-            col = texture(iTexture, uv).xyz;
-        } else if (abs(a.y) > 0.5) {
-            // oben
-            uv = 0.5 + a.xz;
-            col = texture(iTexture, uv).xyz;
-        } else if (abs(a.x) > 0.5) {
-            uv = vec2(0.5 - a.z * sign(a.x), 0.5 - a.y);
-            col = texture(iTexture, uv).rgb;
-            col.r = 0.;
-        }
+    if (abs(a.z) > 0.5) {
+        uv = vec2(0.5 + a.x * sign(a.z), 0.5 - a.y);
+        // col.b = sign(a.z);
+    } else if (abs(a.y) > 0.5) {
+        // oben
+        // uv = 0.5 + a.xz;
+        uv = vec2(0.5 + a.x * sign(a.y), 0.5 + a.z);
+    } else if (abs(a.x) > 0.5) {
+        uv = vec2(0.5 - a.z * sign(a.x), 0.5 - a.y);
     }
 
 //
-//    if (p.z > b.z - 0.01) {
-//        col = vec3(0,1,0);
-//    }
-//    if (p.z < -b.z + 0.01) {
-//        col = vec3(0,0,1);
-//    }
+//    uv = mix(
+//        mix(
+//            vec2(0.5 + a.x * sign(a.z), 0.5 - a.y),
+//            vec2(0.5 + a.x * sign(a.y), 0.5 + a.z),
+//            step(0.5, abs(a.y))
+//        ),
+//        vec2(0.5 - a.z * sign(a.x), 0.5 - a.y),
+//        step(0.5, abs(a.x))
+//    );
 
     // check execution time (query?)
     // check memory usage - texture and uniforms
 
-    return Surface(d, col);
+    return Surface(d, col, MATERIAL_BOX, uv);
 }
 
 float floorLevel = -3.;
 
-Surface sdFloor(vec3 p, vec3 col) {
+Surface sdFloor(vec3 p) {
     float d = p.y - floorLevel;
-    return Surface(d, col);
+    vec3 floorColor = (0.5 + 0.15 * mod(floor(p.x) + floor(p.z), 4.0)) * vec3(0.9, 1., .95);
+    vec2 floorUv = fract(0.25 * p.xz);
+    // floorColor = texture(iTexture2, floorUv).rgb;
+    return Surface(d, floorColor, MATERIAL_FLOOR, floorUv);
 }
 
 Surface takeCloser(Surface obj1, Surface obj2) {
@@ -155,24 +172,28 @@ Surface takeCloser(Surface obj1, Surface obj2) {
 }
 
 Surface sdScene(vec3 p) {
-    vec3 floorColor = (0.5 + 0.15 * mod(floor(p.x) + floor(p.z), 4.0)) * vec3(0.9, 1., .95);
-    Surface co = sdFloor(p, floorColor);
-    Surface box, ball;
-//    box = sdBox(p, vec3(1.), vec3(-2., floorLevel + 1., -2.), vec3(1, 0.1, 0.4), identity());
-//    co = takeCloser(co, box);
-    box = sdSpaceBox(p, vec3(0.9), vec3(1.5, floorLevel + 1.2, -1.5), vec3(0.3, 0.65, 0.9), rotateY(-0.2 * pi));
-    co = takeCloser(co, box);
+    Surface obj;
+    Surface co = sdFloor(p);
+
+    obj = sdTexturedBox(p, vec3(0.9), vec3(1.5, floorLevel + 1.2, -1.5), vec3(0.3, 0.65, 0.9), rotateX(-0.2 * pi + iTime));
+    co = takeCloser(co, obj);
 
     // 0.5 pi = 90°
-    box = sdSpaceBox(p, vec3(0.9), vec3(-1.5, floorLevel + 1.2, -1.5), vec3(0.3, 0.65, 0.9), rotateY(+0.3 * pi));
-    co = takeCloser(co, box);
+    obj = sdTexturedBox(p, vec3(0.9), vec3(-1.5, floorLevel + 1.2, -1.5), vec3(0.3, 0.65, 0.9), rotateY(+0.3 * pi + iTime));
+    co = takeCloser(co, obj);
 
+    obj = sdPatternSphere(p, vec3(1.), vec3(-2., floorLevel + 1., -2.), vec3(1, 0.1, 0.8), identity(), vec3(0.5, 0.2, 0.8), 8.);
 
-    //    ball = sdPatternSphere(p, vec3(1.), vec3(-2., floorLevel + 1., -2.), vec3(1, 0.1, 0.8), identity(), vec3(0.5, 0.2, 0.8), 8.);
+    mat3 ballTransform = rotateY(0.5 * iTime);
+    obj = sdSphere(p, vec3(1.), vec3(-2., floorLevel + 1., -2.), vec3(1, 0.6, 0.8), ballTransform);
+    co = takeCloser(co, obj);
 
-    //    mat3 ballTransform = rotateY(0.5 * iTime);
-    //    ball = sdSphere(p, vec3(1.), vec3(-2., floorLevel + 1., -2.), vec3(1, 0.6, 0.8), ballTransform);
-    //    co = takeCloser(co, ball);
+    if (co.material == MATERIAL_BOX) {
+        co.col *= texture(iTexture0, co.st).rgb;
+    }
+    else if (co.material == MATERIAL_FLOOR) {
+        co.col *= texture(iTexture2, co.st).rgb;
+    }
 
     return co;
 }
@@ -236,8 +257,9 @@ vec3 calcNormal(in vec3 p) {
 void main() {
     vec2 uv = (-1.0 + 2.0 * gl_FragCoord.xy / iResolution.xy) * vec2(iResolution.x / iResolution.y, 1.0);
 
-    vec3 backgroundColor = vec3(0); // vec3(0.8, 0.3 + uv.y, 1.);
-    vec3 col = vec3(0.);
+    vec2 st = fract(uv);
+    vec4 backgroundColor = texture(iTexture1, st);
+    vec4 col = vec4(0.);
     float d;
 
     vec3 ro = vec3(0., 0., 1.);
@@ -247,9 +269,7 @@ void main() {
 
     Surface co = rayMarch(ro, rd, MIN_DIST, MAX_DIST);
 
-    if (co.sd > MAX_DIST) {
-        col = backgroundColor;
-    } else {
+    if (co.sd < MAX_DIST) {
         vec3 p = ro + rd * co.sd;
         vec3 normal = calcNormal(p);
         vec3 lightPosition = vec3(4., 7., 2.);
@@ -284,7 +304,7 @@ void main() {
         //        d = mix(d, specular, 0.);
 
         // verschiedenartiges Color Grading
-        col = pow(co.sd, 0.1) * co.col;
+        col.xyz = pow(co.sd, 0.1) * co.col;
 
         //        dif = mix(dif, co.sd, 0.03);
         //        dif = mix(dif, dif * co.sd, 0.24);
@@ -294,14 +314,21 @@ void main() {
         //        dif = pow(dif, 2.);
 
         // Distance Fog: Abschwächen je nach durchlaufenem Abstand
-        col *= exp(-0.0001 * pow(co.sd, 3.));
+        float fog = exp(-0.00001 * pow(co.sd, 4.));
+        col.xyz *= fog;
+        col.a = step(0.1, fog);
+        // col.a = exp(-0.0001 * pow(co.sd, 3.));
+        // col.a = 1. - clamp(pow(length(col.xyz), 50.), 0., 1.);
     }
 
     // Beispiel Post-Processing (transformiert nur noch Farbe -> Farbe, nicht mehr Geometrie)
     // col = atan(8. * pow(col, vec3(5.)));
 
-    fragColor = vec4(col, 1.0);
+    fragColor = mix(backgroundColor, vec4(col.xyz, 1.), col.a);
+    //fragColor = mix(backgroundColor, col, col.a);
 
     // quick check: so sähe das direkt gemappt aus.
-//     fragColor = texture(iTexture, uv);
+    // Man achte auf die Werte der Koordinaten und die Texturparameter.
+    // (v.A. bei einer Textur, die keinen schwarzen Rand hat.)
+    // fragColor = texture(iTexture, uv);
 }

@@ -26,9 +26,11 @@ const generatePage = (elements, state, controls, autoRenderOnLoad) => {
     );
 
     document.addEventListener("DOMContentLoaded", () => {
-        const firstAnnotatedLine = document.querySelector(".line.annotated");
-        if (firstAnnotatedLine) {
-            firstAnnotatedLine.scrollIntoView({
+        const firstInterestingLine =
+            document.querySelector(".line.error")
+            ?? document.querySelector(".line.annotated");
+        if (firstInterestingLine) {
+            firstInterestingLine.scrollIntoView({
                 behaviour: "smooth",
                 block: "center"
             });
