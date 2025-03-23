@@ -85,21 +85,9 @@ export const addControlsToPage = (elements, state, controls, autoRenderOnLoad) =
 function renderErrorConsole(state) {
     let result = `
         <h2>Compilation failed.</h2>
-        <div>
-            <h4>Fragment Shader</h4>
-            <div>Compile Status: ${state.compileStatus.fragment}</div>
-            <div class="error">${state.error.fragment}</div>
-        </div>
-        <div>
-            <h4>Vertex Shader</h4>
-            <div>Compile Status: ${state.compileStatus.vertex}</div>
-            <div class="error">${state.error.vertex}</div>
-        </div>
-        <div>
-            <h4>Shader Program</h4>
-            <div>Link Status: ${state.compileStatus.linker}</div>
-            <div class="error">${state.error.linker}</div>
-        </div>
+        ${renderCompileStepStatus("Fragment Shader", state.error.fragment, "compiled.")}
+        ${renderCompileStepStatus("Vertex Shader", state.error.vertex, "compiled.")}
+        ${renderCompileStepStatus("Shader Program", state.error.linker, "linked.")}
     `;
 
     const locations = Object.entries(state.location);
@@ -115,4 +103,16 @@ function renderErrorConsole(state) {
     }
 
     return result;
+}
+
+function renderCompileStepStatus(title, error, successMessage) {
+    const content = error
+        ? `<div class="error">${error}</div>`
+        : `<div>${successMessage}</div>`;
+    return `
+        <div>
+            <h4>${title}</h4>
+            ${content}
+        </div>    
+    `;
 }

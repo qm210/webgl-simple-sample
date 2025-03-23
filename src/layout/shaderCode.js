@@ -2,7 +2,7 @@ import {diffLines} from "diff";
 
 export function displayCode(element, shaderSource, errorLog, storageKey) {
 
-    const lines = enrichedParse(shaderSource, errorLog, storageKey);
+    const lines = prepareAnnotatedLines(shaderSource, errorLog, storageKey);
 
     const rendered = lines.map(renderEnrichedLine).join("");
 
@@ -19,56 +19,57 @@ function renderEnrichedLine(line) {
         return `<div class="empty-line"></div>`;
     }
 
-    const classes = ["line"];
+    const element = createDiv("", "line");
+
     const errors = line.error
         ?.inRow
         .map(error => error.message)
         .join('; ') ?? "";
 
-    let title = "";
     let annotation = "";
 
     if (line.changed) {
-        classes.push("changed");
+        element.classList.add("changed");
+        element.title = "Line Changed"
         annotation = "changed";
-        title = "Line Changed"
     }
     if (line.removedBefore.length > 0) {
-        classes.push("removed-before");
-        title = "Was Removed: " + line.removedBefore.join("\n");
+        element.classList.add("removed-before");
+        element.title = "Was Removed: " + line.removedBefore.join("\n");
     }
     if (errors) {
-        classes.push("error");
-        title = errors;
+        element.classList.add("error");
+        element.title = errors;
         annotation = errors;
     }
 
-    let attributes = "";
-    if (title) {
-        attributes += `title="${title}"`;
-    }
+    element.appendChild(
+        createDiv(line.number, "line-number")
+    );
+    element.appendChild(
+        createDiv(line.code, "code")
+    );
 
-    const elements = [
-        `<div class="line-number">${line.number}</div>`,
-        `<div class="code">${line.code}</div>`,
-    ];
     if (annotation) {
-        classes.push("annotated");
-        elements.push(
-            `<div class="annotation">${annotation}</div>`
+        element.appendChild(
+            createDiv(annotation, "annotation")
         );
+        element.classList.add("annotated");
     }
 
-    attributes += ` class="${classes.join(" ")}"`;
-
-    return `
-        <div ${attributes}>
-            ${elements.join("")}
-        </div>
-    `;
+    return element.outerHTML;
 }
 
-function enrichedParse(source, errorLog, storageKey) {
+function createDiv(content, classes) {
+    const div = document.createElement("div");
+    if (classes) {
+        div.classList.add(...classes.split(" "));
+    }
+    div.textContent = content.toString();
+    return div;
+}
+
+function prepareAnnotatedLines(source, errorLog, storageKey) {
     const stored = sessionStorage.getItem(storageKey) ?? "";
     if (storageKey) {
         sessionStorage.setItem(storageKey, source);
