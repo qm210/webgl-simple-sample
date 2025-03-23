@@ -2,7 +2,7 @@ import standardSetup from "./3_SimpleGeometry.js";
 import {startRenderLoop} from "../webgl/render.js";
 import {createTextureFromImage} from "../webgl/helpers.js";
 
-import fragmentShaderSource from "../shaders/texturesBeginning.glsl";
+import fragmentShaderSource from "../shaders/textures.glsl";
 import postFragmentShaderSource from "../shaders/postProcessing.glsl";
 
 import image0 from "../textures/frame.png";

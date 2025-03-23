@@ -20,6 +20,7 @@ const float MAX_DIST = 100.0;
 const float PRECISION = 0.001;
 
 // Rotation matrix around the X axis.
+// Winkel in Einheit Radians, d.h. theta = pi entspricht 180°
 mat3 rotateX(float theta) {
     float c = cos(theta);
     float s = sin(theta);
@@ -66,10 +67,10 @@ mat3 identity() {
 }
 
 struct Surface {
-    float sd;
-    vec3 col;
-    int material;
-    vec2 uv;
+    float sd; // Abstand des Rays vom Objekt
+    vec3 col; // <-- die Objekte dürfen eine intrinsische Farbe haben
+    int material; // wir verlagern die Zuweisung der Farben auf nach dem Ray Marching...
+    vec2 uv; // wir müssen aber mitführen
 };
 
 void wobbleDistort(inout Surface surface, vec3 p, float amp, vec3 scale) {
@@ -116,15 +117,20 @@ Surface sdTexturedBox( vec3 p, vec3 b, vec3 offset, vec3 col, mat3 transform) {
     vec3 q = abs(p) - b;
     float d = length(max(q,0.0)) + min(max(q.x,max(q.y,q.z)),0.0);
 
+    // Koordinatentransformation:
+    // Um Textur zuzuordnen, müssen wir uns in den Würfel hineinversetzen.
+    // - In seinem eigenen Koordinatensystem rotiert er nicht,
+    // - die Mitte ist nicht bei p (Weltkoordinaten), sondern bei vec3(0)
+    // - und auch die Skalierung (b) für seine prinzipielle Würfelhaftigkeit egal.
     vec3 a = 0.5 * p / b;
+    // damit geht der Würfel in jeder Dimension von einer Wand bei -0.5 zu einer bei +0.5
 
-    // put a shiny gradient on there
+    // Gradient um oben/unten auseinander halten zu können.
     col = vec3(
         0.5 + a.z,
         0.5 + a.x,
-        0.5 - a.z // B mirrors R because we want bright colors for clarity
+        0.5 - a.z // aber zu Farbmischungen kommen wir noch.
     );
-    // col = mix(vec3(1,0,0), vec3(1,1,0), 0.5 * (1. + p.x / b.x));
 
     vec2 uv;
     // Um Zuordnung zu verstehen:
@@ -137,8 +143,10 @@ Surface sdTexturedBox( vec3 p, vec3 b, vec3 offset, vec3 col, mat3 transform) {
     } else if (abs(a.x) > 0.5) {
         uv = vec2(0.5 - a.z * sign(a.x), 0.5 - a.y);
     }
+    // Reminder: if() generell überdenken, aber das reicht auch,
+    // wenn irgendwo konkret ein Performanceproblem vorliegt.
 
-//
+    // oder wäre das hier viel lehrreicher?
 //    uv = mix(
 //        mix(
 //            vec2(0.5 + a.x * sign(a.z), 0.5 - a.y),
@@ -157,6 +165,22 @@ float hash(vec2 n) {
     return fract(sin(dot(n, vec2(12.9898, 4.1414))) * 43758.5453);
 }
 
+float hash14(vec4 p)
+{
+    uvec4 q = uvec4(ivec4(p)) * uvec4(1597334673U, 3812015801U, 2798796415U, 1979697957U);
+    uint n = (q.x ^ q.y ^ q.z ^ q.w) * 1597334673U;
+    return float(n) * 2.328306437080797e-10;
+}
+
+float hash14(vec2 p)
+{
+    // funny enough, with 0. the glitches stay.
+    return hash14(vec4(p, 1., 1.));
+}
+
+// um schnell zwischen Hashfunktionen zu wechseln
+#define HASH hash14
+
 // "Value Noise" function
 float noise(vec2 p){
     vec2 ip = floor(p);
@@ -166,13 +190,13 @@ float noise(vec2 p){
 
     return mix(
         mix(
-            hash(ip),
-            hash(ip+vec2(1.0,0.0)),
+            HASH(ip),
+            HASH(ip+vec2(1.0,0.0)),
             fp.x
         ),
         mix(
-            hash(ip+vec2(0.0,1.0)),
-            hash(ip+vec2(1.0,1.0)),
+            HASH(ip+vec2(0.0,1.0)),
+            HASH(ip+vec2(1.0,1.0)),
             fp.x
         ),
         fp.y
@@ -180,7 +204,7 @@ float noise(vec2 p){
 }
 
 // Fractional Brownian Motion for low-frequency noise
-#define FBM_ITERATIONS 8
+#define FBM_ITERATIONS 10
 float fbm(vec2 p) {
     float f = 0.0;
     float amp = 0.5;
@@ -193,26 +217,25 @@ float fbm(vec2 p) {
 }
 
 float floorLevel = -1.;
-float noiseHeight = 3.;
+float noiseHeight = 3.; // was passiert bei zu hohen Werten, v.A. in Verbindung mit hohen FBM_ITERATIONS?
 float noiseFreq = 0.2;
 
 Surface sdFloor(vec3 p) {
-    vec3 floorColor = (0.5 + 0.15 * mod(floor(p.x) + floor(p.z), 4.0)) * vec3(0.9, 1., .95);
+    vec3 floorColor = vec3(1.);
+    // bisher: wurde hier definiert -> man verfolge MATERIAL_FLOOR
+    // floorColor = (0.5 + 0.15 * mod(floor(p.x) + floor(p.z), 4.0)) * vec3(0.9, 1., .95);
     vec2 floorUv = fract(p.xz); // fract() for texture wrapping, could scale like fract(0.25 * p.xz)
     float d = p.y - floorLevel;
-    // bisher: exit here.
-    // return Surface(d, floorColor, MATERIAL_CONST, floorUv); //MATERIAL_FLOOR
+    // flaches Terrain: exit here.
+    // return Surface(d, floorColor, MATERIAL_FLOOR, floorUv);
 
     // wir machen es uns hier leicht -- was ist mit den Normalenvektoren?
     // -> mal diffuse lighting einschalten
     float someOffset = 5.3; // hashes sehen um 0 oft auffällig auf
-    float noise = noiseHeight * (fbm(noiseFreq * p.xz + someOffset) - 0.5);
-    float noisyLevel = floorLevel - noise;
+    float noise = fbm(noiseFreq * p.xz + someOffset);
+    float noisyLevel = floorLevel - noiseHeight * (noise - 0.5);
     d = p.y - noisyLevel;
-    // quick idea to make the noise more visible: scale color with height (only visualization!)
-    // floorColor *= atan(noise);
-    // floorColor = vec3(1);
-    return Surface(d, floorColor, MATERIAL_CONST, floorUv);
+    return Surface(d, floorColor, MATERIAL_FLOOR, floorUv);
 }
 
 Surface takeCloser(Surface obj1, Surface obj2) {
@@ -231,7 +254,6 @@ Surface sdScene(vec3 p) {
     obj = sdTexturedBox(p, vec3(0.6), firstCubePos, vec3(0.3, 0.65, 0.9), rotateX(-0.2 * pi + iTime));
     co = takeCloser(co, obj);
 
-    // Radians: pi = 180°
     obj = sdTexturedBox(p, vec3(0.6), firstCubePos + vec3(-3.0, 0., 0.), vec3(0.3, 0.65, 0.9), rotateY(+0.3 * pi + iTime));
     co = takeCloser(co, obj);
 
@@ -242,14 +264,43 @@ Surface sdScene(vec3 p) {
     obj = sdSphere(p, vec3(1.), vec3(-2., floorLevel + 1., -2.), vec3(1, 0.6, 0.8), ballTransform);
     co = takeCloser(co, obj);
     */
-    if (co.material == MATERIAL_BOX) {
-        co.col *= texture(iTexture0, co.uv).rgb;
-    }
-    else if (co.material == MATERIAL_FLOOR) {
-        co.col *= texture(iTexture2, co.uv).rgb;
-    }
-
     return co;
+}
+
+void applyMaterial(inout Surface s, vec3 ray) {
+    if (s.material == MATERIAL_BOX) {
+        s.col *= texture(iTexture0, s.uv).rgb;
+        // Bock auf Holz?
+        float scale = 4.;
+        vec3 holz = texture(iTexture2, s.uv / scale).rgb;
+        // naive Farbmischung: mal mit Grundrechenarten rumprobieren.
+        // s.col = holz;
+        // s.col *= holz;
+        // s.col = min(s.col, holz);
+        // s.col = max(s.col, holz);
+        // s.col = pow(s.col + holz, vec3(1.4));  // <-- etc... you know the drill
+
+        // s.col = mix(s.col, holz, 0.5);
+        s.col = mix(s.col, holz, 0.5 - 0.5 * cos(iTime));
+
+        // "Screen"
+//         s.col = 1. - (1. - s.col) * (1. - holz);
+
+        // "Overlay"
+//        s.col = length(s.col) < 0.5
+//            ? 2. * s.col * holz
+//            : 1. - 2. * (1. - s.col) * (1. - holz);
+
+        // "Soft Light"
+//         s.col = s.col - holz + 2. * s.col * holz;
+
+        // "Soft Light", invers
+        s.col = holz - s.col + 2. * s.col * holz;
+    }
+    else if (s.material == MATERIAL_FLOOR) {
+        s.col *= (0.5 + 0.15 * mod(floor(ray.x) + floor(ray.z), 4.0)) * vec3(0.9, 1., .95);
+    }
+    s.col = clamp(s.col, vec3(0.), vec3(1.));
 }
 
 Surface rayMarch(vec3 ro, vec3 rd, float start, float end) {
@@ -272,8 +323,8 @@ Surface rayMarch(vec3 ro, vec3 rd, float start, float end) {
 float rayMarchShadow( in vec3 ro, in vec3 rd)
 {
     float tMin = 0.05;
-    float tMax = 2.;
-    float w = 0.1;
+    float tMax = 3.;
+    float w = 0.002;
 
     float d = 1.0;
     float t = tMin;
@@ -320,23 +371,38 @@ void main() {
     // transform uv but only for background
     vec2 bgUv = uv + 0.0 * vec2(0.1 * iTime, 0.);
     float bgRotationSpeed = 0.0; // 0.1;
-    bgUv = (rotateZ(bgRotationSpeed * iTime) * vec3(bgUv, 1.)).xy;
+    float bgScale = 1.; // z.B. mal 0.6 - wie üblich: invers denken
+    bgUv = bgScale * (rotateZ(bgRotationSpeed * iTime) * vec3(bgUv, 1.)).xy;
     vec2 st = fract(bgUv);
     vec4 bgColor = texture(iTexture1, st);
 
-    /*
-    bgColor.xyz = vec3(0);
-    float blurSteps = 32.;
-    float blurFactor = 0.05;
-    float phi = 0.04 * iTime;
-    for (float step=0.; step < blurSteps; step += 1.) {
-        phi -= 0.01;
-        bgUv = (rotateZ(phi) * vec3(uv, 1.)).xy;
-        st = fract(bgUv);
-        vec3 texColor = texture(iTexture1, st).xyz * exp(-blurFactor * step);
-        bgColor.xyz = max(texColor, bgColor.xyz);
-    }
-    */
+    // Beispiel Textur-Processing: Radial Motion Blur
+    // man achte aber auf die Ecken -> Granularität sichtbar
+//    bgColor.xyz = vec3(0);
+//    float blurSteps = 32.;
+//    float blurLength = 5.;
+//    float phi = 0.03 * iTime;
+//    for (float step=0.; step < blurSteps; step += 1.) {
+//        phi -= 0.005;
+//        bgUv = (rotateZ(phi) * vec3(uv, 1.)).xy;
+//        st = fract(bgUv);
+//        vec3 texColor = texture(iTexture1, st).xyz * exp(-step / blurLength);
+//        bgColor.xyz = max(texColor, bgColor.xyz);
+//    }
+
+    // anderes Beispiel: Radial Blur
+//    bgColor.xyz = vec3(0);
+//    float blurSteps = 32.;
+//    float blurLength = 15.;
+//    float factor = 0.005;
+//    vec2 center = vec2(0., 0.6 + 0.2 * sin(iTime));
+//    for (float step=0.; step < blurSteps; step += 1.) {
+//        bgScale = 1. + factor * step;
+//        bgUv = bgScale * (uv - center) + center;
+//        st = fract(bgUv);
+//        vec3 texColor = texture(iTexture1, st).xyz * exp(-step / blurLength);
+//        bgColor.xyz = max(texColor, bgColor.xyz);
+//    }
 
     vec4 col = vec4(0.);
     float d;
@@ -351,8 +417,11 @@ void main() {
 
     if (co.sd < MAX_DIST) {
         vec3 p = ro + rd * co.sd;
+        applyMaterial(co, p);
         vec3 normal = calcNormal(p);
-        vec3 lightPosition = firstCubePos + vec3(0., 4., 0.); // vec3(0., 2., 3.);
+        vec3 lightPosition = firstCubePos + vec3(0., 3., 3.);
+        lightPosition.x += 5. * cos(iTime);
+        lightPosition.z += 3. * sin(iTime);
         vec3 lightDirection = normalize(lightPosition - p);
 
         // lightDirection = normalize(vec3(2. * cos(iTime), 0.5, 0.));
@@ -376,21 +445,24 @@ void main() {
 
         // sekundäres Ray Marching für Schatten
         float shadow = rayMarchShadow(p, lightDirection);
-        d = mix(d, shadow, 0.5);
+        d = mix(d, shadow, 0.8);
 
         // Specular reflection:
         // proportional to angle between ray and reflections
-        //        vec3 refl = reflect(lightDirection, normal);
-        //        float specular = dot(refl, normalize(p));
-        //        specular = clamp(specular, 0., 1.);
-        //        specular = pow(specular, 3.);
-        //        d = mix(d, specular, 0.);
+        vec3 refl = reflect(lightDirection, normal);
+        float specular = dot(refl, normalize(p));
+        specular = clamp(specular, 0., 1.);
+        specular = pow(specular, 3.);
+        // Idee: unterschiedliche Materialien spiegeln unterschiedlich stark.
+        specular = co.material == MATERIAL_FLOOR ? 0.1 : 1.;
+
+        d = mix(d, specular, 0.5);
 
 
         // verschiedenartiges Color Grading
         // col.xyz = pow(co.sd, 0.1) * co.col;
 
-        col.xyz = pow(d, 1.) * co.col;
+        col.xyz = pow(d, 0.3) * co.col;
 
         //        dif = mix(dif, co.sd, 0.03);
         //        dif = mix(dif, dif * co.sd, 0.24);
@@ -415,10 +487,10 @@ void main() {
     // Beispiel Post-Processing (transformiert nur noch Farbe -> Farbe, nicht mehr Geometrie)
     // col = atan(8. * pow(col, vec3(5.)));
 
-    // uv = floor(1000.*uv);
-    float rnd;
-
-    // float rnd = fract(1000000. * sin(321231. * uv.x + 34928. * uv.y));
+//    float rnd;
+//    rnd = fract(1000000. * sin(321231. * uv.x + 34928. * uv.y)); // see it flickering?
+//    rnd = hash14(floor(0.1 * gl_FragCoord));
+//    col.xyz = vec3(rnd);
 
     //uv = floor(2. * uv);
 
