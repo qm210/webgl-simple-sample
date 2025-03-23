@@ -1,4 +1,4 @@
-import {asResolution} from "./helpers.js";
+import {asResolution, createShader} from "./helpers.js";
 
 /**
  *
@@ -55,11 +55,6 @@ function createInitialState(vertexSrc, fragmentSrc) {
             fragment: "",
             linker: "",
         },
-        compileStatus: {
-            vertex: undefined,
-            fragment: undefined,
-            linker: undefined,
-        },
         program: undefined,
         location: {},
     };
@@ -74,44 +69,25 @@ function createInitialState(vertexSrc, fragmentSrc) {
 export function compile(gl, vertexSrc, fragmentSrc) {
     const result = createInitialState(vertexSrc, fragmentSrc);
 
-    // we do it as verbose as it's usually done - i.e. yes, this could be cleaner.
+    const v = createShader(gl, gl.VERTEX_SHADER, vertexSrc);
+    result.error.vertex = v.error;
 
-    const vertexShader = gl.createShader(gl.VERTEX_SHADER);
-    gl.shaderSource(vertexShader, vertexSrc);
-    gl.compileShader(vertexShader);
-    result.compileStatus.vertex = gl.getShaderParameter(vertexShader, gl.COMPILE_STATUS);
-    result.error.vertex = gl.getShaderInfoLog(vertexShader);
-    if (!result.compileStatus.vertex) {
-        gl.deleteShader(vertexShader);
-        // NOTE: vertexShader is now unusuable ...
-    }
-    // NOTE: ... but we don't need it further anyway ;)
+    const f = createShader(gl, gl.FRAGMENT_SHADER, fragmentSrc);
+    result.error.fragment = f.error;
 
-    const fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
-    gl.shaderSource(fragmentShader, fragmentSrc);
-    gl.compileShader(fragmentShader);
-    result.compileStatus.fragment = gl.getShaderParameter(fragmentShader, gl.COMPILE_STATUS);
-    result.error.fragment = gl.getShaderInfoLog(fragmentShader);
-    if (!result.compileStatus.fragment) {
-        gl.deleteShader(fragmentShader);
-    }
-
-    // Note: these single error checks are only useful for demonstration, we wouldn't get far anyway
     const program = gl.createProgram();
-    if (!result.error.vertex) {
-        gl.attachShader(program, vertexShader);
+    if (!v.error) {
+        gl.attachShader(program, v.shader);
     }
-    if (!result.error.fragment) {
-        gl.attachShader(program, fragmentShader);
+    if (!f.error) {
+        gl.attachShader(program, f.shader);
     }
     gl.linkProgram(program);
-    result.compileStatus.linker = gl.getProgramParameter(program, gl.LINK_STATUS);
     result.error.linker = gl.getProgramInfoLog(program);
-    if (!result.compileStatus.linker) {
+    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
         gl.deleteProgram(program);
         return result;
     }
-    // Note: usually, we only read the getProgramInfoLog when one of the parameters is false
 
     result.program = program;
     return result;

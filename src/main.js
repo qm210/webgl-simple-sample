@@ -12,9 +12,10 @@ import showcase4 from "./showcases/4_More2DGeometry.js";
 import showcase5a from "./showcases/5a_RayTracingCubeBeginning.js";
 import showcase5b from "./showcases/5b_RayTracingCubeExtended.js";
 import showcase6 from "./showcases/6_Texture.js";
+import showcase7 from "./showcases/7_ColorMixing.js";
 
 // choose wisely :)
-const showcase = showcase6;
+const showcase = showcase7;
 
 const autoRenderOnLoad = true;
 

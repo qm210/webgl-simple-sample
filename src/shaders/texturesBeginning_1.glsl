@@ -3,12 +3,14 @@ precision highp float;
 out vec4 fragColor;
 uniform vec2 iResolution;
 uniform float iTime;
+uniform int iPass;
 
+uniform sampler2D iTexture0;
 uniform sampler2D iTexture1;
 uniform sampler2D iTexture2;
 
 #define MATERIAL_CONST 0
-#define MATERIAL_GRASS 1
+#define MATERIAL_BOX 1
 #define MATERIAL_FLOOR 2
 
 const float pi = 3.141593;
@@ -110,47 +112,57 @@ Surface sdBox( vec3 p, vec3 b, vec3 offset, vec3 col, mat3 transform) {
     return Surface(d, col, 0, vec2(0));
 }
 
-Surface sdSpaceBox( vec3 p, vec3 b, vec3 offset, vec3 col, mat3 transform) {
+Surface sdTexturedBox( vec3 p, vec3 b, vec3 offset, vec3 col, mat3 transform) {
     p = (p - offset) * transform;
     vec3 q = abs(p) - b;
     float d = length(max(q,0.0)) + min(max(q.x,max(q.y,q.z)),0.0);
 
-    col = mix(vec3(1,0,0), vec3(1,1,0), 0.5 * (1. + p.x / b.x));
-
     vec3 a = 0.5 * p / b;
+
+    col = vec3(
+        0.5 + a.z,
+        0.5 + a.x,
+        0.5 - a.z // B mirrors R because we want bright colors for clarity
+    );
+    // col = mix(vec3(1,0,0), vec3(1,1,0), 0.5 * (1. + p.x / b.x));
+
     vec2 uv;
-    if (d < 0.001) {
-        if (abs(a.z) > 0.5) {
-            uv = 0.5 - a.xy;
-        } else if (abs(a.y) > 0.5) {
-            // oben
-            uv = 0.5 + a.xz;
-        } else if (abs(a.x) > 0.5) {
-            uv = vec2(0.5 - a.z * sign(a.x), 0.5 - a.y);
-            col.r = 0.;
-        }
-        col *= texture(iTexture2, uv).rgb;
+    if (abs(a.z) > 0.5) {
+        uv = vec2(0.5 + a.x * sign(a.z), 0.5 - a.y);
+        // col.b = sign(a.z);
+    } else if (abs(a.y) > 0.5) {
+        // oben
+        // uv = 0.5 + a.xz;
+        uv = vec2(0.5 + a.x * sign(a.y), 0.5 + a.z);
+    } else if (abs(a.x) > 0.5) {
+        uv = vec2(0.5 - a.z * sign(a.x), 0.5 - a.y);
     }
 
 //
-//    if (p.z > b.z - 0.01) {
-//        col = vec3(0,1,0);
-//    }
-//    if (p.z < -b.z + 0.01) {
-//        col = vec3(0,0,1);
-//    }
+//    uv = mix(
+//        mix(
+//            vec2(0.5 + a.x * sign(a.z), 0.5 - a.y),
+//            vec2(0.5 + a.x * sign(a.y), 0.5 + a.z),
+//            step(0.5, abs(a.y))
+//        ),
+//        vec2(0.5 - a.z * sign(a.x), 0.5 - a.y),
+//        step(0.5, abs(a.x))
+//    );
 
     // check execution time (query?)
     // check memory usage - texture and uniforms
 
-    return Surface(d, col, MATERIAL_GRASS, uv);
+    return Surface(d, col, MATERIAL_BOX, uv);
 }
 
 float floorLevel = -3.;
 
-Surface sdFloor(vec3 p, vec3 col) {
+Surface sdFloor(vec3 p) {
     float d = p.y - floorLevel;
-    return Surface(d, col, 0, vec2(0.));
+    vec3 floorColor = (0.5 + 0.15 * mod(floor(p.x) + floor(p.z), 4.0)) * vec3(0.9, 1., .95);
+    vec2 floorUv = fract(0.25 * p.xz);
+    // floorColor = texture(iTexture2, floorUv).rgb;
+    return Surface(d, floorColor, MATERIAL_FLOOR, floorUv);
 }
 
 Surface takeCloser(Surface obj1, Surface obj2) {
@@ -161,27 +173,28 @@ Surface takeCloser(Surface obj1, Surface obj2) {
 }
 
 Surface sdScene(vec3 p) {
-    vec3 floorColor = (0.5 + 0.15 * mod(floor(p.x) + floor(p.z), 4.0)) * vec3(0.9, 1., .95);
-    // vec2 floorUv = fract(0.25 * p.xz);
-    // floorColor = texture(iTexture2, floorUv).rgb;
+    Surface obj;
+    Surface co = sdFloor(p);
 
-    Surface co = sdFloor(p, floorColor);
-    Surface box, ball;
-//    box = sdBox(p, vec3(1.), vec3(-2., floorLevel + 1., -2.), vec3(1, 0.1, 0.4), identity());
-//    co = takeCloser(co, box);
-    box = sdSpaceBox(p, vec3(0.9), vec3(1.5, floorLevel + 1.2, -1.5), vec3(0.3, 0.65, 0.9), rotateY(-0.2 * pi));
-    co = takeCloser(co, box);
+    obj = sdTexturedBox(p, vec3(0.9), vec3(1.5, floorLevel + 1.2, -1.5), vec3(0.3, 0.65, 0.9), rotateX(-0.2 * pi + iTime));
+    co = takeCloser(co, obj);
 
     // 0.5 pi = 90°
-    box = sdSpaceBox(p, vec3(0.9), vec3(-1.5, floorLevel + 1.2, -1.5), vec3(0.3, 0.65, 0.9), rotateY(+0.3 * pi));
-    co = takeCloser(co, box);
+    obj = sdTexturedBox(p, vec3(0.9), vec3(-1.5, floorLevel + 1.2, -1.5), vec3(0.3, 0.65, 0.9), rotateY(+0.3 * pi + iTime));
+    co = takeCloser(co, obj);
 
+    obj = sdPatternSphere(p, vec3(1.), vec3(-2., floorLevel + 1., -2.), vec3(1, 0.1, 0.8), identity(), vec3(0.5, 0.2, 0.8), 8.);
 
-    //    ball = sdPatternSphere(p, vec3(1.), vec3(-2., floorLevel + 1., -2.), vec3(1, 0.1, 0.8), identity(), vec3(0.5, 0.2, 0.8), 8.);
+    mat3 ballTransform = rotateY(0.5 * iTime);
+    obj = sdSphere(p, vec3(1.), vec3(-2., floorLevel + 1., -2.), vec3(1, 0.6, 0.8), ballTransform);
+    co = takeCloser(co, obj);
 
-    //    mat3 ballTransform = rotateY(0.5 * iTime);
-    //    ball = sdSphere(p, vec3(1.), vec3(-2., floorLevel + 1., -2.), vec3(1, 0.6, 0.8), ballTransform);
-    //    co = takeCloser(co, ball);
+    if (co.material == MATERIAL_BOX) {
+        co.col *= texture(iTexture0, co.uv).rgb;
+    }
+    else if (co.material == MATERIAL_FLOOR) {
+        co.col *= texture(iTexture2, co.uv).rgb;
+    }
 
     return co;
 }
@@ -302,8 +315,9 @@ void main() {
         //        dif = pow(dif, 2.);
 
         // Distance Fog: Abschwächen je nach durchlaufenem Abstand
-        col.xyz *= exp(-0.00001 * pow(co.sd, 4.));
-        col.a = step(0.3, length(col.xyz));
+        float fog = exp(-0.00001 * pow(co.sd, 4.));
+        col.xyz *= fog;
+        col.a = step(0.1, fog);
         // col.a = exp(-0.0001 * pow(co.sd, 3.));
         // col.a = 1. - clamp(pow(length(col.xyz), 50.), 0., 1.);
     }

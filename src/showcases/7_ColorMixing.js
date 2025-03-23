@@ -1,14 +1,14 @@
 import standardSetup from "./3_SimpleGeometry.js";
+import {startRenderLoop} from "../webgl/render.js";
 import {createTextureFromImage} from "../webgl/helpers.js";
 
-import fragmentShaderSource from "../shaders/texturesBeginning.glsl";
+import fragmentShaderSource from "../shaders/colorMixing.glsl";
 import image0 from "../textures/frame.png";
 import image1 from "../textures/hubble_extreme_deep_field.jpg";
 import image2 from "../textures/Wood066_1K-JPG_Color.jpg";
-import {startRenderLoop} from "../webgl/render.js";
 
 export default {
-    title: "Textures",
+    title: "Color Mixing",
     init: (gl) => {
         const state = standardSetup.init(gl, fragmentShaderSource);
 
