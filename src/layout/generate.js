@@ -1,5 +1,6 @@
 import {addButton, addValueLabel} from "./controls.js";
-import {displayCode} from "./shaderCode.js";
+import {appendCodeBlock} from "./shaderCode.js";
+import {appendText} from "./helpers.js";
 
 
 const generatePage = (elements, state, controls, autoRenderOnLoad) => {
@@ -11,19 +12,38 @@ const generatePage = (elements, state, controls, autoRenderOnLoad) => {
         elements.console.remove();
     }
 
-    displayCode(
-        elements.fragment,
+    appendCodeBlock(
+        elements.shaders,
         state.source.fragment,
         state.error.fragment,
         "fragment.source"
     );
-
-    displayCode(
-        elements.vertex,
+    appendCodeBlock(
+        elements.shaders,
         state.source.vertex,
         state.error.vertex,
         "vertex.source"
     );
+
+    if (state.post) {
+        appendText(
+            elements.shaders,
+            "h4",
+            "Second Program (Post Processing):"
+        );
+        appendCodeBlock(
+            elements.shaders,
+            state.post.source.fragment,
+            state.post.error.fragment,
+            "fragment.post.source"
+        );
+        appendCodeBlock(
+            elements.shaders,
+            state.post.source.vertex,
+            state.post.error.vertex,
+            "vertex.post.source"
+        );
+    }
 
     document.addEventListener("DOMContentLoaded", () => {
         const firstInterestingLine =

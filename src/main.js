@@ -13,9 +13,10 @@ import showcase5a from "./showcases/5a_RayTracingCubeBeginning.js";
 import showcase5b from "./showcases/5b_RayTracingCubeExtended.js";
 import showcase6 from "./showcases/6_Texture.js";
 import showcase7 from "./showcases/7_ColorMixing.js";
+import showcase8 from "./showcases/8_Multipass.js";
 
 // choose wisely :)
-const showcase = showcase7;
+const showcase = showcase8;
 
 const autoRenderOnLoad = true;
 

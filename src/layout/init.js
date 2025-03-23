@@ -6,8 +6,6 @@ export default function init(rootId) {
     root.innerHTML = `
       <div id="layout">
         <div id="shaders">
-          <div id="fragment-source"></div>
-          <div id="vertex-source"></div>
         </div>
         <div id="console"></div>
         <div id="working-program">
@@ -26,8 +24,6 @@ export default function init(rootId) {
         shaders,
         console: document.getElementById("console"),
         workingShader: document.getElementById("working-program"),
-        fragment: document.getElementById("fragment-source"),
-        vertex: document.getElementById("vertex-source"),
         canvasFrame: document.getElementById("canvas-frame"),
         canvas: document.getElementById("canvas"),
         controls: document.getElementById("controls"),

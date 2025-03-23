@@ -1,10 +1,16 @@
 import {diffLines} from "diff";
+import {createDiv} from "./helpers.js";
 
-export function displayCode(element, shaderSource, errorLog, storageKey) {
+export function appendCodeBlock(parent, shaderSource, errorLog, storageKey) {
+    if (!shaderSource) {
+        return;
+    }
+
+    const element = document.createElement("div");
 
     const lines = prepareAnnotatedLines(shaderSource, errorLog, storageKey);
 
-    const rendered = lines.map(renderEnrichedLine).join("");
+    const rendered = lines.map(renderAnnotatedLine).join("");
 
     element.classList.add("code-block");
     element.innerHTML = `
@@ -12,9 +18,11 @@ export function displayCode(element, shaderSource, errorLog, storageKey) {
             ${rendered}
         </div>
     `;
+
+    parent.appendChild(element);
 }
 
-function renderEnrichedLine(line) {
+function renderAnnotatedLine(line) {
     if (!line.code) {
         return `<div class="empty-line"></div>`;
     }
@@ -60,15 +68,6 @@ function renderEnrichedLine(line) {
     return element.outerHTML;
 }
 
-function createDiv(content, classes) {
-    const div = document.createElement("div");
-    if (classes) {
-        div.classList.add(...classes.split(" "));
-    }
-    div.textContent = content.toString();
-    return div;
-}
-
 function prepareAnnotatedLines(source, errorLog, storageKey) {
     const stored = sessionStorage.getItem(storageKey) ?? "";
     if (storageKey) {
@@ -101,6 +100,7 @@ function prepareAnnotatedLines(source, errorLog, storageKey) {
             }
         } catch (err) {
             console.warn("WHAT??", diff.value, storedLines);
+            console.warn(err);
         }
 
         lines.push({
