@@ -127,7 +127,7 @@ function renderErrorConsole(state) {
 
 function renderCompileStepStatus(title, error, successMessage) {
     const content = error
-        ? `<div class="error">${error}</div>`
+        ? `<pre class="error">${error}</pre>`
         : `<div>${successMessage}</div>`;
     return `
         <div>

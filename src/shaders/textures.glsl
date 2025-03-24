@@ -7,6 +7,7 @@ uniform float iTime;
 uniform sampler2D iTexture0;
 uniform sampler2D iTexture1;
 uniform sampler2D iTexture2;
+uniform sampler2D iBumpMap;
 
 #define MATERIAL_CONST 0
 #define MATERIAL_BOX 1
@@ -172,6 +173,61 @@ Surface sdTetraeder( vec3 p, vec3 b, vec3 offset, vec3 col, mat3 transform) {
     return Surface(d, col, MATERIAL_BOX, uv);
 }
 
+float dot2( in vec3 v ) { return dot(v,v); }
+
+float udTriangle( vec3 p, vec3 a, vec3 b, vec3 c )
+{
+    vec3 ba = b - a; vec3 pa = p - a;
+    vec3 cb = c - b; vec3 pb = p - b;
+    vec3 ac = a - c; vec3 pc = p - c;
+    vec3 nor = cross( ba, ac );
+
+    return sqrt(
+        (sign(dot(cross(ba,nor),pa)) +
+        sign(dot(cross(cb,nor),pb)) +
+        sign(dot(cross(ac,nor),pc))<2.0)
+    ?
+    min( min(
+        dot2(ba*clamp(dot(ba,pa)/dot(ba,ba),0.0,1.0)-pa),
+        dot2(cb*clamp(dot(cb,pb)/dot(cb,cb),0.0,1.0)-pb) ),
+        dot2(ac*clamp(dot(ac,pc)/dot(ac,ac),0.0,1.0)-pc) )
+    :
+    dot(nor,pa)*dot(nor,pa)/dot2(nor) );
+}
+
+Surface sdTriangle( vec3 p, vec3 b, vec3 offset, vec3 col, mat3 transform) {
+    // was heißt es bildlich, das auszukommentieren?
+    p = (p - offset) * transform;
+
+    vec3 v1 = vec3(b.x, 0., 0.);
+    vec3 v2 = vec3(0., b.y, 0.);
+    vec3 v3 = vec3(0., 0., b.z);
+//
+//    v1 = vec3(0., 0.5 - 0.5 * cos(iTime), 0.);
+//    v2 = vec3(-1., 0., 0.);
+//    v3 = vec3(0., -1., 0.);
+
+    float d = udTriangle(p, v1, v2, v3);
+
+    vec3 vx = v2 - v1; // Vektor von v1 nach v2
+    vec3 vy = v3 - v1; // Vektor von v1 nach v3
+    vec3 vp = p - v1; // Vektor von v1 nach p
+
+    float lx2 = dot(vx, vx);
+    float ly2 = dot(vy, vy);
+    float dxy = dot(vx, vy);
+    float lxy = lx2 * ly2 - dxy * dxy;
+    float px = dot(vp, vx);
+    float py = dot(vp, vy);
+
+    float u = (ly2 * px - dxy * py) / lxy;
+    float v = (lx2 * py - dxy * px) / lxy;
+
+    vec2 uv = vec2(u, 1. - v);
+
+    return Surface(d, col, MATERIAL_BOX, uv);
+}
+
 // Hash function for noise generation
 float hash(vec2 n) {
     return fract(sin(dot(n, vec2(12.9898, 4.1414))) * 43758.5453);
@@ -247,6 +303,11 @@ Surface sdFloor(vec3 p) {
     float noise = fbm(noiseFreq * p.xz + someOffset);
     float noisyLevel = floorLevel - noiseHeight * (noise - 0.5);
     d = p.y - noisyLevel;
+
+    // oder aber: Height Map / Bump Map als Textur reingeben.
+//    vec2 st = clamp(0.033 * p.xz + vec2(.5,.8), vec2(0), vec2(1));
+//    d += 3. * texture(iBumpMap, st).r;
+
     return Surface(d, floorColor, MATERIAL_FLOOR, floorUv);
 }
 
@@ -257,19 +318,19 @@ Surface takeCloser(Surface obj1, Surface obj2) {
     return obj1;
 }
 
-vec3 firstCubePos = vec3(1.5, 0.5, -1.);
+vec3 firstCubePos = vec3(1.5, -0.25, -1.);
 
 Surface sdScene(vec3 p) {
     Surface obj;
     Surface co = sdFloor(p);
-
+//
     obj = sdTexturedBox(p, vec3(0.6), firstCubePos, vec3(0.3, 0.65, 0.9), rotateX(-0.2 * pi + iTime));
     co = takeCloser(co, obj);
 
 //    obj = sdTexturedBox(p, vec3(0.6), firstCubePos + vec3(-3.0, 0., 0.), vec3(0.3, 0.65, 0.9), rotateY(+0.3 * pi + iTime));
 //    co = takeCloser(co, obj);
-
-    obj = sdTetraeder(p, vec3(0.6), firstCubePos + vec3(-3.,0.,0.), vec3(0.3, 0.65, 0.9), rotateX(iTime));
+//
+    obj = sdTriangle(p, vec3(1.), firstCubePos + vec3(-3.,0.2 * sin(iTime),-.5), vec3(0.2, 0.7, 0.9), rotateY(iTime));
     co = takeCloser(co, obj);
 
     /*
@@ -414,7 +475,7 @@ void main() {
     vec4 col = vec4(0.);
     float d;
 
-    vec3 ro = vec3(0., 2., 1.);
+    vec3 ro = vec3(0., 1., 1.);
     float fov = 45. * pi / 180.; // 45° ist natürlicher, bleibt aber eine Designentscheidung
     vec3 rd = normalize(vec3(uv, -fov));
     rd *= rotateX(-0.2 * pi);

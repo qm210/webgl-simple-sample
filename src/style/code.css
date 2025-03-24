@@ -25,8 +25,13 @@
 .line {
     position: relative;
     display: flex;
+
     flex-flow: row wrap;
     align-items: baseline;
+}
+
+.line .code {
+    min-width: fit-content;
 }
 
 .line.changed {
@@ -46,11 +51,8 @@
 .annotation {
     font-size: 0.8rem;
     height: 0.7rem;
-    position: absolute;
-    right: 0.25rem;
-    top: 0;
-    bottom: 0;
-    margin: auto;
+    margin-left: auto;
+    padding: 0.5em;
     overflow: visible;
 }
 

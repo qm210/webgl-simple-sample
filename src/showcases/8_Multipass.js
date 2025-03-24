@@ -5,9 +5,10 @@ import {createTextureFromImage} from "../webgl/helpers.js";
 import fragmentShaderSource from "../shaders/textures.glsl";
 import postFragmentShaderSource from "../shaders/postProcessing.glsl";
 
-import image0 from "../textures/frame.png";
-import image1 from "../textures/hubble_extreme_deep_field.jpg";
-import image2 from "../textures/Wood066_1K-JPG_Color.jpg";
+import imageFrame from "../textures/frame.png";
+import imageSpace from "../textures/hubble_extreme_deep_field.jpg";
+import imageWood from "../textures/Wood066_1K-JPG_Color.jpg";
+import imageBumpMap from "../textures/funny_bumpmap.png";
 
 const ACTIVATE_POST_PROCESSING = true;
 
@@ -20,26 +21,33 @@ export default {
             return state;
         }
 
-        state.texture0 = createTextureFromImage(gl, image0, {
+        state.texture0 = createTextureFromImage(gl, imageFrame, {
             wrapS: gl.CLAMP_TO_EDGE,
             wrapT: gl.CLAMP_TO_EDGE,
             minFilter: gl.LINEAR,
             magFilter: gl.LINEAR,
         });
-        state.texture1 = createTextureFromImage(gl, image1, {
+        state.texture1 = createTextureFromImage(gl, imageSpace, {
             wrapS: gl.CLAMP_TO_EDGE,
             wrapT: gl.CLAMP_TO_EDGE,
             minFilter: gl.LINEAR,
         });
-        state.texture2 = createTextureFromImage(gl, image2, {
+        state.texture2 = createTextureFromImage(gl, imageWood, {
             wrapS: gl.CLAMP_TO_EDGE,
             wrapT: gl.CLAMP_TO_EDGE,
             minFilter: gl.LINEAR,
+        });
+        state.texture3 = createTextureFromImage(gl, imageBumpMap, {
+            wrapS: gl.CLAMP_TO_EDGE,
+            wrapT: gl.CLAMP_TO_EDGE,
+            minFilter: gl.LINEAR,
+            magFilter: gl.LINEAR
         });
 
         state.location.texture0 = gl.getUniformLocation(state.program, "iTexture0");
         state.location.texture1 = gl.getUniformLocation(state.program, "iTexture1");
         state.location.texture2 = gl.getUniformLocation(state.program, "iTexture2");
+        state.location.texture3 = gl.getUniformLocation(state.program, "iBumpMap");
 
         // <-- up to here, known from 6_Texture.js
 
@@ -115,6 +123,12 @@ function render(gl, state) {
     gl.activeTexture(gl.TEXTURE2);
     gl.bindTexture(gl.TEXTURE_2D, state.texture2);
     gl.uniform1i(state.location.texture2, 2);
+
+    gl.activeTexture(gl.TEXTURE3);
+    gl.bindTexture(gl.TEXTURE_2D, state.texture3);
+    gl.uniform1i(state.location.texture3, 3);
+
+    // texture unit goes up to gl.TEXTURE31 - was passiert danach?
 
     if (post) {
         gl.bindFramebuffer(gl.FRAMEBUFFER, state.fbo)
