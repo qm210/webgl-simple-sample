@@ -160,6 +160,18 @@ Surface sdTexturedBox( vec3 p, vec3 b, vec3 offset, vec3 col, mat3 transform) {
     return Surface(d, col, MATERIAL_BOX, uv);
 }
 
+Surface sdTetraeder( vec3 p, vec3 b, vec3 offset, vec3 col, mat3 transform) {
+    p = (p - offset) * transform;
+    vec3 q = p / b;
+    float d = sqrt(1./3.) * (
+        max(
+            abs(q.x+q.y)-q.z,
+            abs(q.x-q.y)+q.z
+        )-1.);
+    vec2 uv = q.xy;
+    return Surface(d, col, MATERIAL_BOX, uv);
+}
+
 // Hash function for noise generation
 float hash(vec2 n) {
     return fract(sin(dot(n, vec2(12.9898, 4.1414))) * 43758.5453);
@@ -254,7 +266,10 @@ Surface sdScene(vec3 p) {
     obj = sdTexturedBox(p, vec3(0.6), firstCubePos, vec3(0.3, 0.65, 0.9), rotateX(-0.2 * pi + iTime));
     co = takeCloser(co, obj);
 
-    obj = sdTexturedBox(p, vec3(0.6), firstCubePos + vec3(-3.0, 0., 0.), vec3(0.3, 0.65, 0.9), rotateY(+0.3 * pi + iTime));
+//    obj = sdTexturedBox(p, vec3(0.6), firstCubePos + vec3(-3.0, 0., 0.), vec3(0.3, 0.65, 0.9), rotateY(+0.3 * pi + iTime));
+//    co = takeCloser(co, obj);
+
+    obj = sdTetraeder(p, vec3(0.6), firstCubePos + vec3(-3.,0.,0.), vec3(0.3, 0.65, 0.9), rotateX(iTime));
     co = takeCloser(co, obj);
 
     /*
