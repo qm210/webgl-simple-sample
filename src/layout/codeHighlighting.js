@@ -2,7 +2,7 @@ export const CodeHighlighting = {
     magicKeyword:
         /\b(gl_Position|gl_PointSize|gl_FragCoord|gl_FrontFacing|gl_PointCoord|main)\b/g,
     keyword:
-        /\b(uniform|varying|attribute|const|in|out|[iu]?vec[234]|mat[234]|float|u?int|bool|sampler[123]D|return|discard|continue|break|if|else|texture|texelFetch|precision|highp|mediump|lowp)\b/g,
+        /\b(uniform|varying|attribute|const|in|out|[iu]?vec[234]|mat[234]|void|float|u?int|bool|sampler[123]D|return|discard|continue|break|if|else|texture|texelFetch|precision|highp|mediump|lowp)\b/g,
     builtin:
         /\b(mix|min|max|clamp|smoothstep|step|length|dot|reflect|normalize|sinh?|cosh?|tanh?|atan|exp|log|sqrt|pow|mod|modf|fract|abs|sign|floor|ceil)\b/g,
     number:
