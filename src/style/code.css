@@ -71,3 +71,46 @@
     font-weight: bold;
     font-size: 0.7em;
 }
+
+.code {
+    --shadow: 1px 1px 1px #0002;
+}
+
+.code .keyword {
+    color: darkmagenta;
+    text-shadow: var(--shadow);
+}
+
+.code .keyword.magic {
+    color: orangered;
+}
+
+.code .number {
+    color: green;
+}
+
+.code .builtin {
+    color: darkblue;
+    text-shadow: var(--shadow);
+}
+
+.code .directive {
+    color: magenta;
+    text-shadow: var(--shadow);
+}
+
+.code .is-defined {
+    color: magenta;
+}
+
+.code .is-global {
+    color: orangered;
+}
+
+.code .is-constant {
+    color: green;
+}
+
+.code .replaced {
+    cursor: help;
+}

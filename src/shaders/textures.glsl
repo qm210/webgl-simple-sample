@@ -279,23 +279,15 @@ void applyMaterial(inout Surface s, vec3 ray) {
         // s.col = min(s.col, holz);
         // s.col = max(s.col, holz);
         // s.col = pow(s.col + holz, vec3(1.4));  // <-- etc... you know the drill
-
         // s.col = mix(s.col, holz, 0.5);
-        s.col = mix(s.col, holz, 0.5 - 0.5 * cos(iTime));
-
-        // "Screen"
-//         s.col = 1. - (1. - s.col) * (1. - holz);
-
-        // "Overlay"
+        // s.col = mix(s.col, holz, 0.5 - 0.5 * cos(iTime));
+//         s.col = 1. - (1. - s.col) * (1. - holz); // "Screen"
+        // "Overlay":
 //        s.col = length(s.col) < 0.5
 //            ? 2. * s.col * holz
 //            : 1. - 2. * (1. - s.col) * (1. - holz);
-
-        // "Soft Light"
-//         s.col = s.col - holz + 2. * s.col * holz;
-
-        // "Soft Light", invers
-        s.col = holz - s.col + 2. * s.col * holz;
+//         s.col = s.col - holz + 2. * s.col * holz; // "Soft Light"
+//         s.col = holz - s.col + 2. * s.col * holz; // "Soft Light", invers
     }
     else if (s.material == MATERIAL_FLOOR) {
         s.col *= (0.5 + 0.15 * mod(floor(ray.x) + floor(ray.z), 4.0)) * vec3(0.9, 1., .95);

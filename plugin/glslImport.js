@@ -2,7 +2,7 @@ import glsl from "vite-plugin-glsl";
 
 // note: this runs in the _build_ process, not in the app itself.
 
-// modifies the behaviour of the existing GLSL Vite Plugin to our needs.
+// modifies the behaviour of the existing CodeHighlighting Vite Plugin to our needs.
 const existingPlugin = glsl({
     compress: false
 });
