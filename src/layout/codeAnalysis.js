@@ -2,11 +2,11 @@ import {diffLines} from "diff";
 
 const REGEX = {
     DEFINE:
-        /^\s*#define\s*(?<name>\w*)\s*(?<value>.*)\s*$/,
+        /^\s*#define\s*(?<name>\w*)(?<args>\(.*\))?\s*(?<value>.*)\s*$/,
     GLOBAL:
         /^\s*(?<keyword>out|uniform|varying)\s*(?<type>\w*)\s*(?<name>\w*);/,
     CONSTANT:
-        /^\s*const\s*(?<type>\w*)\s*(?<name>\w*)\s*=\s*(?<value>\S*);/,
+        /^\s*const\s*(?<type>float|u?int|bool|[iu]vec[2-4]|mat[2-4])\s*(?<name>\w*)\s*=\s*(?<value>\S*);/,
     ERROR_LOG:
         /:\s*([0-9]*):([0-9]*):\s*(.*)/g,
     // <--this holds for WebGl2, as of March 2025 - e.g. error logs look like:
@@ -55,7 +55,8 @@ export function analyzeLines(source, errorLog, storageKey) {
             console.warn("Error Comparing", err, `"${diff.value}"`, storedLines);
         }
 
-        if (!actualCode) {
+        const noContent = !actualCode || actualCode === "{";
+        if (noContent) {
             consecutiveBlanks++;
         } else {
             consecutiveBlanks = 0;
@@ -99,7 +100,11 @@ export function analyzeLines(source, errorLog, storageKey) {
 function extendDefinitionIfMatch(targetList, regex, lineOfCode, lineIndex) {
     const match = lineOfCode.match(regex)?.groups;
     if (match) {
-        targetList.push({...match, lineNumber: lineIndex + 1});
+        targetList.push({
+            ...match,
+            lineOfCode: lineOfCode.trim(),
+            lineNumber: lineIndex + 1
+        });
     }
 }
 

@@ -252,7 +252,7 @@ float gold_noise(in vec2 xy, in float seed) {
     return fract(tan(distance(xy * PHI, xy) * seed) * xy.x);
 }
 
-#define FROM_RGB rgb2oklch
+#define FROM_RGB(x) rgb2oklch(x)
 #define TO_RGB oklch2rgb
 
 //#define FROM_RGB(x) x
@@ -328,8 +328,9 @@ void main() {
 //    col = vec3(grey);
 
     // Transformation in geeigneteren Farbräumen
+    // col = FROM_RGB(col);
     col = rgb2oklch(col);
-//    col.z = 0.7; // irgendein Beispiel.
+    col.z = 0.7; // irgendein Beispiel.
     // col.z = mod(iTime, 2. * pi);
     col = oklch2rgb(col);
 

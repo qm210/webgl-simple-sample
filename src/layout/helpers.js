@@ -1,4 +1,4 @@
-import {highlightGLSL, replaceKnownDefinitions} from "./codeHighlighting.js";
+import {highlightGLSL, highlightDefinedSymbols} from "./codeHighlighting.js";
 
 export function createDiv(content, classes) {
     const div = document.createElement("div");
@@ -17,7 +17,7 @@ export function appendText(parent, tagName, textContent) {
 
 export function createHighlightedCode(analyzedLine) {
     const element = createDiv("", "code");
-    element.innerHTML = replaceKnownDefinitions(
+    element.innerHTML = highlightDefinedSymbols(
         highlightGLSL(analyzedLine.code),
         analyzedLine.defined,
         analyzedLine.number,

@@ -104,11 +104,11 @@
 }
 
 .code .is-global {
-    color: orangered;
+    color: blue;
 }
 
 .code .is-constant {
-    color: green;
+    color: blue;
 }
 
 .code .replaced {

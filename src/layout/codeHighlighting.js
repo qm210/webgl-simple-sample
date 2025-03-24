@@ -4,7 +4,7 @@ export const CodeHighlighting = {
     keyword:
         /\b(uniform|varying|attribute|const|in|out|[iu]?vec[234]|mat[234]|float|u?int|bool|sampler[123]D|return|discard|continue|break|if|else|texture|texelFetch|precision|highp|mediump|lowp)\b/g,
     builtin:
-        /\b(mix|min|max|clamp|smoothstep|step|length|dot|reflect|normalize|sin|cos|exp|log|sqrt|pow|mod|modf|fract|abs|sign|floor|ceil)\b/g,
+        /\b(mix|min|max|clamp|smoothstep|step|length|dot|reflect|normalize|sinh?|cosh?|tanh?|atan|exp|log|sqrt|pow|mod|modf|fract|abs|sign|floor|ceil)\b/g,
     number:
         /\b(-?\d+(\.\d+)?(e-?\d+)?U?)/g,
     directive:
@@ -30,9 +30,7 @@ export function highlightGLSL(code) {
         );
 }
 
-const ARROW = "\u2794";
-
-export function replaceKnownDefinitions(code, definitions, lineNumber) {
+export function highlightDefinedSymbols(code, definitions, lineNumber) {
     let result = code;
 
     function replace(symbol, className) {
@@ -41,13 +39,8 @@ export function replaceKnownDefinitions(code, definitions, lineNumber) {
                 // do not replace the actual definition ;)
                 return match;
             }
-            const value = symbol.value ?? match;
-            const name = [symbol.keyword ?? "", symbol.type, symbol.name]
-                .join(" ");
-            const title = symbol.value
-                ? `${name} ${ARROW} ${symbol.value} (line ${symbol.lineNumber})`
-                : `${name} (line ${symbol.lineNumber})`;
-            return `<span class="${className}" title="${title}">${value}</span>`;
+            const title = `line ${symbol.lineNumber}: ${symbol.lineOfCode}`;
+            return `<span class="${className}" title="${title}">${match}</span>`;
         });
     }
 
