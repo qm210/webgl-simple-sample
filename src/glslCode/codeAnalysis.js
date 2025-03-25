@@ -10,7 +10,7 @@ const REGEX = {
         /^\s*const\s*(?<type>float|u?int|bool|[iu]vec[2-4]|mat[2-4])\s*(?<name>\w*)\s*=\s*(?<value>\S*);/,
     FUNCTION:
         // /^\s*(?<type>\w+)\s+(?<name>\w*)\s*(?<args>\(.*\))\s*{(?<body>.*)}/mg,
-        /(?:^|\n)\s*(?<returnType>\w+[234])\s+(?<name>\w+)\s*\((?<args>[^()]*)\)(?:\s*\{\s*(?<body>[^}]*)})?\s*;?\n?/mg,
+        /(?:^|\n)\s*(?<returnType>\w+)\s+(?<name>\w+)\s*\((?<args>[^()]*)\)(?:\s*\{\s*(?<body>[^}]*)})?\s*;?\n?/mg,
     ERROR_LOG:
         /:\s*([0-9]*):([0-9]*):\s*(.*)/g,
     // <--this holds for WebGl2, as of March 2025 - e.g. error logs look like:
