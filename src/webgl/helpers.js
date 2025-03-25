@@ -80,9 +80,11 @@ export function createTextureFromImage(gl, imageSource, options) {
     // <-- TEXTURE_MAG_FILTER kann auch ausgelassen werden, ist aber oft sinnvoll.
     // wir lass hier Mipmaps aus, aber es sei erwähnt, dass sie existieren.
 
-    // asynchron -> wird erst kurz nach laden aktualisiert, aber das akzeptieren wir mal.
+    // Laden im Browser notwendigerweise asynchron.
+    // -> wird kurz flackern, aber das akzeptieren wir mal
+
     loadImage(imageSource, (img) => {
-        // muss Textur neu binden, weil inzwischen alles mögliche passiert sein kann.
+        // -> daher auch: Textur lieber neu binden, weil inzwischen alles mögliche passiert sein kann.
         gl.bindTexture(gl.TEXTURE_2D, texture);
         gl.texImage2D(
             gl.TEXTURE_2D,

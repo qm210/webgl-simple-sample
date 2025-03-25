@@ -12,7 +12,7 @@ import showcase3 from "./showcases/3_SimpleGeometry.js";
 import showcase4 from "./showcases/4_More2DGeometry.js";
 import showcase5a from "./showcases/5a_RayTracingCubeBeginning.js";
 import showcase5b from "./showcases/5b_RayTracingCubeExtended.js";
-import showcase6 from "./showcases/6_Texture.js";
+import showcase6 from "./showcases/6_Textures.js";
 import showcase7 from "./showcases/7_ColorMixing.js";
 import showcase8 from "./showcases/8_Multipass.js";
 import showcase9 from "./showcases/9_Volumetric.js";

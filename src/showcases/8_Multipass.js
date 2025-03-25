@@ -49,7 +49,7 @@ export default {
         state.location.texture2 = gl.getUniformLocation(state.program, "iTexture2");
         state.location.texture3 = gl.getUniformLocation(state.program, "iBumpMap");
 
-        // <-- up to here, known from 6_Texture.js
+        // <-- up to here, known from 6_Textures.js
 
         state.post = standardSetup.init(gl, postFragmentShaderSource);
 
