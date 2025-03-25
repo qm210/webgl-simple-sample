@@ -1,10 +1,10 @@
 const REGEX = {
     DEFINE:
-        /^\s*#define\s*(?<name>\w*)(?<args>\(.*\))?\s*(?<value>.*)\s*$/,
+        /\b#define\s*(?<name>\w*)(?<args>\(.*\))?\s*(?<value>.*)\s*$/g,
     GLOBAL:
-        /^\s*(?<keyword>out|uniform|varying)\s*(?<type>\w*)\s*(?<name>\w*);/,
+        /\b(?<keyword>out|uniform|varying)\s*(?<type>\w+)\s*(?<name>\w*);/g,
     CONSTANT:
-        /^\s*const\s*(?<type>float|u?int|bool|[iu]vec[2-4]|mat[2-4])\s*(?<name>\w*)\s*=\s*(?<value>\S*);/,
+        /\bconst\s*(?<type>float|u?int|bool|[iu]vec[2-4]|mat[2-4])\s*(?<name>\w*)\s*=\s*(?<value>\S*);/g,
     FUNCTION:
         /(?:^|\n)\s*(?<returnType>\w+)\s+(?<name>\w+)\s*\((?<args>[^()]*)\)(?:\s*\{\s*(?<body>[^}]*)(?<=\n)})?\s*;?\n?/mg,
     FUNCTION_SIGNATURE:

@@ -71,9 +71,6 @@ export const addControlsToPage = (elements, state, controls, autoRenderOnLoad) =
     }
 
     for (const control of controls) {
-        if (control.hidden) {
-            continue;
-        }
 
         switch (control.type) {
             case "renderButton":

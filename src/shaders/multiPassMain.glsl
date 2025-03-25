@@ -3,10 +3,7 @@ precision highp float;
 out vec4 fragColor;
 uniform vec2 iResolution;
 uniform float iTime;
-
 uniform vec3 cursorWalk;
-uniform float iFieldOfView;
-uniform float iCameraTilt;
 
 uniform sampler2D iTexture0;
 uniform sampler2D iTexture1;
@@ -487,16 +484,11 @@ void main() {
     vec4 col = vec4(0.);
     float d;
 
-    // man beachte - neue uniforms - spart ständiges kompilieren.
-
-    // Angabe üblich als Winkel - z.B: 67-90° üblich bei Webcams ~ entspricht inverser Brennweite
-    float fov = iFieldOfView * pi / 180.;
-
     vec3 ro = vec3(0., 0., 1.) + 0.25 * cursorWalk;
+    float fov = 45. * pi / 180.; // Angabe 80°C üblicher für Field-of-View ~ entspricht inverser Brennweite
     float uvz = -1. / tan(fov / 2.);
     vec3 rd = normalize(vec3(uv, uvz));
-
-    rd *= rotateX(iCameraTilt * pi / 180.);
+    rd *= rotateX(-0.125 * pi);
     // rd *= rotateY(0.02 * sin(3. * iTime));
 
     Surface co = rayMarch(ro, rd, MIN_DIST, MAX_DIST);
@@ -607,4 +599,24 @@ void main() {
     // (v.A. bei einer Textur, die keinen schwarzen Rand hat.)
 //    fragColor = texture(iTexture2, uv);
 
+    // Post Processing - Vignette
+    vec3 post = fragColor.xyz;
+
+    //    post *= exp( -0.03 * pow(length(uv), 5.7));
+//    post = clamp(post, 0.0, 1.0);
+//    post = pow(post, vec3(0.7));
+//    post = post * 0.4 + 0.6 * smoothstep(vec3(0), vec3(1), post) + vec3(0.0,0.0,0.04);
+//
+    // Einfacher RGB-basierter Filter wäre z.B. so einer. Aber damit geht nicht viel.
+    // post.r = max(post.g, post.b);
+
+    // --> verschoben auf multiPassPost.glsl, wird in 8_Multipass.js als 2nd Pass genutzt.
+
+    fragColor.xyz = post;
+
+    // wenn wir Alpha ignorieren, haben wir noch Platz für einen Parameter in den 2nd Pass
+    // ohne dass wir unsere Pipeline anfassen müssen (ansonsten: mehr Framebuffer).
+    // wir merken uns die Signed Distance vom Raymarching, weil das für Depth-of-Field nützlich ist.
+    // aber: Alpha-Werte sind von 0 bis 1 begrenzt, also müssen wir skalieren. (s. MAX_DIST)
+    fragColor.w = co.sd / MAX_DIST;
 }

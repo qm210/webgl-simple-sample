@@ -1,4 +1,4 @@
-import {createDiv} from "./helpers.js";
+import REGEX from "../glslCode/regexp.js";
 
 export function addButton(parent, {onClick, onRightClick, title = "", className = ""}) {
     const button = document.createElement("button");
@@ -27,14 +27,20 @@ export const addValueLabel = (parent, {label, name}) => {
 };
 
 export function addInput (parent, state, control) {
+    if (control.hidden) {
+        return;
+    }
+
     control.storageKey = `qm.${state.title}.${control.name}`;
     const storedState = sessionStorage.getItem(control.storageKey);
     if (storedState) {
         state[control.name] = JSON.parse(storedState);
     }
 
-    // convenience feature: do not add input if not in the fragment shader source(s)
-    if (uniformAbsent(control, state.source.fragment, state.post?.source.fragment)) {
+    const expected = state.expectedUniforms
+        .find(uniform => uniform.name === control.name);
+
+    if (!expected) {
         return;
     }
 
@@ -46,19 +52,6 @@ export function addInput (parent, state, control) {
         default:
             console.warn("Unknown input control", control);
     }
-}
-
-function uniformAbsent(name, ...sources) {
-    for (const source of sources) {
-        if (!source) {
-            continue;
-        }
-        const regex = new RegExp(`^\s*uniform\s*\w*\s*${name}`);
-        if (regex.test(source)) {
-            return false;
-        }
-    }
-    return true;
 }
 
 function sessionStoreControlState(state, control) {

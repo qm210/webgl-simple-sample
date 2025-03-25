@@ -3,7 +3,7 @@ import {startRenderLoop} from "../webgl/render.js";
 import {createTextureFromImage} from "../webgl/helpers.js";
 
 import fragmentShaderSource from "../shaders/texturesAdvanced.glsl";
-import postFragmentShaderSource from "../shaders/postProcessing.glsl";
+import postFragmentShaderSource from "../shaders/multiPassPost.glsl";
 
 import imageFrame from "../textures/frame.png";
 import imageSpace from "../textures/hubble_extreme_deep_field.jpg";

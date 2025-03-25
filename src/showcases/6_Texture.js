@@ -44,7 +44,11 @@ export default {
         state.location.texture1 = gl.getUniformLocation(state.program, "iTexture1");
         state.location.texture2 = gl.getUniformLocation(state.program, "iTexture2");
 
-        state.location.pass = gl.getUniformLocation(state.program, "iPass");
+        state.location.cursorWalk = gl.getUniformLocation(state.program, "cursorWalk");
+        state.cursorWalk = [0, 0, 0];
+
+        state.location.iFieldOfView = gl.getUniformLocation(state.program, "iFieldOfView");
+        state.location.iCameraTilt = gl.getUniformLocation(state.program, "iCameraTilt");
 
         return state;
     },
@@ -61,6 +65,19 @@ export default {
     }, {
         type: "label",
         name: "iTime",
+    }, {
+        type: "cursorInput",
+        name: "cursorWalk",
+        keys: ["w", "a", "s", "d", "r", "f", "q"],
+        hidden: true,
+    }, {
+        type: "floatInput",
+        name: "iFieldOfView",
+        defaultValue: 80,
+    }, {
+        type: "floatInput",
+        name: "iCameraTilt",
+        defaultValue: -23,
     }]
 };
 
@@ -69,8 +86,9 @@ function render(gl, state) {
 
     gl.uniform1f(state.location.iTime, state.time);
     gl.uniform2fv(state.location.iResolution, state.resolution);
-
-    // generell: getUniformLocation kann auch hier aufgerufen werden, optimiert vielleicht ein paar epsilons...
+    gl.uniform3fv(state.location.cursorWalk, state.cursorWalk);
+    gl.uniform1f(state.location.iFieldOfView, state.iFieldOfView);
+    gl.uniform1f(state.location.iCameraTilt, state.iCameraTilt);
 
     // Was ist die Texture Unit? (i.e. TEXTURE0)
     gl.activeTexture(gl.TEXTURE0);
