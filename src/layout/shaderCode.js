@@ -1,31 +1,30 @@
-import {diffLines} from "diff";
 import {createHighlightedCode, createDiv} from "./helpers.js";
-import {analyzeLines} from "./codeAnalysis.js";
+import {analyzeShader} from "../glslCode/codeAnalysis.js";
 
-export function appendCodeBlock(parent, shaderSource, errorLog, storageKey) {
+export function appendShaderCode(elements, shaderSource, errorLog, storageKey) {
     if (!shaderSource) {
         return;
     }
 
-    const element = document.createElement("div");
+    const codeBlock = document.createElement("div");
+    codeBlock.classList.add("code-block");
+    elements.shaders.appendChild(codeBlock);
 
-    const lines = analyzeLines(shaderSource, errorLog, storageKey);
+    const sourceColumn = document.createElement("div");
+    sourceColumn.classList.add("source");
+    codeBlock.appendChild(sourceColumn);
 
-    const rendered = lines.map(renderAnnotatedLine).join("");
+    const analyzedLines = analyzeShader(shaderSource, errorLog, storageKey);
 
-    element.classList.add("code-block");
-    element.innerHTML = `
-        <div class="source">
-            ${rendered}
-        </div>
-    `;
-
-    parent.appendChild(element);
+    for (const line of analyzedLines) {
+        const annotatedLine = createAnnotatedLine(line, elements.scrollStack);
+        sourceColumn.appendChild(annotatedLine);
+    }
 }
 
-function renderAnnotatedLine(line) {
+function createAnnotatedLine(line, scrollStack) {
     if (!line.code) {
-        return `<div class="empty-line"></div>`;
+        return createDiv("", "empty-line");
     }
 
     const element = createDiv("", "line");
@@ -52,12 +51,12 @@ function renderAnnotatedLine(line) {
         annotation = errors;
     }
 
-    element.appendChild(
-        createDiv(line.number, "line-number")
-    );
-    element.appendChild(
-        createHighlightedCode(line)
-    );
+    const numberElement = createDiv(line.number, "line-number");
+    numberElement.id = `l.${line.number}`;
+    element.appendChild(numberElement);
+
+    const codeElement = createHighlightedCode(line, scrollStack);
+    element.appendChild(codeElement);
 
     if (annotation) {
         element.appendChild(
@@ -66,5 +65,5 @@ function renderAnnotatedLine(line) {
         element.classList.add("annotated");
     }
 
-    return element.outerHTML;
+    return element;
 }

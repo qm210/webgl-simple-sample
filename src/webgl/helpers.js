@@ -1,5 +1,5 @@
 // we'll get to that, but let's not use these for less confusion
-// even though, of course, we all love clean code.
+// even though, of course, we all love clean glslCode.
 
 
 export function createShader(gl, type, source) {

@@ -4,7 +4,7 @@ out vec4 farbe;
 uniform vec2 iResolution;
 uniform float iTime;
 
-// somewhat-common abbreviation for concise but uneasily readable code
+// somewhat-common abbreviation for concise but uneasily readable glslCode
 vec4 c = vec4(1., 0., -1., 0.5);
 
 // note: "in" is the default qualifier, so could be left out.

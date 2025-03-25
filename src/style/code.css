@@ -5,6 +5,8 @@
     font-weight: bold;
     background-color: #f0f9ff;
     color: black;
+
+    --shadow: 1px 1px 1px #0002;
 }
 
 .source {
@@ -74,10 +76,6 @@
     font-size: 0.7em;
 }
 
-.code {
-    --shadow: 1px 1px 1px #0002;
-}
-
 .code .keyword {
     color: darkmagenta;
     text-shadow: var(--shadow);
@@ -113,6 +111,15 @@
     color: blue;
 }
 
-.code .replaced {
-    cursor: help;
+.code .is-own-function {
+    color: green;
+}
+
+.symbol {
+    cursor: pointer;
+}
+
+.symbol:hover {
+    text-decoration: underline;
+    background-color: white;
 }

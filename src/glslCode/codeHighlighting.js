@@ -6,7 +6,7 @@ export const CodeHighlighting = {
     builtin:
         /\b(mix|min|max|clamp|smoothstep|step|length|dot|normalize|cross|reflect|refract|sinh?|cosh?|tanh?|atan|exp|log|sqrt|pow|mod|modf|fract|abs|sign|floor|ceil)\b/g,
     number:
-        /\b(-?\d+(\.\d+)?(e-?\d+)?U?)/g,
+        /\b(-?\d+\.?\d*(e-?\d+)?[Uf]?)/g,
     directive:
         /^\s*(#.*)/g,
 };
@@ -34,24 +34,36 @@ export function highlightDefinedSymbols(code, definitions, lineNumber) {
     let result = code;
 
     function replace(symbol, className) {
-        result = result.replaceAll(symbol.name, match => {
+        const symbolUsed =
+            new RegExp(`(?<!")${symbol.name}(?!")`, "g");
+
+        result = result.replaceAll(symbolUsed, match => {
+
             if (symbol.lineNumber === lineNumber) {
                 // do not replace the actual definition ;)
-                return match;
+                return `<span id="${symbol.name}">${match}</span>`;
             }
-            const title = `line ${symbol.lineNumber}: ${symbol.lineOfCode}`;
-            return `<span class="${className}" title="${title}">${match}</span>`;
+
+            const title = `line ${symbol.lineNumber}: ${symbol.lineOfCode}`
+                .replaceAll(symbol.name, '...');
+            // <-- have to replace the name, otherwise this very replaceAll will conflict :D
+
+            const attributes = `class="${className}" title="${title}" data-id="${symbol.name}"`;
+            return `<span ${attributes}>${match}</span>`;
         });
     }
 
     for (const symbol of definitions.defines) {
-        replace(symbol, "replaced is-defined");
+        replace(symbol, "is-defined symbol");
     }
     for (const symbol of definitions.globals) {
-        replace(symbol, "replaced is-global");
+        replace(symbol, "is-global symbol");
     }
     for (const symbol of definitions.constants) {
-        replace(symbol, "replaced is-constant");
+        replace(symbol, "is-constant symbol");
+    }
+    for (const symbol of definitions.functions) {
+        replace(symbol, "is-own-function symbol")
     }
     return result;
 }

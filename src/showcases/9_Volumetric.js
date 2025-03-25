@@ -1,10 +1,10 @@
 import standardSetup from "./3_SimpleGeometry.js";
 import {startRenderLoop} from "../webgl/render.js";
 
-import fragmentShaderSource from "../shaders/colorMixing.glsl";
+import fragmentShaderSource from "../shaders/volumetricClouds.glsl";
 
 export default {
-    title: "Color Mixing",
+    title: "Volumetric Clouds",
     init: (gl) => {
         const state = standardSetup.init(gl, fragmentShaderSource);
 

@@ -1,5 +1,5 @@
 import {addButton, addInput, addValueLabel} from "./controls.js";
-import {appendCodeBlock} from "./shaderCode.js";
+import {appendShaderCode} from "./shaderCode.js";
 import {appendText} from "./helpers.js";
 
 
@@ -12,14 +12,16 @@ const generatePage = (elements, state, controls, autoRenderOnLoad) => {
         elements.console.remove();
     }
 
-    appendCodeBlock(
-        elements.shaders,
+    elements.scrollStack = createScrollStackOn(elements.shaders);
+
+    appendShaderCode(
+        elements,
         state.source.fragment,
         state.error.fragment,
         "fragment.source"
     );
-    appendCodeBlock(
-        elements.shaders,
+    appendShaderCode(
+        elements,
         state.source.vertex,
         state.error.vertex,
         "vertex.source"
@@ -27,18 +29,18 @@ const generatePage = (elements, state, controls, autoRenderOnLoad) => {
 
     if (state.post) {
         appendText(
-            elements.shaders,
+            elements,
             "h4",
             "Second Program (Post Processing):"
         );
-        appendCodeBlock(
-            elements.shaders,
+        appendShaderCode(
+            elements,
             state.post.source.fragment,
             state.post.error.fragment,
             "fragment.post.source"
         );
-        appendCodeBlock(
-            elements.shaders,
+        appendShaderCode(
+            elements,
             state.post.source.vertex,
             state.post.error.vertex,
             "vertex.post.source"
@@ -144,4 +146,22 @@ function renderCompileStepStatus(title, error, successMessage) {
             ${content}
         </div>    
     `;
+}
+
+function createScrollStackOn(parent) {
+    const scrollStack = [];
+
+    parent.addEventListener("contextmenu", (event) => {
+        const stackElement = scrollStack.pop();
+        console.log("SACK.?", stackElement, scrollStack);
+        if (stackElement) {
+            stackElement.scrollIntoView({
+                behaviour: "smooth",
+                block: "center"
+            });
+            event.preventDefault();
+        }
+    });
+
+    return scrollStack;
 }

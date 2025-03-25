@@ -1,4 +1,4 @@
-import {highlightGLSL, highlightDefinedSymbols} from "./codeHighlighting.js";
+import {highlightGLSL, highlightDefinedSymbols} from "../glslCode/codeHighlighting.js";
 
 export function createDiv(content, classes) {
     const div = document.createElement("div");
@@ -15,12 +15,33 @@ export function appendText(parent, tagName, textContent) {
     parent.appendChild(element);
 }
 
-export function createHighlightedCode(analyzedLine) {
-    const element = createDiv("", "code");
-    element.innerHTML = highlightDefinedSymbols(
-        highlightGLSL(analyzedLine.code),
-        analyzedLine.defined,
-        analyzedLine.number,
-    );
-    return element;
+export function createHighlightedCode(analyzedLine, scrollStack) {
+    const codeElement = createDiv("", "code");
+    codeElement.innerHTML =
+        highlightDefinedSymbols(
+            highlightGLSL(analyzedLine.code),
+            analyzedLine.defined,
+            analyzedLine.number,
+        );
+
+    for (const symbolElement of document.getElementsByClassName("symbol")) {
+        symbolElement.addEventListener("click", () => {
+            const id = symbolElement.getAttribute("data-id");
+            const target = document.getElementById(id);
+            if (target) {
+                scrollStack.push(symbolElement);
+                target.scrollIntoView({
+                    behaviour: "smooth",
+                    block: "start"
+                });
+                console.log("SCROLL STACK", scrollStack);
+            } else {
+                console.error("Target Element does not exist", id, symbolElement);
+            }
+        })
+    }
+
+
+
+    return codeElement;
 }
