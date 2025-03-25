@@ -4,16 +4,15 @@ out vec4 fragColor;
 uniform vec2 iResolution;
 uniform float iTime;
 uniform vec3 cursorWalk;
-uniform float iSomeFloat;
 
 uniform sampler2D iTexture0;
 uniform sampler2D iTexture1;
 uniform sampler2D iTexture2;
 uniform sampler2D iBumpMap;
 
-#define MATERIAL_CONST 0
-#define MATERIAL_BOX 1
-#define MATERIAL_FLOOR 2
+const int MATERIAL_CONST = 0;
+const int MATERIAL_BOX = 1;
+const int MATERIAL_FLOOR = 2;
 
 const float pi = 3.141593;
 
@@ -302,8 +301,8 @@ Surface sdFloor(vec3 p) {
     // wir machen es uns hier leicht -- was ist mit den Normalenvektoren?
     // -> mal diffuse lighting einschalten
     float someOffset = 5.3; // hashes sehen um 0 oft auffällig auf
-    float noise = fbm(noiseFreq * p.xz + 0.02 * iTime + someOffset);
-    float noisyLevel = floorLevel - noiseHeight * iSomeFloat * (noise - 0.5);
+    float noise = fbm(noiseFreq * p.xz + someOffset); // mal im Argument sowas wie... 0.03 * iTime ?
+    float noisyLevel = floorLevel - noiseHeight * (noise - 0.5);
     d = p.y - noisyLevel;
 
     // oder aber: Height Map / Bump Map als Textur reingeben.
@@ -329,7 +328,13 @@ Surface sdScene(vec3 p) {
     obj = sdTexturedBox(p, vec3(0.6), firstCubePos, vec3(0.3, 0.65, 0.9), rotateX(-0.2 * pi + iTime));
     co = takeCloser(co, obj);
 
-    obj = sdTexturedBox(p, vec3(0.6), firstCubePos + vec3(-3.0, 0., 0.), vec3(0.3, 0.65, 0.9), identity()); // rotateY(+0.3 * pi + iTime)
+    vec3 secondCubePos = firstCubePos + vec3(-3.0, 0., 0.);
+    // this is advanced. dithering the time parameter for less glitchs. ist echt so.
+//    float phi = 20. * (iTime + 1.e-3 * hash14(p.xz));
+//    secondCubePos += 1. * vec3(cos(phi), 0., sin(phi));
+    mat3 transformLeft = rotateY(+0.3 * pi + iTime);
+    //transformLeft = identity();
+    obj = sdTexturedBox(p, vec3(0.6), secondCubePos, vec3(0.3, 0.65, 0.9), transformLeft);
     co = takeCloser(co, obj);
 
 //    obj = sdTriangle(p, vec3(1.), firstCubePos + vec3(-3.,0.2 * sin(iTime),-.5), vec3(0.2, 0.7, 0.9), rotateY(iTime));
@@ -480,8 +485,9 @@ void main() {
     float d;
 
     vec3 ro = vec3(0., 0., 1.) + 0.25 * cursorWalk;
-    float fov = 80. * pi / 180.; // Angabe 80°C üblicher für Field-of-View ~ entspricht inverser Brennweite
-    vec3 rd = normalize(vec3(uv, -fov));
+    float fov = 45. * pi / 180.; // Angabe 80°C üblicher für Field-of-View ~ entspricht inverser Brennweite
+    float uvz = -1. / tan(fov / 2.);
+    vec3 rd = normalize(vec3(uv, uvz));
     rd *= rotateX(-0.125 * pi);
     // rd *= rotateY(0.02 * sin(3. * iTime));
 
@@ -587,7 +593,7 @@ void main() {
 
     fragColor = mix(bgColor, vec4(col.xyz, 1.), col.a);
     //fragColor = mix(backgroundColor, col, col.a);
-    
+
     // quick check: so sähe das direkt gemappt aus.
     // Man achte auf die Werte der Koordinaten und die Texturparameter.
     // (v.A. bei einer Textur, die keinen schwarzen Rand hat.)
@@ -607,4 +613,10 @@ void main() {
     // --> verschoben auf postProcessing.glsl, wird in 8_Multipass.js als 2nd Pass genutzt.
 
     fragColor.xyz = post;
+
+    // wenn wir Alpha ignorieren, haben wir noch Platz für einen Parameter in den 2nd Pass
+    // ohne dass wir unsere Pipeline anfassen müssen (ansonsten: mehr Framebuffer).
+    // wir merken uns die Signed Distance vom Raymarching, weil das für Depth-of-Field nützlich ist.
+    // aber: Alpha-Werte sind von 0 bis 1 begrenzt, also müssen wir skalieren. (s. MAX_DIST)
+    fragColor.w = co.sd / MAX_DIST;
 }

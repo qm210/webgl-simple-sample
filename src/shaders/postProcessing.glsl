@@ -4,11 +4,13 @@ out vec4 fragColor;
 uniform vec2 iResolution;
 uniform float iTime;
 
+//uniform float focusDistance;
+//uniform float focalLength;
+//uniform float aperture;
+
 uniform sampler2D iImage;
 
-#define MATERIAL_CONST 0
-#define MATERIAL_BOX 1
-#define MATERIAL_FLOOR 2
+#define PIXELSIZE (0.5/iResolution.y)
 
 const float pi = 3.141593;
 
@@ -258,7 +260,14 @@ float gold_noise(in vec2 xy, in float seed) {
 //#define FROM_RGB(x) x
 //#define TO_RGB(x) x
 
-#define DO_NOTHING true
+#define DO_NOTHING false
+// <-- anders definiert als der Rest, weil meine IDE mich genervt hat. Macht nichts.
+#define PIXELATE 0
+#define GAUSS_BLUR 0
+#define VIGNETTE 1
+#define GRAYSCALE 0
+#define OKLCH_TRANSFORMATION 0
+#define DEPTH_OF_FIELD 0
 
 void main() {
     vec2 uv = (2.0 * gl_FragCoord.xy - iResolution.xy) / iResolution.y;
@@ -266,6 +275,7 @@ void main() {
 
     if (DO_NOTHING) {
         fragColor = texture(iImage, st);
+        // fragColor.a = 1.;
         return;
     }
 
@@ -273,66 +283,106 @@ void main() {
     // uv: Bildschirmkoordinate y in [-1..1], x entsprechend Seitenverhältnis z.B. [-16/9.. 16/9]
     // st: Texturkoordinate: x, y in [0..1] jeweils
 
-    // Pixeleffekt - st in Rundungseinheiten zusammenfassen - muss aber _vor_ auslesen passieren.
-//    float yBins = 120.;
-//    vec2 bins = yBins * vec2(iResolution.x/iResolution.y, 1.);
-//    st = floor(bins * st) / bins;
+    #if PIXELATE == 1
+        // Pixeleffekt - st in Rundungseinheiten zusammenfassen - muss aber _vor_ auslesen passieren.
+        float yBins = 120.;
+        vec2 bins = yBins * vec2(iResolution.x/iResolution.y, 1.);
+        st = floor(bins * st) / bins;
+    #endif
 
     vec4 image = texture(iImage, st);
 
-//    fragColor = image;
-//    return;
-
-    // col.xyz = vec3(gold_noise(uv, iTime));
-
-    // vec3 gradient = vec3(uv.x, uv.y, 1. - uv.x);
-
     vec3 col = image.xyz;
 
-    // Gaussian Blur
-    int range = 5;
-    float radius = 0.1;
-    float weight;
-    vec2 shift;
-    float nSamples = pow(2. * float(range) + 1., 2.);
-    for (int i = -range; i<= range; i++) {
-        for (int j = -range; j <= range; j++) {
-            shift = vec2(i, j) / iResolution;
-            weight = 1./nSamples * exp(-dot(shift, shift)/radius/radius);
-            col += texture(iImage, st + shift).xyz * weight;
+    // Wir haben vom ersten Pass noch die Marching Distance übertragen,
+    // Aber skaliert, um auf [0..1] zu passen. (MAX_DIST war 100 - muss passen)
+    // Damit können wir jetzt einen Depth-of-Field-Effekt versuchen.
+    float sd = image.w * 100.;
+
+    #if DEPTH_OF_FIELD == 1
+        float focusDistance = 5.;
+        float focalLength = 2.5;
+        float aperture = 0.5;
+        // <-- können auch über uniforms kommen :)
+        float coc = abs(
+            (focalLength * (focusDistance - sd)) / (sd * (focusDistance - focalLength)) * aperture
+        );
+        if (coc > PIXELSIZE) {
+            int samples = int(coc / PIXELSIZE);
+            samples = clamp(samples, 1, 40);
+            vec3 dofColor = vec3(0.);
+            float sumWeight = 0.;
+            float radius = 20. * PIXELSIZE * coc;
+            for (int i = 0; i < samples; i++) {
+                float r = sqrt(float(i) / float(samples));
+                float theta = float(i) * PHI; // golden ratio
+                vec2 tapUv = st + vec2(sin(theta), cos(theta)) * radius * r;
+                float weight = exp(-r*r);
+                dofColor += texture(iImage, tapUv).rgb * weight;
+                sumWeight += weight;
+            }
+            // <-- golden-ratio-sampling, viel effizienter als O(n^2) Loop
+    //        for (int i = -samples; i <= samples; i++) {
+    //            for (int j = -samples; j <= samples; j++) {
+    //                vec2 offset = vec2(i, j) * radius;
+    //                float weight = exp(-dot(vec2(i, j), vec2(i, j)));
+    //                dofColor += texture(iImage, st + offset).rgb * weight;
+    //                sumWeight += weight;
+    //            }
+    //        }
+            dofColor /= sumWeight;
+            col = dofColor;
         }
-    }
-    // "softer" way of dealing with excess values
-    col = atan(col);
+    #endif
 
-    float mixBlur = 0.5 - 0.5 * cos(iTime);
-     mixBlur = 1.;
-//    mixBlur = 0.0;
-    col = mix(image.xyz, col, mixBlur);
+    #if GAUSS_BLUR == 1
+        // Gaussian Blur
+        int range = 5;
+        float radius = 0.1;
+        float weight;
+        vec2 shift;
+        float nSamples = pow(2. * float(range) + 1., 2.);
+        for (int i = -range; i<= range; i++) {
+            for (int j = -range; j <= range; j++) {
+                shift = vec2(i, j) / iResolution;
+                weight = 1./nSamples * exp(-dot(shift, shift)/radius/radius);
+                col += texture(iImage, st + shift).xyz * weight;
+            }
+        }
+        // "softer" way of dealing with excess values
+        col = atan(col);
 
-    // Vignette
-    // Hinweis: operiert auf uv, nicht st
+        float mixBlur = 0.5 - 0.5 * cos(iTime);
+         mixBlur = 1.;
+    //    mixBlur = 0.0;
+        col = mix(image.xyz, col, mixBlur);
+    #endif
 
-//     col = vec3(1); // test effect stand-alone
+    #if VIGNETTE == 1
+        // Hinweis: operiert auf uv (Bildschirm), nicht st (Textur)
+        //     col = vec3(1); // test effect stand-alone
+        float weightedOffset = pow(0.5 * length(uv), 3.);
+        float vign = 1. - smoothstep(0.4, 1.4, weightedOffset);
+        col *= vign;
+    #endif
 
-    float weightedOffset = pow(0.5 * length(uv), 3.);
-    float vign = 1. - smoothstep(0.4, 1.4, weightedOffset);
-    col *= vign;
+    #if GRAYSCALE == 1
+        // einfaches schwarz-weiß
+        float grey = dot(col.rgb, vec3(0.2126, 0.7152, 0.0722)); // eher menschliches Helligkeitsempfinden
+        //  <-- vergleiche bei Laune -->
+        // grey = length(col.rgb) / sqrt(3.); // R, G, B gleichmäßig gewichtet
+        // grey = max(col.r, max(col.g, col.b)); // Maximum
+        col = vec3(grey);
+    #endif
 
-    // einfaches schwarz-weiß
-//    float grey = dot(col.rgb, vec3(0.2126, 0.7152, 0.0722)); // eher menschliches Helligkeitsempfinden
-    //  <-- vergleiche bei Laune -->
-    // grey = length(col.rgb) / sqrt(3.); // R, G, B gleichmäßig gewichtet
-    // grey = max(col.r, max(col.g, col.b)); // Maximum
+    #if OKLCH_TRANSFORMATION == 1
+        // Transformation in geeigneteren Farbräumen
+        // col = FROM_RGB(col);
+        col = rgb2oklch(col);
+        col.z = 0.7; // irgendein Beispiel.
+        // col.z = mod(iTime, 2. * pi);
+        col = oklch2rgb(col);
+    #endif
 
-//    col = vec3(grey);
-
-    // Transformation in geeigneteren Farbräumen
-    // col = FROM_RGB(col);
-    col = rgb2oklch(col);
-    col.z = 0.7; // irgendein Beispiel.
-    // col.z = mod(iTime, 2. * pi);
-    col = oklch2rgb(col);
-
-    fragColor = vec4(col, image.w);
+    fragColor = vec4(col, 1.);
 }

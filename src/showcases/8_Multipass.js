@@ -2,7 +2,7 @@ import standardSetup from "./3_SimpleGeometry.js";
 import {startRenderLoop} from "../webgl/render.js";
 import {createTextureFromImage} from "../webgl/helpers.js";
 
-import fragmentShaderSource from "../shaders/advanced.glsl";
+import fragmentShaderSource from "../shaders/texturesAdvanced.glsl";
 import postFragmentShaderSource from "../shaders/postProcessing.glsl";
 
 import imageFrame from "../textures/frame.png";
@@ -114,6 +114,19 @@ export default {
         defaultValue: 0.5,
         min: undefined,
         max: undefined,
+        hidden: true,
+    }, {
+        type: "floatInput",
+        name: "focusDistance",
+        defaultValue: 1,
+    }, {
+        type: "floatInput",
+        name: "focalLength",
+        defaultValue: 0.5,
+    }, {
+        type: "floatInput",
+        name: "aperture",
+        defaultValue: 0.25,
     }]
 };
 
@@ -163,6 +176,20 @@ function render(gl, state) {
 
         gl.uniform1f(post.location.iTime, state.time);
         gl.uniform2fv(post.location.iResolution, state.resolution);
+
+        // spontan eingefügt, um Depth-of-Field-Parameter zu testen
+        gl.uniform1f(
+            gl.getUniformLocation(post.program, "focusDistance"),
+            state.focusDistance,
+        );
+        gl.uniform1f(
+            gl.getUniformLocation(post.program, "focalLength"),
+            state.focalLength
+        );
+        gl.uniform1f(
+            gl.getUniformLocation(post.program, "aperture"),
+            state.aperture
+        );
 
         gl.bindFramebuffer(gl.FRAMEBUFFER, null);
         gl.activeTexture(gl.TEXTURE0);
