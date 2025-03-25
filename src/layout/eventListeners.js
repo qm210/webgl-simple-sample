@@ -1,21 +1,49 @@
 import {assignGloballyUniqueClass, findParentOfClass} from "./helpers.js";
 
 
+const storedLineId = sessionStorage.getItem("selected.line.id");
+
+// TODO: think about whether this is actually good...
+const initiallyScrollToLineId = false;
+
+export function addStartupListeners() {
+
+
+    document.addEventListener("DOMContentLoaded", () => {
+        let interestingLine =
+            document.querySelector(".line.error")
+            ?? document.querySelector(".line.annotated");
+
+        if (!interestingLine && storedLineId && initiallyScrollToLineId) {
+            interestingLine = document.getElementById(storedLineId);
+            selectContainingLine(interestingLine);
+        }
+
+        if (interestingLine) {
+            interestingLine.scrollIntoView({
+                behaviour: "smooth",
+                block: "center"
+            });
+        }
+    });
+
+}
+
 export function createScrollStackOn(parent) {
     const scrollStack = [];
 
     parent.addEventListener("contextmenu", (event) => {
-        const stacked = scrollStack.pop();
-        if (!stacked) {
+        const stackElement = scrollStack.pop();
+        if (!stackElement) {
             return;
         }
 
         event.preventDefault();
-        stacked.element.scrollIntoView({
+        stackElement.scrollIntoView({
             behaviour: "smooth",
             block: "center"
         });
-        assignGloballyUniqueClass(stacked.selectElement, "selected");
+        selectContainingLine(stackElement);
     });
 
     return scrollStack;
@@ -29,32 +57,42 @@ export function addShaderCodeEventListeners(parent, scrollStack) {
 
     for (const element of symbolElements) {
         element.addEventListener("click", event => {
-            const id = element.getAttribute("data");
-            const target = document.getElementById(id);
-            if (!target) {
-                console.error("Target Element does not exist", id, element);
-                return;
-            }
-
             event.stopPropagation();
-            const sourceLine = findParentOfClass(element, "line");
-            const targetLine = findParentOfClass(target, "line");
-            scrollStack.push({
-                element,
-                selectElement: sourceLine,
-            });
-
-            target.scrollIntoView({
-                behaviour: "smooth",
-                block: "start"
-            });
-            assignGloballyUniqueClass(targetLine, "selected");
+            const id = element.getAttribute("data");
+            scrollToElementId(id, element, scrollStack);
         });
     }
 
     for (const element of lineElements) {
         element.addEventListener("click", () => {
-            assignGloballyUniqueClass(element, "selected");
+            selectContainingLine(element);
         });
+    }
+}
+
+export function scrollToElementId(id, sourceElement, scrollStack) {
+    const target = document.getElementById(id);
+    if (!target) {
+        console.error("Target Element does not exist:", id, "Source Element:", sourceElement);
+        return;
+    }
+
+    target.scrollIntoView({
+        behaviour: "smooth",
+        block: "center"
+    });
+    selectContainingLine(target);
+
+    if (sourceElement && scrollStack) {
+        scrollStack.push(sourceElement);
+    }
+}
+
+function selectContainingLine(element) {
+    const lineParent = findParentOfClass(element, "line");
+    assignGloballyUniqueClass(lineParent, "selected");
+
+    if (lineParent?.id) {
+        sessionStorage.setItem("selected.line.id", lineParent.id);
     }
 }

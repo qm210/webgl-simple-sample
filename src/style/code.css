@@ -1,12 +1,30 @@
 .code-block {
+    --shadow: 1px 1px 1px #0002;
+    --code-background: #f0f9ff;
+
     text-align: left;
     font-size: var(--font-size-large);
     line-height: 1.2;
     font-weight: bold;
-    background-color: #f0f9ff;
+    background-color: var(--code-background);
     color: black;
+    position: relative;
+}
 
-    --shadow: 1px 1px 1px #0002;
+.code-header {
+    position: absolute;
+    top: 0;
+    right: 0;
+    padding: 0.5rem;
+    color: cornflowerblue;
+    text-align: right;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    clear: right;
+    background-color: var(--code-background);
+    box-shadow: -1px 1px 1px black;
+    z-index: 1;
 }
 
 .source {
@@ -131,4 +149,16 @@
 .symbol:hover {
     text-decoration: underline;
     background-color: white;
+}
+
+.quicklink {
+    font-size: smaller;
+    font-family: monospace;
+    text-decoration: underline;
+    color: black;
+}
+
+.quicklink:hover {
+    cursor: pointer;
+    opacity: 0.6;
 }

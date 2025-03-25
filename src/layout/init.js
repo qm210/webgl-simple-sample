@@ -27,6 +27,7 @@ export default function init(rootId) {
         canvasFrame: document.getElementById("canvas-frame"),
         canvas: document.getElementById("canvas"),
         controls: document.getElementById("controls"),
+        startRendering: performance.now(),
     };
 
 }

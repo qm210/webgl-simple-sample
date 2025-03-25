@@ -1,7 +1,7 @@
 import {addButton, addInput, addValueLabel} from "./controls.js";
 import {appendShaderCode} from "./shaderCode.js";
 import {appendText} from "./helpers.js";
-import {createScrollStackOn} from "./eventListeners.js";
+import {addStartupListeners, createScrollStackOn} from "./eventListeners.js";
 
 
 const generatePage = (elements, state, controls, autoRenderOnLoad) => {
@@ -19,13 +19,15 @@ const generatePage = (elements, state, controls, autoRenderOnLoad) => {
         elements,
         state.source.fragment,
         state.error.fragment,
-        "fragment.source"
+        "fragment.source",
+        "Fragment Shader"
     );
     appendShaderCode(
         elements,
         state.source.vertex,
         state.error.vertex,
-        "vertex.source"
+        "vertex.source",
+        "Vertex Shader"
     );
 
     if (state.post) {
@@ -38,29 +40,22 @@ const generatePage = (elements, state, controls, autoRenderOnLoad) => {
             elements,
             state.post.source.fragment,
             state.post.error.fragment,
-            "fragment.post.source"
+            "fragment.post.source",
+            "Fragment Shader"
         );
         appendShaderCode(
             elements,
             state.post.source.vertex,
             state.post.error.vertex,
-            "vertex.post.source"
+            "vertex.post.source",
+            "Vertex Shader"
         );
     }
 
-    document.addEventListener("DOMContentLoaded", () => {
-        const firstInterestingLine =
-            document.querySelector(".line.error")
-            ?? document.querySelector(".line.annotated");
-        if (firstInterestingLine) {
-            firstInterestingLine.scrollIntoView({
-                behaviour: "smooth",
-                block: "center"
-            });
-        }
-    });
-
+    addStartupListeners();
     addControlsToPage(elements, state, controls, autoRenderOnLoad);
+
+    elements.initialRenderMs = performance.now() - elements.startRendering;
 };
 
 export default generatePage;

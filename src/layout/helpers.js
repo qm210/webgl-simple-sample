@@ -43,9 +43,11 @@ export function assignGloballyUniqueClass(element, className) {
 }
 
 export function findParentOfClass(element, className) {
-    let parent = element.parentElement;
-    while (parent && !parent.classList.contains(className)) {
-        parent = parent.parentElement;
+    // (yeah. name not exactly right, the element itself can also match.)
+    let result = element;
+    while (result && !result.classList.contains(className)) {
+        result = result.parentElement;
     }
-    return parent;
+    return result;
 }
+

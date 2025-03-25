@@ -44,3 +44,5 @@ generatePage(elements, state, controls, autoRenderOnLoad);
 if (showcase.title) {
     document.title = showcase.title;
 }
+
+console.log("Page took", elements.initialRenderMs.toFixed(3), "ms to render.");

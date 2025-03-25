@@ -1,5 +1,4 @@
 import {diffLines} from "diff";
-import {renderSpan} from "../layout/helpers.js";
 
 const REGEX = {
     DEFINE:
@@ -9,8 +8,7 @@ const REGEX = {
     CONSTANT:
         /^\s*const\s*(?<type>float|u?int|bool|[iu]vec[2-4]|mat[2-4])\s*(?<name>\w*)\s*=\s*(?<value>\S*);/,
     FUNCTION:
-        // /^\s*(?<type>\w+)\s+(?<name>\w*)\s*(?<args>\(.*\))\s*{(?<body>.*)}/mg,
-        /(?:^|\n)\s*(?<returnType>\w+)\s+(?<name>\w+)\s*\((?<args>[^()]*)\)(?:\s*\{\s*(?<body>[^}]*)})?\s*;?\n?/mg,
+        /(?:^|\n)\s*(?<returnType>\w+)\s+(?<name>\w+)\s*\((?<args>[^()]*)\)(?:\s*\{\s*(?<body>[^}]*)(?<=\n)})?\s*;?\n?/mg,
     ERROR_LOG:
         /:\s*([0-9]*):([0-9]*):\s*(.*)/g,
     // <--this holds for WebGl2, as of March 2025 - e.g. error logs look like:
@@ -18,10 +16,10 @@ const REGEX = {
     // -> parse accordingly: /<ignore>: <number>:<number>: <rest>/
 };
 
-export function analyzeShader(source, errorLog, storageKey) {
-    const stored = sessionStorage.getItem(storageKey) ?? "";
-    if (storageKey) {
-        sessionStorage.setItem(storageKey, source);
+export function analyzeShader(source, errorLog, shaderKey) {
+    const stored = sessionStorage.getItem(shaderKey) ?? "";
+    if (shaderKey) {
+        sessionStorage.setItem(shaderKey, source);
     }
 
     const errors = parseErrors(errorLog);
@@ -45,11 +43,11 @@ export function analyzeShader(source, errorLog, storageKey) {
             functions: [],
         },
         replaceMarkers: [],
+        shaderKey,
     };
     let lineIndex = 0;
     let removedBefore = [];
     let consecutiveBlanks = 0;
-    let functionIndex = 0;
 
     for (const diff of differences) {
         if (diff.removed) {
@@ -96,14 +94,12 @@ export function analyzeShader(source, errorLog, storageKey) {
             actualCode,
             lineNumber
         );
-
-        if (functionMatches[functionIndex]?.lineOfCode.startsWith(actualCode) && actualCode) {
-            analyzed.defined.functions.push({
-                ...functionMatches[functionIndex],
-                lineNumber
-            });
-            functionIndex++;
-        }
+        extendFunctionDefinitionIfMatch(
+            analyzed.defined.functions,
+            functionMatches,
+            actualCode,
+            lineNumber
+        );
 
         analyzed.lines.push({
             code: diff.value,
@@ -124,6 +120,8 @@ export function analyzeShader(source, errorLog, storageKey) {
     for (const key in analyzed.defined) {
         defineMarkers(analyzed, key);
     }
+
+    console.log("Analyzed Shader", {analyzed, functionMatches});
 
     return analyzed;
 
@@ -163,6 +161,22 @@ function extendDefinitionIfMatch(targetList, regex, lineOfCode, lineNumber) {
             lineNumber
         });
     }
+}
+
+function extendFunctionDefinitionIfMatch(targetList, matches, code, lineNumber) {
+    if (!code.trim()) {
+        return;
+    }
+    const match = matches.find(match =>
+        match.lineOfCode.startsWith(code)
+    );
+    if (!match) {
+        return;
+    }
+    targetList.push({
+        ...match,
+        lineNumber
+    });
 }
 
 function parseErrors(errorLog) {
