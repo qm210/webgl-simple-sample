@@ -9,6 +9,8 @@ const REGEX = {
         /^\s*const\s*(?<type>float|u?int|bool|[iu]vec[2-4]|mat[2-4])\s*(?<name>\w*)\s*=\s*(?<value>\S*);/,
     FUNCTION:
         /(?:^|\n)\s*(?<returnType>\w+)\s+(?<name>\w+)\s*\((?<args>[^()]*)\)(?:\s*\{\s*(?<body>[^}]*)(?<=\n)})?\s*;?\n?/mg,
+    FUNCTION_SIGNATURE:
+        /(?:^|\n)\s*(?<returnType>\w+)\s+(?<name>\w+)\s*\((?<args>[^()]*)\)\s*\{/,
     ERROR_LOG:
         /:\s*([0-9]*):([0-9]*):\s*(.*)/g,
     // <--this holds for WebGl2, as of March 2025 - e.g. error logs look like:
@@ -154,21 +156,25 @@ export function analyzeShader(source, errorLog, shaderKey) {
 
 function extendDefinitionIfMatch(targetList, regex, lineOfCode, lineNumber) {
     const match = lineOfCode.match(regex)?.groups;
-    if (match) {
-        targetList.push({
-            ...match,
-            lineOfCode: lineOfCode.trim(),
-            lineNumber
-        });
+    if (!match) {
+        return;
     }
+    targetList.push({
+        ...match,
+        lineOfCode: lineOfCode.trim(),
+        lineNumber
+    });
 }
 
 function extendFunctionDefinitionIfMatch(targetList, matches, code, lineNumber) {
-    if (!code.trim()) {
+    const signature = code.match(REGEX.FUNCTION_SIGNATURE)?.groups;
+    if (!signature) {
         return;
     }
     const match = matches.find(match =>
-        match.lineOfCode.startsWith(code)
+        match.name === signature.name &&
+        match.returnType === signature.returnType &&
+        match.args === signature.args
     );
     if (!match) {
         return;

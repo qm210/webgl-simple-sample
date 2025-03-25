@@ -17,7 +17,7 @@ import showcase8 from "./showcases/8_Multipass.js";
 import showcase9 from "./showcases/9_Volumetric.js";
 
 // choose wisely :)
-const showcase = showcase9;
+const showcase = showcase5b;
 
 const autoRenderOnLoad = true;
 
@@ -45,4 +45,4 @@ if (showcase.title) {
     document.title = showcase.title;
 }
 
-console.log("Page took", elements.initialRenderMs.toFixed(3), "ms to render.");
+console.log("Page took", elements.initialRenderMs.toFixed(1), "ms to render.");
