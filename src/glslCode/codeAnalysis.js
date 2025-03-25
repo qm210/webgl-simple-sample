@@ -1,22 +1,5 @@
 import {diffLines} from "diff";
-
-const REGEX = {
-    DEFINE:
-        /^\s*#define\s*(?<name>\w*)(?<args>\(.*\))?\s*(?<value>.*)\s*$/,
-    GLOBAL:
-        /^\s*(?<keyword>out|uniform|varying)\s*(?<type>\w*)\s*(?<name>\w*);/,
-    CONSTANT:
-        /^\s*const\s*(?<type>float|u?int|bool|[iu]vec[2-4]|mat[2-4])\s*(?<name>\w*)\s*=\s*(?<value>\S*);/,
-    FUNCTION:
-        /(?:^|\n)\s*(?<returnType>\w+)\s+(?<name>\w+)\s*\((?<args>[^()]*)\)(?:\s*\{\s*(?<body>[^}]*)(?<=\n)})?\s*;?\n?/mg,
-    FUNCTION_SIGNATURE:
-        /(?:^|\n)\s*(?<returnType>\w+)\s+(?<name>\w+)\s*\((?<args>[^()]*)\)\s*\{/,
-    ERROR_LOG:
-        /:\s*([0-9]*):([0-9]*):\s*(.*)/g,
-    // <--this holds for WebGl2, as of March 2025 - e.g. error logs look like:
-    // ERROR: 0:12: '=' : dimension mismatch
-    // -> parse accordingly: /<ignore>: <number>:<number>: <rest>/
-};
+import REGEX from "./regexp.js";
 
 export function analyzeShader(source, errorLog, shaderKey) {
     const stored = sessionStorage.getItem(shaderKey) ?? "";
@@ -29,12 +12,7 @@ export function analyzeShader(source, errorLog, shaderKey) {
     const differences = diffLines(stored, source, {
         oneChangePerToken: true
     });
-    const functionMatches = [...source.matchAll(REGEX.FUNCTION)]
-        .map(match => {
-            const code = match[0].trim();
-            const lineOfCode = code.split("\n")[0];
-            return {...match.groups, code, lineOfCode};
-        });
+    const functionMatches = parseFunctions(source);
 
     const analyzed = {
         lines: [],
@@ -61,7 +39,7 @@ export function analyzeShader(source, errorLog, shaderKey) {
         let changed = diff.added && stored !== "";
         try {
             const onlyWhiteSpaceChanged = changed &&
-                actualCode === storedLines[lineIndex].trim();
+                actualCode === storedLines[lineIndex]?.trim();
             if (onlyWhiteSpaceChanged) {
                 changed = false;
                 removedBefore = [];
@@ -183,6 +161,26 @@ function extendFunctionDefinitionIfMatch(targetList, matches, code, lineNumber) 
         ...match,
         lineNumber
     });
+}
+
+function parseFunctions(code) {
+    const result = [];
+
+    for (const match of code.matchAll(REGEX.FUNCTION)) {
+        const falsePositive = (
+            REGEX.KEYWORD.test(match.groups.name) ||
+            match.groups.returnType === "return"
+        );
+        if (falsePositive) {
+            continue;
+        }
+
+        const code = match[0].trim();
+        const lineOfCode = code.split("\n")[0];
+        result.push({...match.groups, code, lineOfCode});
+    }
+
+    return result;
 }
 
 function parseErrors(errorLog) {

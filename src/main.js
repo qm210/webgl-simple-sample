@@ -1,4 +1,5 @@
 import {setupWebGl} from "./webgl/setup.js";
+import {prepareShowcase} from "./layout/showcase.js";
 import generatePage from "./layout/generate.js";
 import initLayout, {setFromUrlParameters} from "./layout/init.js";
 import './style/index.css';
@@ -17,7 +18,7 @@ import showcase8 from "./showcases/8_Multipass.js";
 import showcase9 from "./showcases/9_Volumetric.js";
 
 // choose wisely :)
-const showcase = showcase5b;
+const showcase = showcase6;
 
 const autoRenderOnLoad = true;
 
@@ -32,17 +33,12 @@ const glContext = setupWebGl(elements.canvas, {
     aspectRatio: 16 / 9,
 });
 
-const state = showcase.init(glContext);
-state.title = showcase.title;
+const state = prepareShowcase(showcase, glContext);
 
 console.log("WebGL objects initialized:", state);
 
 const controls = showcase.generateControls(glContext, state, elements);
 
 generatePage(elements, state, controls, autoRenderOnLoad);
-
-if (showcase.title) {
-    document.title = showcase.title;
-}
 
 console.log("Page took", elements.initialRenderMs.toFixed(1), "ms to render.");
