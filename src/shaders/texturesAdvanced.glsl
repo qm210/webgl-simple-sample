@@ -198,7 +198,7 @@ float udTriangle( vec3 p, vec3 a, vec3 b, vec3 c )
     dot(nor,pa)*dot(nor,pa)/dot2(nor) );
 }
 
-#define SIMPLE_TRIANGLE 1
+#define SIMPLE_TRIANGLE 0
 
 Surface sdTriangle( vec3 p, vec3 b, vec3 offset, vec3 col, mat3 transform) {
     vec3 v1 = vec3(b.x, 0., 0.);
@@ -210,8 +210,7 @@ Surface sdTriangle( vec3 p, vec3 b, vec3 offset, vec3 col, mat3 transform) {
         v2 = vec3(-1., 0., 0.);
         v3 = vec3(0., -1., 0.);
     #else
-        // was passiert hiermit also bildlich?
-        p = (p - offset) * transform;
+        p = (p - offset) * transform; // was passiert hiermit also bildlich?
     #endif
 
 
@@ -332,7 +331,8 @@ Surface sdScene(vec3 p) {
     Surface obj;
     Surface co = sdFloor(p);
 
-    obj = sdTriangle(p, vec3(1.), firstCubePos + vec3(-2.7,0.2 * sin(iTime),1.1), vec3(0.2, 0.7, 0.9), identity());
+    mat3 transform = rotateX(0.3 * iTime);
+    obj = sdTriangle(p, vec3(1.), firstCubePos + vec3(-2.7,0.2 * sin(iTime),1.1), vec3(0.2, 0.7, 0.9), transform);
     co = takeCloser(co, obj);
 
     #if SIMPLE_TRIANGLE == 1
@@ -350,9 +350,6 @@ Surface sdScene(vec3 p) {
 //    //transformLeft = identity();
 //    obj = sdTexturedBox(p, vec3(0.6), secondCubePos, vec3(0.3, 0.65, 0.9), transformLeft);
 //    co = takeCloser(co, obj);
-
-    obj = sdTriangle(p, vec3(1.), firstCubePos + vec3(-2.7,0.2 * sin(iTime),1.1), vec3(0.2, 0.7, 0.9), identity());
-    co = takeCloser(co, obj);
 
     /*
     obj = sdPatternSphere(p, vec3(1.), vec3(-2., floorLevel + 1., -2.), vec3(1, 0.1, 0.8), identity(), vec3(0.5, 0.2, 0.8), 8.);
