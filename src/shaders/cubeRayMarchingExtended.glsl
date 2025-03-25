@@ -76,7 +76,7 @@ float checkerboard(vec2 p, float scale) {
 
 float surfaceCheckerPattern(vec3 p, float checkerSize) {
     vec2 surface = vec2(
-        atan(p.z, p.x) / (2. * 3.1) + 0.5,
+        atan(p.z, p.x) / (2. * pi) + 0.5,
         p.y / 2. + 0.5
     );
     return checkerboard(surface, checkerSize);

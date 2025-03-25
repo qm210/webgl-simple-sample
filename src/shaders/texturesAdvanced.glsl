@@ -11,7 +11,6 @@ uniform float iCameraTilt;
 uniform sampler2D iTexture0;
 uniform sampler2D iTexture1;
 uniform sampler2D iTexture2;
-uniform sampler2D iBumpMap;
 
 const int MATERIAL_CONST = 0;
 const int MATERIAL_BOX = 1;
@@ -73,9 +72,9 @@ mat3 identity() {
 
 struct Surface {
     float sd; // Abstand des Rays vom Objekt
-    vec3 col; // <-- die Objekte dürfen eine intrinsische Farbe haben
+    vec3 col; // <-- die Objekte hatten bisher nur eine intrinsische Farbe
     int material; // wir verlagern die Zuweisung der Farben auf nach dem Ray Marching...
-    vec2 uv; // wir müssen aber mitführen
+    vec2 uv; // wir müssen die Oberflächenkoodinaten kennen für Texturen
 };
 
 void wobbleDistort(inout Surface surface, vec3 p, float amp, vec3 scale) {
@@ -89,7 +88,7 @@ float checkerboard(vec2 p, float scale) {
 
 float surfaceCheckerPattern(vec3 p, float checkerSize) {
     vec2 surface = vec2(
-        atan(p.z, p.x) / (2. * 3.14159) + 0.5,
+        atan(p.z, p.x) / (2. * pi) + 0.5,
         p.y / 2. + 0.5
     );
     return checkerboard(surface, checkerSize);
@@ -199,17 +198,22 @@ float udTriangle( vec3 p, vec3 a, vec3 b, vec3 c )
     dot(nor,pa)*dot(nor,pa)/dot2(nor) );
 }
 
-Surface sdTriangle( vec3 p, vec3 b, vec3 offset, vec3 col, mat3 transform) {
-    // was heißt es bildlich, das auszukommentieren?
-    p = (p - offset) * transform;
+#define SIMPLE_TRIANGLE 1
 
+Surface sdTriangle( vec3 p, vec3 b, vec3 offset, vec3 col, mat3 transform) {
     vec3 v1 = vec3(b.x, 0., 0.);
     vec3 v2 = vec3(0., b.y, 0.);
     vec3 v3 = vec3(0., 0., b.z);
-//
-//    v1 = vec3(0., 0.5 - 0.5 * cos(iTime), 0.);
-//    v2 = vec3(-1., 0., 0.);
-//    v3 = vec3(0., -1., 0.);
+
+    #if SIMPLE_TRIANGLE == 1
+        v1 = vec3(0., 0., 0.);
+        v2 = vec3(-1., 0., 0.);
+        v3 = vec3(0., -1., 0.);
+    #else
+        // was passiert hiermit also bildlich?
+        p = (p - offset) * transform;
+    #endif
+
 
     float d = udTriangle(p, v1, v2, v3);
 
@@ -328,20 +332,27 @@ Surface sdScene(vec3 p) {
     Surface obj;
     Surface co = sdFloor(p);
 
+    obj = sdTriangle(p, vec3(1.), firstCubePos + vec3(-2.7,0.2 * sin(iTime),1.1), vec3(0.2, 0.7, 0.9), identity());
+    co = takeCloser(co, obj);
+
+    #if SIMPLE_TRIANGLE == 1
+        return co;
+    #endif
+
     obj = sdTexturedBox(p, vec3(0.6), firstCubePos, vec3(0.3, 0.65, 0.9), rotateX(-0.2 * pi + iTime));
     co = takeCloser(co, obj);
 
-    vec3 secondCubePos = firstCubePos + vec3(-3.0, 0., 0.);
-    // this is advanced. dithering the time parameter for less glitchs. ist echt so.
+    //    vec3 secondCubePos = firstCubePos + vec3(-3.0, 0., 0.);
+//    // this is advanced. dithering the time parameter for less glitchs. ist echt so.
 //    float phi = 20. * (iTime + 1.e-3 * hash14(p.xz));
 //    secondCubePos += 1. * vec3(cos(phi), 0., sin(phi));
-    mat3 transformLeft = rotateY(+0.3 * pi + iTime);
-    //transformLeft = identity();
-    obj = sdTexturedBox(p, vec3(0.6), secondCubePos, vec3(0.3, 0.65, 0.9), transformLeft);
-    co = takeCloser(co, obj);
-
-//    obj = sdTriangle(p, vec3(1.), firstCubePos + vec3(-3.,0.2 * sin(iTime),-.5), vec3(0.2, 0.7, 0.9), rotateY(iTime));
+//    mat3 transformLeft = rotateY(+0.3 * pi + iTime);
+//    //transformLeft = identity();
+//    obj = sdTexturedBox(p, vec3(0.6), secondCubePos, vec3(0.3, 0.65, 0.9), transformLeft);
 //    co = takeCloser(co, obj);
+
+    obj = sdTriangle(p, vec3(1.), firstCubePos + vec3(-2.7,0.2 * sin(iTime),1.1), vec3(0.2, 0.7, 0.9), identity());
+    co = takeCloser(co, obj);
 
     /*
     obj = sdPatternSphere(p, vec3(1.), vec3(-2., floorLevel + 1., -2.), vec3(1, 0.1, 0.8), identity(), vec3(0.5, 0.2, 0.8), 8.);
@@ -510,7 +521,7 @@ void main() {
 //        lightPosition.z += 3. * sin(iTime);
         vec3 lightDirection = normalize(lightPosition - p);
 
-        float lightArea = clamp(dot(rd, lightDirection), 0., 1.);
+        // float lightArea = clamp(dot(rd, lightDirection), 0., 1.);
 
         // lightDirection = normalize(vec3(2. * cos(iTime), 0.5, 0.));
         // lightDirection = normalize(vec3(0., 1., 0.));
@@ -564,8 +575,6 @@ void main() {
         // float richtungInsLicht = clamp(dot(rd, lightPosition - ro), 0., 1.);
         // col.xyz *= exp(-1. * (1. - richtungInsLicht));
 
-        col.xyz = mix(col.xyz, vec3(1), pow(lightArea, 9.));
-
         // Distance Fog: Abschwächen je nach durchlaufenem Abstand
         float fog = exp(-0.00001 * pow(co.sd, 4.));
         col.xyz *= fog;
@@ -605,6 +614,6 @@ void main() {
     // quick check: so sähe das direkt gemappt aus.
     // Man achte auf die Werte der Koordinaten und die Texturparameter.
     // (v.A. bei einer Textur, die keinen schwarzen Rand hat.)
-//    fragColor = texture(iTexture2, uv);
 
+    //fragColor = texture(iTexture1, uv);
 }
