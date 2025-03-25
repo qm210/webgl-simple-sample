@@ -2,7 +2,7 @@ import standardSetup from "./3_SimpleGeometry.js";
 import {startRenderLoop} from "../webgl/render.js";
 import {createTextureFromImage} from "../webgl/helpers.js";
 
-import fragmentShaderSource from "../shaders/textures.glsl";
+import fragmentShaderSource from "../shaders/advanced.glsl";
 import postFragmentShaderSource from "../shaders/postProcessing.glsl";
 
 import imageFrame from "../textures/frame.png";
@@ -82,6 +82,10 @@ export default {
 
         state.post.location.texture = gl.getUniformLocation(state.program, "iImage");
 
+        // ... and there may be more uniforms. take one position to move around with keys.
+        state.location.cursorWalk = gl.getUniformLocation(state.program, "cursorWalk");
+        state.cursorWalk = [0, 0, 0];
+
         return state;
     },
     generateControls: (gl, state, elements) => [{
@@ -97,6 +101,9 @@ export default {
     }, {
         type: "label",
         name: "iTime",
+    }, {
+        type: "cursorInput",
+        name: "cursorWalk"
     }]
 };
 
@@ -107,6 +114,7 @@ function render(gl, state) {
 
     gl.uniform1f(state.location.iTime, state.time);
     gl.uniform2fv(state.location.iResolution, state.resolution);
+    gl.uniform3fv(state.location.cursorWalk, state.cursorWalk);
 
     // generell: getUniformLocation kann auch hier aufgerufen werden, optimiert vielleicht ein paar epsilons...
 

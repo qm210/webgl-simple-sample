@@ -3,6 +3,7 @@ precision highp float;
 out vec4 fragColor;
 uniform vec2 iResolution;
 uniform float iTime;
+uniform vec3 cursorWalk;
 
 uniform sampler2D iTexture0;
 uniform sampler2D iTexture1;
@@ -284,7 +285,7 @@ float fbm(vec2 p) {
     return f;
 }
 
-float floorLevel = -1.;
+float floorLevel = -2.;
 float noiseHeight = 3.; // was passiert bei zu hohen Werten, v.A. in Verbindung mit hohen FBM_ITERATIONS?
 float noiseFreq = 0.2;
 
@@ -318,20 +319,20 @@ Surface takeCloser(Surface obj1, Surface obj2) {
     return obj1;
 }
 
-vec3 firstCubePos = vec3(1.5, -0.25, -1.);
+vec3 firstCubePos = vec3(1.5, -0.87, -1.);
 
 Surface sdScene(vec3 p) {
     Surface obj;
     Surface co = sdFloor(p);
-//
+
     obj = sdTexturedBox(p, vec3(0.6), firstCubePos, vec3(0.3, 0.65, 0.9), rotateX(-0.2 * pi + iTime));
     co = takeCloser(co, obj);
 
-//    obj = sdTexturedBox(p, vec3(0.6), firstCubePos + vec3(-3.0, 0., 0.), vec3(0.3, 0.65, 0.9), rotateY(+0.3 * pi + iTime));
-//    co = takeCloser(co, obj);
-//
-    obj = sdTriangle(p, vec3(1.), firstCubePos + vec3(-3.,0.2 * sin(iTime),-.5), vec3(0.2, 0.7, 0.9), rotateY(iTime));
+    obj = sdTexturedBox(p, vec3(0.6), firstCubePos + vec3(-3.0, 0., 0.), vec3(0.3, 0.65, 0.9), identity()); // rotateY(+0.3 * pi + iTime)
     co = takeCloser(co, obj);
+
+//    obj = sdTriangle(p, vec3(1.), firstCubePos + vec3(-3.,0.2 * sin(iTime),-.5), vec3(0.2, 0.7, 0.9), rotateY(iTime));
+//    co = takeCloser(co, obj);
 
     /*
     obj = sdPatternSphere(p, vec3(1.), vec3(-2., floorLevel + 1., -2.), vec3(1, 0.1, 0.8), identity(), vec3(0.5, 0.2, 0.8), 8.);
@@ -475,7 +476,7 @@ void main() {
     vec4 col = vec4(0.);
     float d;
 
-    vec3 ro = vec3(0., 1., 1.);
+    vec3 ro = vec3(0., 0., 1.) + 0.25 * cursorWalk;
     float fov = 45. * pi / 180.; // 45° ist natürlicher, bleibt aber eine Designentscheidung
     vec3 rd = normalize(vec3(uv, -fov));
     rd *= rotateX(-0.2 * pi);
@@ -491,6 +492,8 @@ void main() {
         lightPosition.x += 5. * cos(iTime);
         lightPosition.z += 3. * sin(iTime);
         vec3 lightDirection = normalize(lightPosition - p);
+
+        float lightArea = clamp(dot(rd, lightDirection), 0., 1.);
 
         // lightDirection = normalize(vec3(2. * cos(iTime), 0.5, 0.));
         // lightDirection = normalize(vec3(0., 1., 0.));
@@ -543,6 +546,8 @@ void main() {
         //col.xyz = mix(col.xyz, vec3(1), pow(clamp(dot(p, lightDirection), 0., 1.), 100.));
         // float richtungInsLicht = clamp(dot(rd, lightPosition - ro), 0., 1.);
         // col.xyz *= exp(-1. * (1. - richtungInsLicht));
+
+        col.xyz = mix(col.xyz, vec3(1), pow(lightArea, 9.));
 
         // Distance Fog: Abschwächen je nach durchlaufenem Abstand
         float fog = exp(-0.00001 * pow(co.sd, 4.));

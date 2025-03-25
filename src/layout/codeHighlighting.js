@@ -4,7 +4,7 @@ export const CodeHighlighting = {
     keyword:
         /\b(uniform|varying|attribute|const|in|out|[iu]?vec[234]|mat[234]|void|float|u?int|bool|sampler[123]D|return|discard|continue|break|if|else|texture|texelFetch|precision|highp|mediump|lowp)\b/g,
     builtin:
-        /\b(mix|min|max|clamp|smoothstep|step|length|dot|reflect|normalize|cross|sinh?|cosh?|tanh?|atan|exp|log|sqrt|pow|mod|modf|fract|abs|sign|floor|ceil)\b/g,
+        /\b(mix|min|max|clamp|smoothstep|step|length|dot|normalize|cross|reflect|refract|sinh?|cosh?|tanh?|atan|exp|log|sqrt|pow|mod|modf|fract|abs|sign|floor|ceil)\b/g,
     number:
         /\b(-?\d+(\.\d+)?(e-?\d+)?U?)/g,
     directive:

@@ -1,4 +1,4 @@
-import {addButton, addValueLabel} from "./controls.js";
+import {addButton, addCursorInput, addValueLabel} from "./controls.js";
 import {appendCodeBlock} from "./shaderCode.js";
 import {appendText} from "./helpers.js";
 
@@ -92,6 +92,11 @@ export const addControlsToPage = (elements, state, controls, autoRenderOnLoad) =
                         label: control.name + " = ",
                         id: control.name
                     });
+                break;
+
+            case "cursorInput":
+                elements[control.name] =
+                    addCursorInput(elements.controls, state, control);
                 break;
 
             default:
