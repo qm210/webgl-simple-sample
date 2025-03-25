@@ -1,4 +1,4 @@
-import {addButton, addCursorInput, addValueLabel} from "./controls.js";
+import {addButton, addInput, addValueLabel} from "./controls.js";
 import {appendCodeBlock} from "./shaderCode.js";
 import {appendText} from "./helpers.js";
 
@@ -95,8 +95,9 @@ export const addControlsToPage = (elements, state, controls, autoRenderOnLoad) =
                 break;
 
             case "cursorInput":
+            case "floatInput":
                 elements[control.name] =
-                    addCursorInput(elements.controls, state, control);
+                    addInput(elements.controls, state, control);
                 break;
 
             default:

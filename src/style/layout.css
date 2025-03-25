@@ -107,3 +107,17 @@
     min-height: 3rem;
     font-size: var(--font-size-large);
 }
+
+#controls > div {
+    display: flex;
+    flex-direction: row;
+    width: 100%;
+    justify-content: stretch;
+    align-items: center;
+}
+
+.small-button {
+    padding: 0.12em 0.5em 0.25em;
+    margin: 0;
+    font-size: smaller;
+}

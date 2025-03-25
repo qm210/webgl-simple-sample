@@ -32,6 +32,7 @@ const glContext = setupWebGl(elements.canvas, {
 });
 
 const state = showcase.init(glContext);
+state.title = showcase.title;
 
 console.log("WebGL objects initialized:", state);
 

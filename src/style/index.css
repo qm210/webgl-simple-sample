@@ -97,3 +97,10 @@ label {
   margin: 0.5rem 0;
   font-size: var(--font-size-large);
 }
+
+kbd {
+  background-color: black;
+  color: white;
+  padding: 0.2em 0.4em;
+  border-radius: 0.5em;
+}

@@ -86,6 +86,8 @@ export default {
         state.location.cursorWalk = gl.getUniformLocation(state.program, "cursorWalk");
         state.cursorWalk = [0, 0, 0];
 
+        state.location.iSomeFloat = gl.getUniformLocation(state.program, "iSomeFloat");
+
         return state;
     },
     generateControls: (gl, state, elements) => [{
@@ -103,7 +105,15 @@ export default {
         name: "iTime",
     }, {
         type: "cursorInput",
-        name: "cursorWalk"
+        name: "cursorWalk",
+        keys: ["w", "a", "s", "d", "r", "f", "q"],
+    }, {
+        type: "floatInput",
+        name: "iSomeFloat",
+        step: 0.001,
+        defaultValue: 0.5,
+        min: undefined,
+        max: undefined,
     }]
 };
 
@@ -115,6 +125,7 @@ function render(gl, state) {
     gl.uniform1f(state.location.iTime, state.time);
     gl.uniform2fv(state.location.iResolution, state.resolution);
     gl.uniform3fv(state.location.cursorWalk, state.cursorWalk);
+    gl.uniform1f(state.location.iSomeFloat, state.iSomeFloat);
 
     // generell: getUniformLocation kann auch hier aufgerufen werden, optimiert vielleicht ein paar epsilons...
 

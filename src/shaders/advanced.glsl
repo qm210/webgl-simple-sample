@@ -4,6 +4,7 @@ out vec4 fragColor;
 uniform vec2 iResolution;
 uniform float iTime;
 uniform vec3 cursorWalk;
+uniform float iSomeFloat;
 
 uniform sampler2D iTexture0;
 uniform sampler2D iTexture1;
@@ -273,7 +274,7 @@ float noise(vec2 p){
 }
 
 // Fractional Brownian Motion for low-frequency noise
-#define FBM_ITERATIONS 10
+#define FBM_ITERATIONS 6
 float fbm(vec2 p) {
     float f = 0.0;
     float amp = 0.5;
@@ -301,8 +302,8 @@ Surface sdFloor(vec3 p) {
     // wir machen es uns hier leicht -- was ist mit den Normalenvektoren?
     // -> mal diffuse lighting einschalten
     float someOffset = 5.3; // hashes sehen um 0 oft auffällig auf
-    float noise = fbm(noiseFreq * p.xz + someOffset);
-    float noisyLevel = floorLevel - noiseHeight * (noise - 0.5);
+    float noise = fbm(noiseFreq * p.xz + 0.02 * iTime + someOffset);
+    float noisyLevel = floorLevel - noiseHeight * iSomeFloat * (noise - 0.5);
     d = p.y - noisyLevel;
 
     // oder aber: Height Map / Bump Map als Textur reingeben.
@@ -319,7 +320,7 @@ Surface takeCloser(Surface obj1, Surface obj2) {
     return obj1;
 }
 
-vec3 firstCubePos = vec3(1.5, -0.87, -1.);
+vec3 firstCubePos = vec3(1.5, -0.87, -2.);
 
 Surface sdScene(vec3 p) {
     Surface obj;
@@ -437,6 +438,8 @@ float gold_noise(in vec2 xy, in float seed) {
 void main() {
     vec2 uv = (2.0 * gl_FragCoord.xy - iResolution.xy) / iResolution.y;
 
+    // firstCubePos += 0.25 * cursorWalk;
+
     // transform uv but only for background
     vec2 bgUv = uv + 0.0 * vec2(0.1 * iTime, 0.);
     float bgRotationSpeed = 0.0; // 0.1;
@@ -477,9 +480,9 @@ void main() {
     float d;
 
     vec3 ro = vec3(0., 0., 1.) + 0.25 * cursorWalk;
-    float fov = 45. * pi / 180.; // 45° ist natürlicher, bleibt aber eine Designentscheidung
+    float fov = 80. * pi / 180.; // Angabe 80°C üblicher für Field-of-View ~ entspricht inverser Brennweite
     vec3 rd = normalize(vec3(uv, -fov));
-    rd *= rotateX(-0.2 * pi);
+    rd *= rotateX(-0.125 * pi);
     // rd *= rotateY(0.02 * sin(3. * iTime));
 
     Surface co = rayMarch(ro, rd, MIN_DIST, MAX_DIST);
@@ -488,9 +491,9 @@ void main() {
         vec3 p = ro + rd * co.sd;
         applyMaterial(co, p);
         vec3 normal = calcNormal(p);
-        vec3 lightPosition = firstCubePos + vec3(0., 3., 3.);
-        lightPosition.x += 5. * cos(iTime);
-        lightPosition.z += 3. * sin(iTime);
+        vec3 lightPosition = vec3(1.5, 3., 2.);
+//        lightPosition.x += 5. * cos(iTime);
+//        lightPosition.z += 3. * sin(iTime);
         vec3 lightDirection = normalize(lightPosition - p);
 
         float lightArea = clamp(dot(rd, lightDirection), 0., 1.);
