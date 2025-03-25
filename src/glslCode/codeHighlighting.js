@@ -1,3 +1,5 @@
+import {createDiv, renderSpan} from "../layout/helpers.js";
+
 export const CodeHighlighting = {
     magicKeyword:
         /\b(gl_Position|gl_PointSize|gl_FragCoord|gl_FrontFacing|gl_PointCoord|main)\b/g,
@@ -11,7 +13,7 @@ export const CodeHighlighting = {
         /^\s*(#.*)/g,
 };
 
-export function highlightGLSL(code) {
+function highlightGLSL(code) {
     return code
         .replace(CodeHighlighting.magicKeyword, match =>
             `<span class="magic keyword">${match}</span>`
@@ -30,40 +32,22 @@ export function highlightGLSL(code) {
         );
 }
 
-export function highlightDefinedSymbols(code, definitions, lineNumber) {
-    let result = code;
+export function prepareHighlightedCode(analyzedLine, analyzed) {
+    const codeElement = createDiv("", "code");
 
-    function replace(symbol, className) {
-        const symbolUsed =
-            new RegExp(`(?<!")${symbol.name}(?!")`, "g");
+    let code = highlightGLSL(analyzedLine.code);
 
-        result = result.replaceAll(symbolUsed, match => {
-
-            if (symbol.lineNumber === lineNumber) {
-                // do not replace the actual definition ;)
-                return `<span id="${symbol.name}">${match}</span>`;
-            }
-
-            const title = `line ${symbol.lineNumber}: ${symbol.lineOfCode}`
-                .replaceAll(symbol.name, '...');
-            // <-- have to replace the name, otherwise this very replaceAll will conflict :D
-
-            const attributes = `class="${className}" title="${title}" data-id="${symbol.name}"`;
-            return `<span ${attributes}>${match}</span>`;
-        });
+    for (const key in analyzed.defined) {
+        for (const symbol of analyzed.defined[key]) {
+            code = code.replaceAll(
+                symbol.marker.originalRegExp,
+                symbol.lineNumber === analyzedLine.number
+                    ? symbol.marker.definition
+                    : symbol.marker.usage
+            );
+        }
     }
 
-    for (const symbol of definitions.defines) {
-        replace(symbol, "is-defined symbol");
-    }
-    for (const symbol of definitions.globals) {
-        replace(symbol, "is-global symbol");
-    }
-    for (const symbol of definitions.constants) {
-        replace(symbol, "is-constant symbol");
-    }
-    for (const symbol of definitions.functions) {
-        replace(symbol, "is-own-function symbol")
-    }
-    return result;
+    codeElement.innerHTML = code;
+    return codeElement;
 }

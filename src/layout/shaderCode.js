@@ -1,5 +1,7 @@
-import {createHighlightedCode, createDiv} from "./helpers.js";
+import {createDiv, renderSpan} from "./helpers.js";
 import {analyzeShader} from "../glslCode/codeAnalysis.js";
+import {prepareHighlightedCode} from "../glslCode/codeHighlighting.js";
+import {addShaderCodeEventListeners} from "./eventListeners.js";
 
 export function appendShaderCode(elements, shaderSource, errorLog, storageKey) {
     if (!shaderSource) {
@@ -14,15 +16,20 @@ export function appendShaderCode(elements, shaderSource, errorLog, storageKey) {
     sourceColumn.classList.add("source");
     codeBlock.appendChild(sourceColumn);
 
-    const analyzedLines = analyzeShader(shaderSource, errorLog, storageKey);
+    const analyzed = analyzeShader(shaderSource, errorLog, storageKey);
 
-    for (const line of analyzedLines) {
-        const annotatedLine = createAnnotatedLine(line, elements.scrollStack);
+    for (const line of analyzed.lines) {
+        const annotatedLine = prepareLine(line, analyzed);
         sourceColumn.appendChild(annotatedLine);
     }
+
+    sourceColumn.innerHTML =
+        withMarkersReplaced(sourceColumn.innerHTML, analyzed);
+
+    addShaderCodeEventListeners(sourceColumn, elements.scrollStack);
 }
 
-function createAnnotatedLine(line, scrollStack) {
+function prepareLine(line, analyzed) {
     if (!line.code) {
         return createDiv("", "empty-line");
     }
@@ -55,7 +62,7 @@ function createAnnotatedLine(line, scrollStack) {
     numberElement.id = `l.${line.number}`;
     element.appendChild(numberElement);
 
-    const codeElement = createHighlightedCode(line, scrollStack);
+    const codeElement = prepareHighlightedCode(line, analyzed);
     element.appendChild(codeElement);
 
     if (annotation) {
@@ -66,4 +73,37 @@ function createAnnotatedLine(line, scrollStack) {
     }
 
     return element;
+}
+
+function withMarkersReplaced(result, analyzed) {
+    const assignedClasses = {
+        "defines": "is-defined symbol",
+        "globals": "is-global symbol",
+        "constants": "is-constant symbol",
+        "functions": "is-own-function symbol"
+    };
+
+    for (const r of analyzed.replaceMarkers) {
+        result = result.replaceAll(r.marker, render(r));
+    }
+
+    return result;
+
+    function render(r) {
+        if (r.isDefinition) {
+            return renderSpan({
+                text: r.symbol.name,
+                id: r.symbol.name
+            });
+        }
+
+        const className = assignedClasses[r.key];
+        const title = `line ${r.symbol.lineNumber}: ${r.symbol.code ?? r.symbol.lineOfCode}`;
+        return renderSpan({
+            text: r.symbol.name,
+            className,
+            title,
+            data: r.symbol.name,
+        });
+    }
 }

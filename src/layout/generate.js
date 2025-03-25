@@ -1,6 +1,7 @@
 import {addButton, addInput, addValueLabel} from "./controls.js";
 import {appendShaderCode} from "./shaderCode.js";
 import {appendText} from "./helpers.js";
+import {createScrollStackOn} from "./eventListeners.js";
 
 
 const generatePage = (elements, state, controls, autoRenderOnLoad) => {
@@ -146,22 +147,4 @@ function renderCompileStepStatus(title, error, successMessage) {
             ${content}
         </div>    
     `;
-}
-
-function createScrollStackOn(parent) {
-    const scrollStack = [];
-
-    parent.addEventListener("contextmenu", (event) => {
-        const stackElement = scrollStack.pop();
-        console.log("SACK.?", stackElement, scrollStack);
-        if (stackElement) {
-            stackElement.scrollIntoView({
-                behaviour: "smooth",
-                block: "center"
-            });
-            event.preventDefault();
-        }
-    });
-
-    return scrollStack;
 }

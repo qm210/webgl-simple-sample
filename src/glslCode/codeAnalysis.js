@@ -1,4 +1,5 @@
 import {diffLines} from "diff";
+import {renderSpan} from "../layout/helpers.js";
 
 const REGEX = {
     DEFINE:
@@ -35,17 +36,20 @@ export function analyzeShader(source, errorLog, storageKey) {
             return {...match.groups, code, lineOfCode};
         });
 
-    const lines = [];
+    const analyzed = {
+        lines: [],
+        defined: {
+            defines: [],
+            globals: [],
+            constants: [],
+            functions: [],
+        },
+        replaceMarkers: [],
+    };
     let lineIndex = 0;
     let removedBefore = [];
     let consecutiveBlanks = 0;
     let functionIndex = 0;
-    const defined = {
-        defines: [],
-        globals: [],
-        constants: [],
-        functions: [],
-    }
 
     for (const diff of differences) {
         if (diff.removed) {
@@ -75,46 +79,79 @@ export function analyzeShader(source, errorLog, storageKey) {
         }
 
         extendDefinitionIfMatch(
-            defined.defines,
+            analyzed.defined.defines,
             REGEX.DEFINE,
             actualCode,
             lineNumber
         );
         extendDefinitionIfMatch(
-            defined.globals,
+            analyzed.defined.globals,
             REGEX.GLOBAL,
             actualCode,
             lineNumber
         );
         extendDefinitionIfMatch(
-            defined.constants,
+            analyzed.defined.constants,
             REGEX.CONSTANT,
             actualCode,
             lineNumber
         );
 
         if (functionMatches[functionIndex]?.lineOfCode.startsWith(actualCode) && actualCode) {
-            defined.functions.push({
+            analyzed.defined.functions.push({
                 ...functionMatches[functionIndex],
                 lineNumber
             });
             functionIndex++;
         }
 
-        lines.push({
+        analyzed.lines.push({
             code: diff.value,
             changed,
             removedBefore,
             error: errors[lineIndex],
             number: lineNumber,
             consecutiveBlanks,
-            defined: structuredClone(defined),
         });
         removedBefore = [];
         lineIndex++;
     }
 
-    return lines.filter(l => l.consecutiveBlanks < 2);
+    analyzed.lines = analyzed.lines.filter(
+        l => l.consecutiveBlanks < 2
+    );
+
+    for (const key in analyzed.defined) {
+        defineMarkers(analyzed, key);
+    }
+
+    return analyzed;
+
+    function defineMarkers(analyzed, key) {
+        const symbols = analyzed.defined[key];
+        for (let s = 0; s < symbols.length; s++) {
+            const symbol = symbols[s];
+            symbol.marker = {
+                definition: `!${symbol.name}!`,
+                usage: `$${symbol.name}$`,
+                originalRegExp:
+                    new RegExp(`(?<![$!])${symbol.name}(?![$!])`, "g")
+            };
+
+            analyzed.replaceMarkers.push({
+                marker: symbol.marker.definition,
+                isDefinition: true,
+                symbol,
+                key,
+            });
+            analyzed.replaceMarkers.push({
+                marker: symbol.marker.usage,
+                isDefinition: false,
+                symbol,
+                key
+            });
+        }
+    }
 }
 
 function extendDefinitionIfMatch(targetList, regex, lineOfCode, lineNumber) {

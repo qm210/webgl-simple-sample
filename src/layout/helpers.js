@@ -1,5 +1,3 @@
-import {highlightGLSL, highlightDefinedSymbols} from "../glslCode/codeHighlighting.js";
-
 export function createDiv(content, classes) {
     const div = document.createElement("div");
     if (classes) {
@@ -15,33 +13,39 @@ export function appendText(parent, tagName, textContent) {
     parent.appendChild(element);
 }
 
-export function createHighlightedCode(analyzedLine, scrollStack) {
-    const codeElement = createDiv("", "code");
-    codeElement.innerHTML =
-        highlightDefinedSymbols(
-            highlightGLSL(analyzedLine.code),
-            analyzedLine.defined,
-            analyzedLine.number,
-        );
-
-    for (const symbolElement of document.getElementsByClassName("symbol")) {
-        symbolElement.addEventListener("click", () => {
-            const id = symbolElement.getAttribute("data-id");
-            const target = document.getElementById(id);
-            if (target) {
-                scrollStack.push(symbolElement);
-                target.scrollIntoView({
-                    behaviour: "smooth",
-                    block: "start"
-                });
-                console.log("SCROLL STACK", scrollStack);
-            } else {
-                console.error("Target Element does not exist", id, symbolElement);
-            }
-        })
+export function renderSpan({text, id, className, title, data}) {
+    const span = document.createElement("span");
+    span.textContent = text ?? "";
+    if (className) {
+        span.className = className;
     }
+    if (id) {
+        span.id = id;
+    }
+    if (title) {
+        span.title = title;
+    }
+    if (data) {
+        span.setAttribute("data", data);
+    }
+    return span.outerHTML;
+}
 
+export function assignGloballyUniqueClass(element, className) {
+    if (!element) {
+        return;
+    }
+    const selected = [...document.getElementsByClassName(className)];
+    for (const previous of selected) {
+        previous.classList.remove(className);
+    }
+    element.classList.add(className);
+}
 
-
-    return codeElement;
+export function findParentOfClass(element, className) {
+    let parent = element.parentElement;
+    while (parent && !parent.classList.contains(className)) {
+        parent = parent.parentElement;
+    }
+    return parent;
 }

@@ -32,6 +32,15 @@
     align-items: baseline;
 }
 
+.line:hover {
+    background-color: #aa44ff10;
+}
+
+.line.selected {
+    background-color: #aa44ff30;
+    box-shadow: 1px 1px 2px #0002;
+}
+
 .line .code {
     min-width: fit-content;
 }
