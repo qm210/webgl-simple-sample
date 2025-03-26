@@ -2,7 +2,9 @@ import standardSetup from "./3_SimpleGeometry.js";
 import {startRenderLoop} from "../webgl/render.js";
 import {createTextureFromImage} from "../webgl/helpers.js";
 
-import fragmentShaderSource from "../shaders/texturesAdvanced.glsl";
+// multiPassMain.glsl ist fast wie texturesAdvanced.glsl
+// aber was ist anders?
+import fragmentShaderSource from "../shaders/multiPassMain.glsl";
 import postFragmentShaderSource from "../shaders/multiPassPost.glsl";
 
 import imageFrame from "../textures/frame.png";

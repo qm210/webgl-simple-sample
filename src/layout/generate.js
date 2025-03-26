@@ -32,7 +32,7 @@ const generatePage = (elements, state, controls, autoRenderOnLoad) => {
 
     if (state.post) {
         appendText(
-            elements,
+            elements.shaders,
             "h4",
             "Second Program (Post Processing):"
         );
