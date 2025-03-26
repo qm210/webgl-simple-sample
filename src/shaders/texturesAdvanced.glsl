@@ -478,7 +478,7 @@ void main() {
 //        bgColor.xyz = max(texColor, bgColor.xyz);
 //    }
 
-    // anderes Beispiel: Radial Blur
+    // anderes Beispiel: Zoom Blur
 //    bgColor.xyz = vec3(0);
 //    float blurSteps = 32.;
 //    float blurLength = 15.;
