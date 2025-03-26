@@ -88,6 +88,9 @@ export default {
         state.location.cursorWalk = gl.getUniformLocation(state.program, "cursorWalk");
         state.cursorWalk = [0, 0, 0];
 
+        state.location.iFieldOfView = gl.getUniformLocation(state.program, "iFieldOfView");
+        state.location.iCameraTilt = gl.getUniformLocation(state.program, "iCameraTilt");
+
         state.location.iSomeFloat = gl.getUniformLocation(state.program, "iSomeFloat");
 
         return state;
@@ -106,17 +109,17 @@ export default {
         type: "label",
         name: "iTime",
     }, {
+        type: "floatInput",
+        name: "iFieldOfView",
+        defaultValue: 80,
+    }, {
+        type: "floatInput",
+        name: "iCameraTilt",
+        defaultValue: -23,
+    }, {
         type: "cursorInput",
         name: "cursorWalk",
         keys: ["w", "a", "s", "d", "r", "f", "q"],
-    }, {
-        type: "floatInput",
-        name: "iSomeFloat",
-        step: 0.001,
-        defaultValue: 0.5,
-        min: undefined,
-        max: undefined,
-        hidden: true,
     }, {
         type: "floatInput",
         name: "focusDistance",
@@ -140,7 +143,8 @@ function render(gl, state) {
     gl.uniform1f(state.location.iTime, state.time);
     gl.uniform2fv(state.location.iResolution, state.resolution);
     gl.uniform3fv(state.location.cursorWalk, state.cursorWalk);
-    gl.uniform1f(state.location.iSomeFloat, state.iSomeFloat);
+    gl.uniform1f(state.location.iFieldOfView, state.iFieldOfView);
+    gl.uniform1f(state.location.iCameraTilt, state.iCameraTilt);
 
     // generell: getUniformLocation kann auch hier aufgerufen werden, optimiert vielleicht ein paar epsilons...
 

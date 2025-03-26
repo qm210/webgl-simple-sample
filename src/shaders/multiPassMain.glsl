@@ -3,7 +3,10 @@ precision highp float;
 out vec4 fragColor;
 uniform vec2 iResolution;
 uniform float iTime;
+
 uniform vec3 cursorWalk;
+uniform float iFieldOfView;
+uniform float iCameraTilt;
 
 uniform sampler2D iTexture0;
 uniform sampler2D iTexture1;
@@ -484,12 +487,11 @@ void main() {
     vec4 col = vec4(0.);
     float d;
 
+    float fov = iFieldOfView * pi / 180.;
     vec3 ro = vec3(0., 0., 1.) + 0.25 * cursorWalk;
-    float fov = 45. * pi / 180.; // Angabe 80°C üblicher für Field-of-View ~ entspricht inverser Brennweite
     float uvz = -1. / tan(fov / 2.);
     vec3 rd = normalize(vec3(uv, uvz));
-    rd *= rotateX(-0.125 * pi);
-    // rd *= rotateY(0.02 * sin(3. * iTime));
+    rd *= rotateX(iCameraTilt * pi / 180.);
 
     Surface co = rayMarch(ro, rd, MIN_DIST, MAX_DIST);
 
@@ -498,8 +500,8 @@ void main() {
         applyMaterial(co, p);
         vec3 normal = calcNormal(p);
         vec3 lightPosition = vec3(1.5, 3., 2.);
-//        lightPosition.x += 5. * cos(iTime);
-//        lightPosition.z += 3. * sin(iTime);
+        lightPosition.x += 5. * cos(iTime);
+        lightPosition.z += 3. * sin(iTime);
         vec3 lightDirection = normalize(lightPosition - p);
 
         float lightArea = clamp(dot(rd, lightDirection), 0., 1.);

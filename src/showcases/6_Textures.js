@@ -104,15 +104,5 @@ function render(gl, state) {
     gl.bindTexture(gl.TEXTURE_2D, state.texture2);
     gl.uniform1i(state.location.texture2, 2);
 
-    gl.uniform1i(state.location.pass, 0);
-    if (state.pass0) {
-        gl.bindFramebuffer(gl.FRAMEBUFFER, state.pass0.fb);
-    }
-
     gl.drawArrays(gl.TRIANGLES, 0, 6);
-
-    if (state.pass1) {
-        gl.uniform1i(state.location.pass, 1);
-        gl.bindFramebuffer(gl.FRAMEBUFFER, state.pass1.fb);
-    }
 }

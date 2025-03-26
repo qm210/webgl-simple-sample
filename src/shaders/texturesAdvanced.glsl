@@ -499,11 +499,9 @@ void main() {
 
     // Angabe üblich als Winkel - z.B: 67-90° üblich bei Webcams ~ entspricht inverser Brennweite
     float fov = iFieldOfView * pi / 180.;
-
     vec3 ro = vec3(0., 0., 1.) + 0.25 * cursorWalk;
     float uvz = -1. / tan(fov / 2.);
     vec3 rd = normalize(vec3(uv, uvz));
-
     rd *= rotateX(iCameraTilt * pi / 180.);
     // rd *= rotateY(0.02 * sin(3. * iTime));
 
