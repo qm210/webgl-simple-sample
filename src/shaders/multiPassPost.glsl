@@ -263,10 +263,10 @@ float gold_noise(in vec2 xy, in float seed) {
 #define DO_NOTHING false
 // <-- anders definiert als der Rest, weil meine IDE mich genervt hat. Macht nichts.
 #define PIXELATE 0
-#define GAUSS_BLUR 0
+#define GAUSS_BLUR 1
 #define VIGNETTE 1
 #define GRAYSCALE 0
-#define OKLCH_TRANSFORMATION 0
+#define OKLCH_TRANSFORMATION 1
 #define DEPTH_OF_FIELD 0
 
 void main() {
@@ -379,7 +379,7 @@ void main() {
         // Transformation in geeigneteren Farbräumen
         // col = FROM_RGB(col);
         col = rgb2oklch(col);
-        col.z = 0.7; // irgendein Beispiel.
+        col.z *= 0.3; // irgendein Beispiel.
         // col.z = mod(iTime, 2. * pi);
         col = oklch2rgb(col);
     #endif
