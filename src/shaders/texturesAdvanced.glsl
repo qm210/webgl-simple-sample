@@ -581,28 +581,7 @@ void main() {
     }
 
     // Beispiel Post-Processing (transformiert nur noch Farbe -> Farbe, nicht mehr Geometrie)
-    // col = atan(8. * pow(col, vec3(5.)));
-
-//    float rnd;
-//    rnd = fract(1000000. * sin(321231. * uv.x + 34928. * uv.y)); // see it flickering?
-//    rnd = hash14(floor(0.1 * gl_FragCoord));
-//    col.xyz = vec3(rnd);
-
-    //uv = floor(2. * uv);
-
-
-//    rnd = fract(
-//        sin(
-//            dot(uv.xy, vec2(12.9898,78.233))
-//        ) * 43758.5453123
-//    );
-
-    // exkursion ins pseudochaos
-//    col.xyz = vec3(1.);
-//    col.xyz *= rnd;
-//    col.a = 1.;
-
-    // col.xyz = vec3(gold_noise(uv, iTime));
+    col.xyz = atan(8. * pow(col.xyz, vec3(5.)));
 
 
     fragColor = mix(bgColor, vec4(col.xyz, 1.), col.a);

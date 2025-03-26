@@ -18,7 +18,7 @@ import showcase8 from "./showcases/8_Multipass.js";
 import showcase9 from "./showcases/9_Volumetric.js";
 
 // choose wisely :)
-const showcase = showcase6;
+const showcase = showcase7;
 
 const autoRenderOnLoad = true;
 

@@ -4,20 +4,7 @@ out vec4 fragColor;
 uniform vec2 iResolution;
 uniform float iTime;
 
-uniform sampler2D iTexture0;
-uniform sampler2D iTexture1;
-uniform sampler2D iTexture2;
-
-#define MATERIAL_CONST 0
-#define MATERIAL_BOX 1
-#define MATERIAL_FLOOR 2
-
 const float pi = 3.141593;
-
-float checkerboard(vec2 p, float scale) {
-    vec2 ip = floor(p * scale);
-    return mod(ip.x + ip.y, 2.0);
-}
 
 vec3 c = vec3(1,0,-1);
 
@@ -208,66 +195,28 @@ vec3 weightedOklabLinearGradientOklab(float amount) {
     )));
 }
 
-// Hash function for noise generation
-float hash(vec2 n) {
-    return fract(sin(dot(n, vec2(12.9898, 4.1414))) * 43758.5453);
-}
+#define FROM_RGB(x) x
+#define TO_RGB(x) x
 
-// "Value Noise" function
-float noise(vec2 p){
-    vec2 ip = floor(p);
-    vec2 fp = fract(p);
-    fp = fp * fp * (3.0 - 2.0 * fp); // this equals smoothstep (in the interval [0,1])
-    // fp = fp * fp * fp * (fp * (fp * 6. - 15.) + 10.); // "smootherstep"
+//#define FROM_RGB rgb2hsv
+//#define TO_RGB hsv2rgb
 
-    return mix(
-        mix(
-            hash(ip),
-            hash(ip+vec2(1.0,0.0)),
-            fp.x
-        ),
-        mix(
-            hash(ip+vec2(0.0,1.0)),
-            hash(ip+vec2(1.0,1.0)),
-            fp.x
-        ),
-        fp.y
-    );
-}
+//#define FROM_RGB rgb2hsl
+//#define TO_RGB hsl2rgb
 
-// Fractional Brownian Motion (fBm) for low-frequency noise
-#define FBM_ITERATIONS 2
-float fbm(vec2 p) {
-    float f = 0.0;
-    float amp = 0.5;
-    for (int i = 0; i < FBM_ITERATIONS; i++) {
-        f += amp * noise(p);
-        p *= 2.0;
-        amp *= 0.5;
-    }
-    return f;
-}
+//#define FROM_RGB rgb2oklab
+//#define TO_RGB oklab2rgb
 
-float PHI = 1.61803398874989484820459;  // Golden Ratio
-
-float gold_noise(in vec2 xy, in float seed) {
-    return fract(tan(distance(xy * PHI, xy) * seed) * xy.x);
-}
-
-#define FROM_RGB rgb2oklch
-#define TO_RGB oklch2rgb
-
-//#define FROM_RGB(x) x
-//#define TO_RGB(x) x
+//#define FROM_RGB rgb2oklch
+//#define TO_RGB oklch2rgb
 
 void main() {
     vec2 uv = (2.0 * gl_FragCoord.xy - iResolution.xy) / iResolution.y;
 
-    // col.xyz = vec3(gold_noise(uv, iTime));
-
-    // vec3 gradient = vec3(uv.x, uv.y, 1. - uv.x);
-
     float insideSquare = float(abs(uv.x) <= 1.);
+//    if (insideSquare < 1.) {
+//        discard;
+//    }
 
     uv = 0.5 * uv + 0.5;
 
