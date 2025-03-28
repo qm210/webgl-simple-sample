@@ -1,14 +1,14 @@
 const REGEX = {
-    DEFINE:
-        /\b#define\s*(?<name>\w*)(?<args>\(.*\))?\s*(?<value>.*)\s*$/g,
-    GLOBAL:
-        /\b(?<keyword>out|uniform|varying)\s*(?<type>\w+)\s*(?<name>\w*);/g,
+    DEFINE_DIRECTIVE:
+        /^\s*#define\s*(?<name>\w*)(?<args>\(.*?\))?\s*(?<value>.*)\s*$/mg,
+    SHADER_VARIABLE:
+        /^\s*(layout\s*\(location\s*=\s*(?<location>\d+)\)\s*)?(?<keyword>out|uniform|varying|attribute)\s*(?<type>\w+)\s*(?<name>\w*);$/mg,
     CONSTANT:
         /\bconst\s*(?<type>float|u?int|bool|[iu]vec[2-4]|mat[2-4])\s*(?<name>\w*)\s*=\s*(?<value>\S*);/g,
     FUNCTION:
         /(?:^|\n)\s*(?<returnType>\w+)\s+(?<name>\w+)\s*\((?<args>[^()]*)\)(?:\s*\{\s*(?<body>[^}]*)(?<=\n)})?\s*;?\n?/mg,
     FUNCTION_SIGNATURE:
-        /(?:^|\n)\s*(?<returnType>\w+)\s+(?<name>\w+)\s*\((?<args>[^()]*)\)\s*\{/,
+        /(?:^|\n)\s*(?<returnType>\w+)\s+(?<name>\w+)\s*\((?<args>[^()]*)\)\s*\{/g,
 
     MAGIC_KEYWORD:
         /\b(gl_Position|gl_PointSize|gl_FragCoord|gl_FrontFacing|gl_PointCoord|main)\b/g,

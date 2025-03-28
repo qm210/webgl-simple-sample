@@ -25,6 +25,7 @@
     background-color: var(--code-background);
     box-shadow: -1px 1px 1px black;
     z-index: 1;
+    user-select: none;
 }
 
 .source {
@@ -96,6 +97,11 @@
     text-align: right;
     margin-right: 2rem;
     opacity: 0.7;
+    user-select: none;
+}
+
+.line-number:hover {
+    user-select: text;
 }
 
 .annotated > .line-number {
@@ -138,7 +144,7 @@
     color: blue;
 }
 
-.code .is-own-function {
+.code .is-custom-function {
     color: green;
 }
 

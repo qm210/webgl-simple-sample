@@ -2,6 +2,8 @@ import standardSetup from "./3_SimpleGeometry.js";
 import {startRenderLoop} from "../webgl/render.js";
 
 import fragmentShaderSource from "../shaders/volumetricClouds.glsl";
+// <-- huge credits to Christopher Wallis for the original
+//     https://www.shadertoy.com/view/tsScDG
 
 export default {
     title: "Volumetric Clouds",

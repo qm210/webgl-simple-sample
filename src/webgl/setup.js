@@ -5,14 +5,18 @@ import {asResolution, createShader} from "./helpers.js";
  * @param canvas - You need a <canvas> element to initialize WebGl context
  *                 Also, your browser needs to support this.
  *                 See: https://caniuse.com/webgl2
- *                 Fallback: https://caniuse.com/webgl
  * @param geometry {width, height, aspectRatio} - canvas dimensions, specify either two
  */
 
 export function setupWebGl(canvas, geometry) {
 
     const gl = canvas.getContext("webgl2");
-    // LEFT OUT: one would check here whether WebGL2 is even supported
+    if (!gl) {
+        window.alert("We need WebGL2 and your Browser does not support that, sadly.");
+        // now the rest will fail badly, but that doesn't matter for me now,
+        // because the application can not be used either way -- we need WebGL2!
+        // https://caniuse.com/webgl2
+    }
 
     const canvasRect = canvas.getBoundingClientRect();
     if (!geometry.height) {
@@ -22,8 +26,6 @@ export function setupWebGl(canvas, geometry) {
     canvas.width = width;
     canvas.height = height;
     gl.viewport(0, 0, width, height);
-
-    // note: canvas is now also passed as gl.canvas
 
     return gl;
 }

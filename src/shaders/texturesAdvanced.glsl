@@ -15,10 +15,11 @@ uniform sampler2D iTexture2;
 const int MATERIAL_CONST = 0;
 const int MATERIAL_BOX = 1;
 const int MATERIAL_FLOOR = 2;
+const int MATERIAL_SPHERE = 3;
 
 const float pi = 3.141593;
 
-const int MAX_MARCHING_STEPS = 255;
+const int MAX_MARCHING_STEPS = 125;
 const float MIN_DIST = 0.0;
 const float MAX_DIST = 100.0;
 const float PRECISION = 0.001;
@@ -99,7 +100,11 @@ Surface sdPatternSphere( vec3 p, vec3 b, vec3 offset, vec3 col, mat3 transform, 
     vec3 q = abs(p) - b;
     float d = length(p / b) - 1.;
     col = mix(col, checkerCol, surfaceCheckerPattern(p, nSegments));
-    return Surface(d, col, 0, vec2(0.));
+    vec2 surface = vec2(
+    atan(p.z, p.x) / (2. * pi) + 0.5,
+    p.y / 2. + 0.5
+    );
+    return Surface(d, col, MATERIAL_SPHERE, surface);
 }
 
 Surface sdSphere( vec3 p, vec3 b, vec3 offset, vec3 col, mat3 transform) {
@@ -136,6 +141,8 @@ Surface sdTexturedBox( vec3 p, vec3 b, vec3 offset, vec3 col, mat3 transform) {
         0.5 - a.z // aber zu Farbmischungen kommen wir noch.
     );
 
+    int material = MATERIAL_BOX;
+
     vec2 uv;
     // Um Zuordnung zu verstehen:
     // mal auskommentieren oder sign()-Abhängigkeit entfernen,
@@ -161,7 +168,7 @@ Surface sdTexturedBox( vec3 p, vec3 b, vec3 offset, vec3 col, mat3 transform) {
 //        step(0.5, abs(a.x))
 //    );
 
-    return Surface(d, col, MATERIAL_BOX, uv);
+    return Surface(d, col, material, uv);
 }
 
 Surface sdTetraeder( vec3 p, vec3 b, vec3 offset, vec3 col, mat3 transform) {
@@ -206,7 +213,7 @@ Surface sdTriangle( vec3 p, vec3 b, vec3 offset, vec3 col, mat3 transform) {
     vec3 v3 = vec3(0., 0., b.z);
 
     #if SIMPLE_TRIANGLE == 1
-        v1 = vec3(0., 0., 0.);
+        v1 = vec3(0., 0.,  0.);
         v2 = vec3(-1., 0., 0.);
         v3 = vec3(0., -1., 0.);
     #else
@@ -332,7 +339,7 @@ Surface sdScene(vec3 p) {
     Surface co = sdFloor(p);
 
     mat3 transform = rotateX(0.3 * iTime);
-    obj = sdTriangle(p, vec3(1.), firstCubePos + vec3(-2.7,0.2 * sin(iTime),1.1), vec3(0.2, 0.7, 0.9), transform);
+    obj = sdTriangle(p, vec3(1.), firstCubePos + vec3(-1.6,1.2 * sin(iTime),-2.6), vec3(0.2, 0.7, 0.9), transform);
     co = takeCloser(co, obj);
 
     #if SIMPLE_TRIANGLE == 1
@@ -351,13 +358,11 @@ Surface sdScene(vec3 p) {
 //    obj = sdTexturedBox(p, vec3(0.6), secondCubePos, vec3(0.3, 0.65, 0.9), transformLeft);
 //    co = takeCloser(co, obj);
 
-    /*
     obj = sdPatternSphere(p, vec3(1.), vec3(-2., floorLevel + 1., -2.), vec3(1, 0.1, 0.8), identity(), vec3(0.5, 0.2, 0.8), 8.);
 
     mat3 ballTransform = rotateY(0.5 * iTime);
-    obj = sdSphere(p, vec3(1.), vec3(-2., floorLevel + 1., -2.), vec3(1, 0.6, 0.8), ballTransform);
+    // obj = sdSphere(p, vec3(1.), vec3(-2., floorLevel + 1., -2.), vec3(1, 0.6, 0.8), ballTransform);
     co = takeCloser(co, obj);
-    */
     return co;
 }
 
@@ -365,7 +370,7 @@ void applyMaterial(inout Surface s, vec3 ray) {
     if (s.material == MATERIAL_BOX) {
         s.col *= texture(iTexture0, s.uv).rgb;
         // Bock auf Holz?
-        float scale = 4.;
+        float scale = 1.;
         vec3 holz = texture(iTexture2, s.uv / scale).rgb;
         // naive Farbmischung: mal mit Grundrechenarten rumprobieren.
         // s.col = holz;
@@ -373,15 +378,20 @@ void applyMaterial(inout Surface s, vec3 ray) {
         // s.col = min(s.col, holz);
         // s.col = max(s.col, holz);
         // s.col = pow(s.col + holz, vec3(1.4));  // <-- etc... you know the drill
-        // s.col = mix(s.col, holz, 0.5);
+        // s.col = mix(s.col, holz, 0.5 + 0.5 * sin(iTime));
         // s.col = mix(s.col, holz, 0.5 - 0.5 * cos(iTime));
-//         s.col = 1. - (1. - s.col) * (1. - holz); // "Screen"
+        // s.col = 1. - (1. - s.col) * (1. - holz); // "Screen"
         // "Overlay":
 //        s.col = length(s.col) < 0.5
 //            ? 2. * s.col * holz
 //            : 1. - 2. * (1. - s.col) * (1. - holz);
-//         s.col = s.col - holz + 2. * s.col * holz; // "Soft Light"
+         s.col = s.col - holz + 2. * s.col * holz; // "Soft Light"
 //         s.col = holz - s.col + 2. * s.col * holz; // "Soft Light", invers
+    }
+    else if (s.material == MATERIAL_SPHERE) {
+        vec3 holz = texture(iTexture0, s.uv * 1.).rgb;
+        // holz = pow(holz, vec3(0.5));
+        s.col = holz;
     }
     else if (s.material == MATERIAL_FLOOR) {
         s.col *= (0.5 + 0.15 * mod(floor(ray.x) + floor(ray.z), 4.0)) * vec3(0.9, 1., .95);
@@ -457,40 +467,45 @@ void main() {
     // firstCubePos += 0.25 * cursorWalk;
 
     // transform uv but only for background
-    vec2 bgUv = uv + 0.0 * vec2(0.1 * iTime, 0.);
+    vec2 bgUv = uv + 0.6 * vec2(0.1 * iTime, 0.);
     float bgRotationSpeed = 0.0; // 0.1;
     float bgScale = 1.; // z.B. mal 0.6 - wie üblich: invers denken
     bgUv = bgScale * (rotateZ(bgRotationSpeed * iTime) * vec3(bgUv, 1.)).xy;
     vec2 st = fract(bgUv);
+    // st = bgUv;
     vec4 bgColor = texture(iTexture1, st);
 
     // Beispiel Textur-Processing: Radial Motion Blur
     // man achte aber auf die Ecken -> Granularität sichtbar
-//    bgColor.xyz = vec3(0);
-//    float blurSteps = 32.;
-//    float blurLength = 5.;
-//    float phi = 0.03 * iTime;
-//    for (float step=0.; step < blurSteps; step += 1.) {
-//        phi -= 0.005;
-//        bgUv = (rotateZ(phi) * vec3(uv, 1.)).xy;
-//        st = fract(bgUv);
-//        vec3 texColor = texture(iTexture1, st).xyz * exp(-step / blurLength);
-//        bgColor.xyz = max(texColor, bgColor.xyz);
-//    }
+
+    bgColor.xyz = vec3(0);
+    float blurSteps = 32.;
+    float blurLength = 15.;
+    float phi = 0.03 * iTime;
+    for (float step=0.; step < blurSteps; step += 1.) {
+        phi -= 0.005;
+        bgUv = (rotateZ(phi) * vec3(uv, 1.)).xy;
+        st = fract(bgUv);
+        vec3 texColor = texture(iTexture1, st).xyz; // * exp(-step / blurLength);
+
+        bgColor.xyz = max(texColor, bgColor.xyz);
+    }
 
     // anderes Beispiel: Zoom Blur
-//    bgColor.xyz = vec3(0);
-//    float blurSteps = 32.;
-//    float blurLength = 15.;
-//    float factor = 0.005;
-//    vec2 center = vec2(0., 0.6 + 0.2 * sin(iTime));
-//    for (float step=0.; step < blurSteps; step += 1.) {
-//        bgScale = 1. + factor * step;
-//        bgUv = bgScale * (uv - center) + center;
-//        st = fract(bgUv);
-//        vec3 texColor = texture(iTexture1, st).xyz * exp(-step / blurLength);
-//        bgColor.xyz = max(texColor, bgColor.xyz);
-//    }
+    /*
+    bgColor.xyz = vec3(0);
+    float blurSteps = 32.;
+    float blurLength = 0.1;
+    float factor = 0.005;
+    vec2 center = vec2(0., 0.6 + 0.2 * sin(iTime));
+    for (float step=0.; step < blurSteps; step += 1.) {
+        bgScale = 1. + factor * step;
+        bgUv = bgScale * (uv - center) + center;
+        st = fract(bgUv);
+        vec3 texColor = texture(iTexture1, st).xyz * exp(-step / blurLength);
+        bgColor.xyz = max(texColor, bgColor.xyz);
+    }
+    */
 
     vec4 col = vec4(0.);
     float d;
@@ -579,7 +594,7 @@ void main() {
     }
 
     // Beispiel Post-Processing (transformiert nur noch Farbe -> Farbe, nicht mehr Geometrie)
-    col.xyz = atan(8. * pow(col.xyz, vec3(5.)));
+    // col.xyz = atan(8. * pow(col.xyz, vec3(5.)));
 
 
     fragColor = mix(bgColor, vec4(col.xyz, 1.), col.a);
@@ -589,5 +604,5 @@ void main() {
     // Man achte auf die Werte der Koordinaten und die Texturparameter.
     // (v.A. bei einer Textur, die keinen schwarzen Rand hat.)
 
-    //fragColor = texture(iTexture1, uv);
+    // fragColor = texture(iTexture2, uv);
 }

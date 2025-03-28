@@ -16,9 +16,10 @@ import showcase6 from "./showcases/6_Textures.js";
 import showcase7 from "./showcases/7_ColorMixing.js";
 import showcase8 from "./showcases/8_Multipass.js";
 import showcase9 from "./showcases/9_Volumetric.js";
+import showcase10 from "./showcases/10_StochasticRayTracing.js";
 
 // choose wisely :)
-const showcase = showcase5b;
+const showcase = showcase10;
 
 const autoRenderOnLoad = true;
 

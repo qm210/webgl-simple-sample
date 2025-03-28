@@ -1,4 +1,4 @@
-import REGEX from "../glslCode/regexp.js";
+import REGEX from "../glslCode/regex.js";
 
 export function addButton(parent, {onClick, onRightClick, title = "", className = ""}) {
     const button = document.createElement("button");

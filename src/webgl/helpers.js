@@ -99,35 +99,35 @@ export function createTextureFromImage(gl, imageSource, options) {
     return texture;
 }
 
-function createFrameBufferWithTexture(gl) {
-    const width = gl.drawingBufferWidth;
-    const height = gl.drawingBufferHeight;
+export function createFramebufferWithTexture(gl, options) {
+    const wrapS = options?.wrapS ?? gl.CLAMP_TO_EDGE;
+    const wrapT = options?.wrapT ?? gl.CLAMP_TO_EDGE;
+    const minFilter = options?.minFilter ?? gl.LINEAR;
+    const magFilter = options?.magFilter ?? gl.LINEAR;
+    const width = options?.width ?? gl.drawingBufferWidth;
+    const height = options?.height ?? gl.drawingBufferHeight;
+    const colorAttachment = options?.colorAttachment ?? gl.COLOR_ATTACHMENT0;
 
     const texture = gl.createTexture();
     gl.bindTexture(gl.TEXTURE_2D, texture);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, minFilter);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, magFilter);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, wrapS);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, wrapT);
+
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
-    // <-- format gl.FLOAT could look like the following (see tables at https://registry.khronos.org/OpenGL-Refpages/es3.1/)
-    // gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, width, height, 0, gl.RGB, gl.FLOAT, null);
-    // but throws one of these:
-    // [.WebGL-0x1dd400107100] GL_INVALID_FRAMEBUFFER_OPERATION: Framebuffer is incomplete: Attachment is not renderable.
-    // [.WebGL-0x1dd402129400] GL_INVALID_FRAMEBUFFER_OPERATION: Framebuffer is incomplete: Attachment has zero size.
 
     const fbo = gl.createFramebuffer();
     gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
-    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texture, 0);
-
-    // ... now the texture is the framebuffer's render target, shouldn't need bindTexture again:
-    gl.bindTexture(gl.TEXTURE_2D, null);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, colorAttachment, gl.TEXTURE_2D, texture, 0 );
 
     const status = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
     if (status !== gl.FRAMEBUFFER_COMPLETE) {
-        console.error("[GL][CREATE_FBO] not complete:", status);
+        console.error("[GL] Framebuffer creation failed, status flag:", status);
     }
 
+    // better clean up - not required, but makes a certain sense...
+    gl.bindTexture(gl.TEXTURE_2D, null);
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
 
     return {

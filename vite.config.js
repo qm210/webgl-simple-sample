@@ -6,4 +6,8 @@ export default defineConfig({
     plugins: [
         glslImport()
     ],
+    test: {
+        globals: true,
+        environment: "happy-dom"
+    }
 })
