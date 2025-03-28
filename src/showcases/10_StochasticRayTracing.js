@@ -26,6 +26,13 @@ export default {
         state.location.iFrame = gl.getUniformLocation(state.program, "iFrame");
         state.location.texture = gl.getUniformLocation(state.program, "iFramebufferTexture");
 
+        // hint: useProgram only needs to be in the render loop if we have more than one
+        gl.useProgram(state.program);
+        gl.drawBuffers([
+            gl.COLOR_ATTACHMENT0,
+            gl.COLOR_ATTACHMENT1
+        ]);
+
         return state;
     },
     generateControls: (gl, state, elements) => [{
@@ -47,8 +54,6 @@ export default {
 
 function render(gl, state) {
     state.frameIndex = (state.frameIndex ?? -1) + 1;
-
-    gl.useProgram(state.program);
 
     gl.uniform1f(state.location.iTime, state.time);
     gl.uniform2fv(state.location.iResolution, state.resolution);

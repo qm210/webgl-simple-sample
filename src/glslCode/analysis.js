@@ -105,16 +105,17 @@ function parseSymbols(lines) {
                     continue;
                 }
 
-                const marker = {
-                    definition: `!${name}!`,
-                    usage: `$${name}$`,
-                    pattern:
-                        new RegExp(`\\b${name}\\b`, "g"),
+                // we will pre-transform the code to avoid accidental matches (e.g. in a title)
+                const marker = `!${name}!`;
+                const pattern = {
+                    original: new RegExp(`\\b${name}\\b`, "g"),
+                    marked: new RegExp(`\\b${marker}\\b`, "g"),
                 };
 
                 result.push({
                     ...match.groups,
                     marker,
+                    pattern,
                     symbolType,
                     lineOfCode: line.code.trimmed,
                     definedInLine: line.number
@@ -149,10 +150,8 @@ export function parseScopes(analyzed) {
                 index,
             }));
 
-        console.log("----- ", line.code.trimmed, parsedBraces)
         for (const opened of parsedBraces) {
 
-            console.log("   -- ", scopes.cursor.openedIn, "->", opened.parts)
             for (const part of opened.parts) {
                 if (part.index < opened.parts.length - 1) {
                     scopes.cursor.closesIn = line.number;
@@ -163,7 +162,6 @@ export function parseScopes(analyzed) {
                 }
             }
 
-            console.log("   ------ now at", opened.index, parsedBraces.length, scopes.result);
             if (opened.index < parsedBraces.length - 1) {
                 scopes.stack.push(scopes.cursor);
                 scopes.cursor = {

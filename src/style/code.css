@@ -78,16 +78,17 @@
     border-top: 3px solid powderblue;
 }
 
+.empty {
+    height: 0.64em;
+    align-items: center;
+}
+
 .annotation {
     font-size: 0.8rem;
     height: 0.7rem;
     margin-left: auto;
     padding: 0.5em;
     overflow: visible;
-}
-
-.empty-line {
-    height: 0.7em;
 }
 
 .line-number {
@@ -102,6 +103,10 @@
 
 .line-number:hover {
     user-select: text;
+}
+
+.empty > .line-number:not(:hover) {
+    visibility: hidden;
 }
 
 .annotated > .line-number {

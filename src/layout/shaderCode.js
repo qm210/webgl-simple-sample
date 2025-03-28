@@ -1,8 +1,7 @@
-import {createDiv, renderSpan} from "./helpers.js";
+import {createDiv} from "./helpers.js";
 import {analyzeShader} from "../glslCode/analysis.js";
 import {withGlslHighlighting, withSymbolsHighlighted} from "../glslCode/highlighting.js";
 import {addShaderCodeEventListeners, scrollToElementId} from "./eventListeners.js";
-import REGEX from "../glslCode/regex.js";
 
 export function appendShaderCode(elements, shaderSource, errorLog, shaderKey, title = "") {
     if (!shaderSource) {
@@ -22,12 +21,14 @@ export function appendShaderCode(elements, shaderSource, errorLog, shaderKey, ti
     enrichHeader(header, analyzed);
 
     for (const line of analyzed.lines) {
-        const annotatedLine = prepareLine(line, shaderKey);
-        sources.appendChild(annotatedLine);
-    }
+        const elements = prepareElements(line, shaderKey)
+        sources.appendChild(elements.line);
 
-    sources.innerHTML =
-        withSymbolsHighlighted(sources.innerHTML, analyzed);
+        let code = elements.code.innerHTML;
+        code = withGlslHighlighting(code);
+        code = withSymbolsHighlighted(code, analyzed.symbols, line.number);
+        elements.code.innerHTML = code;
+    }
 
     addShaderCodeEventListeners(sources, elements.scrollStack);
 }
@@ -36,13 +37,12 @@ function idForLine(shaderKey, lineNumber) {
     return `${shaderKey}.line.${lineNumber}`;
 }
 
-function prepareLine(line, shaderKey) {
-    if (!line.code) {
-        return createDiv("", "empty-line");
-    }
-
+function prepareElements(line, shaderKey) {
     const element = createDiv("", "line");
     element.id = idForLine(shaderKey, line.number);
+    if (!line.code.trimmed) {
+        element.classList.add("empty");
+    }
 
     const errors = line.error
         ?.inRow
@@ -58,7 +58,7 @@ function prepareLine(line, shaderKey) {
     }
     if (line.removedBefore.length > 0) {
         element.classList.add("removed-before");
-        element.title = "Was Removed: " + line.removedBefore.join("\n");
+        element.title = "Was Removed: " + line.removedBefore.join("\n").trim();
     }
     if (errors) {
         element.classList.add("error");
@@ -69,7 +69,7 @@ function prepareLine(line, shaderKey) {
     const numberElement = createDiv(line.number, "line-number");
     element.appendChild(numberElement);
 
-    const codeElement = withGlslHighlighting(line);
+    const codeElement = createDiv(line.code.original, "code");
     element.appendChild(codeElement);
 
     if (annotation) {
@@ -79,7 +79,10 @@ function prepareLine(line, shaderKey) {
         element.classList.add("annotated");
     }
 
-    return element;
+    return {
+        line: element,
+        code: codeElement,
+    };
 }
 
 function enrichHeader(element, analyzed) {

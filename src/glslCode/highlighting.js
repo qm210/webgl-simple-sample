@@ -1,8 +1,8 @@
 import REGEX from "./regex.js";
-import {createDiv, renderSpan} from "../layout/helpers.js";
+import {renderSpan} from "../layout/helpers.js";
 import {SymbolType} from "./analysis.js";
 
-function highlightGLSL(code) {
+export function withGlslHighlighting(code) {
     return code
         .replace(REGEX.MAGIC_KEYWORD, match =>
             `<span class="magic keyword">${match}</span>`
@@ -20,32 +20,24 @@ function highlightGLSL(code) {
             `<span class="number">${match}</span>`
         );
 }
+export function withSymbolsHighlighted(code, analyzedSymbols, lineNumber) {
+    let result = code;
 
-export function withGlslHighlighting(line) {
-    const codeElement = createDiv("", "code");
-    codeElement.innerHTML = highlightGLSL(line.code.original);
-    return codeElement;
-}
+    for (const symbol of analyzedSymbols) {
+        let firstMatch = true;
 
-export function withSymbolsHighlighted(code, analyzed) {
-    const result = {
-        original: code,
-        code: code,
-    };
-
-    for (const symbol of analyzed.symbols) {
-        let firstMention = false;
-        result.code = result.code.replaceAll(
-            symbol.marker.pattern,
+        result = result.replaceAll(
+            symbol.pattern.original,
             () => {
-                const rendered = render(symbol, !firstMention);
-                firstMention = true;
+                const isDefinition = lineNumber === symbol.definedInLine && firstMatch;
+                const rendered = render(symbol, isDefinition);
+                firstMatch = false;
                 return rendered;
             }
         );
     }
 
-    return result.code;
+    return result;
 }
 
 const SymbolClass = {
