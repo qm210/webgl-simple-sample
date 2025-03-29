@@ -166,7 +166,7 @@ function render(gl, state) {
     gl.bindTexture(gl.TEXTURE_2D, state.texture3);
     gl.uniform1i(state.location.texture3, 3);
 
-    // texture unit goes up to gl.TEXTURE31 - was passiert danach?
+    // texture unit goes up to gl.TEXTURE31 - was könnte man tun, wenn das nicht reicht?
 
     if (post) {
         gl.bindFramebuffer(gl.FRAMEBUFFER, state.fbo)

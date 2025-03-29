@@ -130,15 +130,9 @@ void main() {
 
         vec3 previousOklab = rgb2oklab(renderResult.rgb);
         vec3 colOklab = rgb2oklab(col);
-        float colWeight;
         // ist ja Lichtmischung - wäre vielleicht also sinnvoll, nach Helligkeit anteilig zu mischen?
-        // colWeight = colOklab.x / (colOklab.x + previousOklab.x);
-        // <-- führt aber zu Matschfarben. Vielleicht einfach: neuen Farbe ist so deckend wie sie hell ist?
-        colWeight = colOklab.x;
-        colOklab = mix(previousOklab, colOklab, colWeight);
-        // hmmm.... oder... hm...
-        // colOklab = previousOklab.x * previousOklab + colOklab.x * colOklab;
-        // hmhmhmh. nee...
-        fragColor.rgb = oklab2rgb(colOklab);
+        float colWeight = colOklab.x / (colOklab.x + previousOklab.x);
+        // colOklab = mix(colOklab, previousOklab, 0.1);
+        //fragColor.rgb = oklab2rgb(colOklab);
     }
 }

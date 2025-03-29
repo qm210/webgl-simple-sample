@@ -40,17 +40,12 @@ function idForLine(shaderKey, lineNumber) {
 function prepareElements(line, shaderKey) {
     const element = createDiv("", "line");
     element.id = idForLine(shaderKey, line.number);
-    if (!line.code.trimmed) {
-        element.classList.add("empty");
-    }
-
-    const errors = line.error
-        ?.inRow
-        .map(error => error.message)
-        .join('; ') ?? "";
 
     let annotation = "";
 
+    if (line.code.empty) {
+        element.classList.add("empty");
+    }
     if (line.changed) {
         element.classList.add("changed");
         element.title = "Line Changed"
@@ -60,6 +55,15 @@ function prepareElements(line, shaderKey) {
         element.classList.add("removed-before");
         element.title = "Was Removed: " + line.removedBefore.join("\n").trim();
     }
+    if (line.belongsToUnusedDefinition) {
+        element.classList.add("unused-definition");
+        annotation = "unused";
+    }
+
+    const errors = line.error
+        ?.inRow
+        .map(error => error.message)
+        .join('; ') ?? "";
     if (errors) {
         element.classList.add("error");
         element.title = errors;
@@ -100,4 +104,8 @@ function enrichHeader(element, analyzed) {
     mainLink.addEventListener("click", () => {
         scrollToElementId(idForLine(analyzed.shaderKey, main.definedInLine))
     });
+}
+
+function deemphasizedIfUnused(element) {
+
 }

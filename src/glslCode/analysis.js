@@ -19,66 +19,88 @@ export function analyzeShader(source, errorLog, shaderKey) {
     const differences = diffLines(stored, source, {
         oneChangePerToken: true
     });
-    const functionMatches = parseFunctions(source);
 
     const analyzed = {
+        shaderKey,
+        source,
         lines: [],
         symbols: [],
-        shaderKey,
+        scopes: [],
+        matches: {},
     };
-    let lineIndex = 0;
-    let removedBefore = [];
-    let consecutiveBlanks = 0;
+    const cursor = {
+        index: 0,
+        positionInSource: 0,
+        scopeLevel: 0,
+        removedBefore: [],
+        consecutiveEmpty: 0,
+    };
 
     for (const diff of differences) {
         if (diff.removed) {
-            removedBefore.push(diff.value);
+            cursor.removedBefore.push(diff.value);
             continue;
         }
 
-        const trimmedCode = diff.value.trim();
+        const code = {
+            trimmed: diff.value.trim(),
+            original: diff.value,
+            length: diff.value.length,
+        };
+        code.empty = !code.trimmed;
+        code.braces = countBraces(code.trimmed);
+
+        if (code.empty) {
+            cursor.consecutiveEmpty++;
+        } else {
+            cursor.consecutiveEmpty = 0;
+        }
+
         let changed = diff.added && stored !== "";
         try {
             const onlyWhiteSpaceChanged =
                 changed &&
-                trimmedCode === storedLines[lineIndex]?.trim();
+                code.trimmed === storedLines[cursor.index]?.trim();
             if (onlyWhiteSpaceChanged) {
                 changed = false;
-                removedBefore = [];
+                cursor.removedBefore = [];
             }
         } catch (err) {
-            console.warn("Error Comparing", err, `"${diff.value}"`, storedLines);
+            console.warn("Error Comparing", err, `"${code.original}"`, storedLines);
         }
 
-        if (trimmedCode === "" || trimmedCode === "{") {
-            consecutiveBlanks++;
-        } else {
-            consecutiveBlanks = 0;
-        }
+
+        const lineNumber = cursor.index + 1;
+        const symbols = parseSymbols(code.trimmed, lineNumber);
 
         analyzed.lines.push({
-            code: {
-                original: diff.value,
-                trimmed: trimmedCode,
-            },
+            code,
             changed,
-            removedBefore,
-            error: errors[lineIndex],
-            number: lineIndex + 1,
-            consecutiveBlanks,
+            number: lineNumber,
+            removedBefore: cursor.removedBefore,
+            error: errors[cursor.index],
+            belongsToUnusedDefinition: false,
+            positionInSource: cursor.positionInSource,
+            scopeLevelAtStart: cursor.scopeLevel,
+            consecutiveEmpty: cursor.consecutiveEmpty,
         });
-        removedBefore = [];
-        lineIndex++;
+        analyzed.symbols.push(...symbols);
+
+        cursor.index++;
+        cursor.removedBefore = [];
+        cursor.positionInSource += code.length;
+        cursor.scopeLevel += code.braces.open - code.braces.close;
     }
 
     analyzed.lines = analyzed.lines.filter(
-        l => l.consecutiveBlanks < 2
+        l => l.consecutiveEmpty < 2
     );
 
-    analyzed.symbols = parseSymbols(analyzed.lines);
     analyzed.scopes = parseScopes(analyzed);
+    analyzed.functionMatches = parseFunctionSignatures(analyzed);
+    enhanceSymbols(analyzed);
 
-    console.log("Analyzed Shader", {analyzed, functionMatches});
+    console.log("Analyzed Shader", analyzed);
 
     return analyzed;
 }
@@ -90,40 +112,42 @@ const SymbolRegex = {
     [SymbolType.CustomFunction]: REGEX.FUNCTION_SIGNATURE,
 }
 
-function parseSymbols(lines) {
+function parseSymbols(code, lineNumber) {
     const result = [];
-    for (const line of lines) {
-        for (const symbolType in SymbolType) {
+    for (const symbolType in SymbolType) {
 
-            const regex = SymbolRegex[symbolType];
-            const matches = line.code.trimmed.matchAll(regex);
-            for (const match of matches) {
+        const regex = SymbolRegex[symbolType];
+        const matches = code.matchAll(regex);
+        for (const match of matches) {
 
-                const name = match.groups?.name;
+            const name = match.groups?.name;
 
-                if (!name) {
-                    continue;
-                }
-
-                // we will pre-transform the code to avoid accidental matches (e.g. in a title)
-                const marker = `!${name}!`;
-                const pattern = {
-                    original: new RegExp(`\\b${name}\\b`, "g"),
-                    marked: new RegExp(`\\b${marker}\\b`, "g"),
-                };
-
-                result.push({
-                    ...match.groups,
-                    marker,
-                    pattern,
-                    symbolType,
-                    lineOfCode: line.code.trimmed,
-                    definedInLine: line.number
-                });
+            if (!name) {
+                continue;
             }
+
+            const pattern =
+                    new RegExp(`\\b${name}\\b`, "g");
+
+            // TODO: might check whether we are in a block defined that is disabled via directive...
+
+            result.push({
+                ...match.groups,
+                pattern,
+                symbolType,
+                lineOfCode: code,
+                definedInLine: lineNumber,
+            });
         }
     }
     return result;
+}
+
+function countBraces(code) {
+    return {
+        open: code.match(/\{/g)?.length ?? 0,
+        close: code.match(/}/g)?.length ?? 0,
+    };
 }
 
 export function parseScopes(analyzed) {
@@ -138,27 +162,34 @@ export function parseScopes(analyzed) {
     };
 
     for (const line of analyzed.lines) {
+        if (line.code.empty) {
+            continue;
+        }
+
         const parsedBraces = line.code.trimmed.split('{')
-            .map((part, index) => ({
-                betweenOpening: part,
-                parts: part.split('}').map(
-                    (innerPart, innerIndex) => ({
-                        innerPart,
-                        index: innerIndex
-                    })
-                ),
-                index,
-            }));
+            .map((part, index) =>
+                ({
+                    part,
+                    index,
+                    closing: part.split('}')
+                        .map((part, index) =>
+                            ({
+                                part,
+                                index
+                            })
+                        ),
+                })
+            );
 
         for (const opened of parsedBraces) {
 
-            for (const part of opened.parts) {
-                if (part.index < opened.parts.length - 1) {
+            for (const closing of opened.closing) {
+                if (closing.index < opened.closing.length - 1) {
                     scopes.cursor.closesIn = line.number;
                     scopes.result.push(scopes.cursor);
                     scopes.cursor = scopes.stack.pop();
                 } else {
-                    scopes.cursor.content.push(part.innerPart);
+                    scopes.cursor.content.push(closing.part);
                 }
             }
 
@@ -176,47 +207,84 @@ export function parseScopes(analyzed) {
         ...scopes.cursor,
         closesIn: analyzed.lines.length
     });
+
+    scopes.result.sort(
+        (a, b) => a.openedIn - b.openedIn
+    );
+
     return scopes.result;
 }
 
-function extendFunctionDefinitionIfMatch(targetList, matches, code, lineNumber) {
-    const signature = code.match(REGEX.FUNCTION_SIGNATURE)?.groups;
-    if (!signature) {
-        return;
-    }
-    const match = matches.find(match =>
-        match.name === signature.name &&
-        match.returnType === signature.returnType &&
-        match.args === signature.args
-    );
-    if (!match) {
-        return;
-    }
-    targetList.push({
-        ...match,
-        lineNumber
-    });
-}
-
-function parseFunctions(code) {
+function parseFunctionSignatures(analyzed) {
     const result = [];
 
-    for (const match of code.matchAll(REGEX.FUNCTION)) {
-        const falsePositive = (
-            REGEX.KEYWORD.test(match.groups.name) ||
-            match.groups.returnType === "return"
-        );
-        if (falsePositive) {
-            continue;
+    for (const match of analyzed.source.matchAll(REGEX.FUNCTION_SIGNATURE)) {
+        const argString = match.groups.args
+            .trim()
+            .replaceAll(/\s+/g, ' ')
+            .replaceAll(/\s*,\s*/g, ', ');
+        const argArray = argString
+            .split(', ');
+        const matchString = match[0]
+            .replaceAll(/^(\s*\n)*/g, '');
+
+        result.push({
+            ...match.groups,
+            argString,
+            argArray,
+            matchString,
+            sourcePosition: match.index
+        });
+    }
+
+    let nextIndex = 0;
+    for (const line of analyzed.lines) {
+
+        const nextSignature = result[nextIndex];
+        if (!nextSignature) {
+            break;
         }
 
-        const code = match[0].trim();
-        const lineOfCode = code.split("\n")[0];
-        result.push({...match.groups, code, lineOfCode});
+        const possibleSourceMatch = analyzed.source.slice(
+            line.positionInSource,
+            line.positionInSource + nextSignature.matchString.length
+        );
+        const startsHere = nextSignature.matchString === possibleSourceMatch;
+        if (startsHere) {
+            nextSignature.startsAtLine = line.number;
+            nextSignature.lineSpan = nextSignature.matchString.split('\n').length;
+            nextSignature.endsAtLine = line.number + nextSignature.lineSpan - 1;
+
+            // needs the scopes to be sorted!
+            nextSignature.functionScope = analyzed.scopes
+                .find(scope => scope.openedIn >= nextSignature.endsAtLine);
+
+            nextIndex++;
+        }
     }
 
     return result;
 }
+//
+// function parseFunctions(code) {
+//     const result = [];
+//
+//     for (const match of code.matchAll(REGEX.FUNCTION)) {
+//         const falsePositive = (
+//             REGEX.KEYWORD.test(match.groups.name) ||
+//             match.groups.returnType === "return"
+//         );
+//         if (falsePositive) {
+//             continue;
+//         }
+//
+//         const code = match[0].trim();
+//         const lineOfCode = code.split("\n")[0];
+//         result.push({...match.groups, code, lineOfCode});
+//     }
+//
+//     return result;
+// }
 
 function parseErrors(errorLog) {
     if (!errorLog) {
@@ -249,4 +317,35 @@ function parseErrors(errorLog) {
     }
 
     return errors;
+}
+
+function enhanceSymbols(analyzed) {
+
+    for (const symbol of analyzed.symbols) {
+        // -1 because the definition itself doesn't count as usage :)
+        symbol.usageCount = [...analyzed.source.matchAll(symbol.pattern)].length - 1;
+
+        symbol.unused = symbol.usageCount === 0
+            && !REGEX.MAGIC_SYMBOL.test(symbol.name);
+
+        symbol.definitionSpansLines = 1;
+
+        if (symbol.symbolType === SymbolType.CustomFunction) {
+            const functionMatch = analyzed.functionMatches.find(
+                match => match.name === symbol.name
+            );
+            symbol.definitionSpansLines = functionMatch.functionScope.closesIn + 1 - functionMatch.startsAtLine;
+        }
+    }
+
+    analyzed.unusedSymbols = analyzed.symbols
+        .filter(symbol => symbol.unused);
+
+    for (const symbol of analyzed.unusedSymbols) {
+        for (let l = 0; l < symbol.definitionSpansLines; l++ ) {
+            const lineIndex = symbol.definedInLine + l - 1;
+            const analyzedLine = analyzed.lines[lineIndex];
+            analyzedLine.belongsToUnusedDefinition = true;
+        }
+    }
 }

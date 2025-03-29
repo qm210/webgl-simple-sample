@@ -32,7 +32,7 @@ function readUniforms(...sources) {
         if (!source) {
             continue;
         }
-        for (const match of source.matchAll(REGEX.GLOBAL)) {
+        for (const match of source.matchAll(REGEX.SHADER_VARIABLE)) {
             if (match.groups?.keyword !== "uniform") {
                 continue;
             }

@@ -10,7 +10,7 @@ const REGEX = {
     FUNCTION_SIGNATURE:
         /(?:^|\n)\s*(?<returnType>\w+)\s+(?<name>\w+)\s*\((?<args>[^()]*)\)\s*\{/g,
 
-    MAGIC_KEYWORD:
+    MAGIC_SYMBOL:
         /\b(gl_Position|gl_PointSize|gl_FragCoord|gl_FrontFacing|gl_PointCoord|main)\b/g,
     KEYWORD:
         /\b(uniform|varying|attribute|layout|const|in|out|[iu]?vec[234]|mat[234]|void|float|u?int|bool|sampler[123]D|return|discard|continue|break|if|else|texture|texelFetch|precision|highp|mediump|lowp)\b/g,

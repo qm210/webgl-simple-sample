@@ -78,8 +78,11 @@
     border-top: 3px solid powderblue;
 }
 
+.line.unused-definition {
+    opacity: 0.35;
+}
+
 .empty {
-    height: 0.64em;
     align-items: center;
 }
 
@@ -87,8 +90,20 @@
     font-size: 0.8rem;
     height: 0.7rem;
     margin-left: auto;
-    padding: 0.5em;
+    padding-right: 0.5em;
     overflow: visible;
+}
+
+.unused-definition .annotation {
+    color: lightslategray;
+}
+
+.line > div:not(.code) {
+    user-select: none;
+}
+
+.line > div:not(.code):hover {
+    user-select: text;
 }
 
 .line-number {
@@ -98,18 +113,9 @@
     text-align: right;
     margin-right: 2rem;
     opacity: 0.7;
-    user-select: none;
 }
 
-.line-number:hover {
-    user-select: text;
-}
-
-.empty > .line-number:not(:hover) {
-    visibility: hidden;
-}
-
-.annotated > .line-number {
+.annotated:not(.unused-definition) > .line-number {
     font-weight: bold;
     font-size: 0.7em;
 }
@@ -151,6 +157,10 @@
 
 .code .is-custom-function {
     color: green;
+}
+
+.code > .unused {
+    opacity: 0.75;
 }
 
 .symbol {

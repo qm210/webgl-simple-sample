@@ -17,6 +17,7 @@
 export function startRenderLoop (renderFunction, state, elements) {
     cancelAnimationFrame(state.animationFrame);
     state.startTime = performance.now();
+    state.frameIndex = -1;
     state.animationFrame = requestAnimationFrame(() =>
         runLoop(renderFunction, state, elements)
     );
@@ -24,6 +25,7 @@ export function startRenderLoop (renderFunction, state, elements) {
 
 function runLoop(renderFunction, state, elements) {
     state.time = 0.001 * (performance.now() - state.startTime);
+    state.frameIndex = state.frameIndex + 1;
 
     renderFunction(state);
 

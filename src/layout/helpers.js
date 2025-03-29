@@ -13,11 +13,11 @@ export function appendText(parent, tagName, textContent) {
     parent.appendChild(element);
 }
 
-export function renderSpan({text, id, className, title, data}) {
+export function createSpan({text, id, classes, title, data}) {
     const span = document.createElement("span");
     span.textContent = text ?? "";
-    if (className) {
-        span.className = className;
+    for (const className of classes ?? []) {
+        span.classList.add(className);
     }
     if (id) {
         span.id = id;
@@ -28,7 +28,7 @@ export function renderSpan({text, id, className, title, data}) {
     if (data) {
         span.setAttribute("data", data);
     }
-    return span.outerHTML;
+    return span;
 }
 
 export function assignGloballyUniqueClass(element, className) {

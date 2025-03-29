@@ -115,10 +115,13 @@ export function createFramebufferWithTexture(gl, options) {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, wrapS);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, wrapT);
 
+    // Alloziert den Speicher, lässt ihn aber leer (letztes Argument: null)
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
 
     const fbo = gl.createFramebuffer();
     gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+
+    // Attachment: Verknüpft Framebuffer fest mit der Textur
     gl.framebufferTexture2D(gl.FRAMEBUFFER, colorAttachment, gl.TEXTURE_2D, texture, 0 );
 
     const status = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
@@ -126,7 +129,7 @@ export function createFramebufferWithTexture(gl, options) {
         console.error("[GL] Framebuffer creation failed, status flag:", status);
     }
 
-    // better clean up - not required, but makes a certain sense...
+    // Kann (und sollte) jetzt aufgeräumt werden, Attachment gilt weiterhin.
     gl.bindTexture(gl.TEXTURE_2D, null);
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
 

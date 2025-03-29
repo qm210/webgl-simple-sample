@@ -41,6 +41,7 @@ export function addInput (parent, state, control) {
         .find(uniform => uniform.name === control.name);
 
     if (!expected) {
+        console.warn("Could not find expected uniform", control, state);
         return;
     }
 
