@@ -1,12 +1,10 @@
 import standardSetup from "./3_SimpleGeometry.js";
 import {startRenderLoop} from "../webgl/render.js";
-import {createFramebufferWithTexture} from "../webgl/helpers.js";
+import {createFramebufferWithTexture, createTextureFromImage} from "../webgl/helpers.js";
 
 import fragmentShaderSource from "../shaders/stochasticRayTracing.glsl";
 
-// Hint: this example uses multiple outputs, which is why we need WebGL2.
-// Older versions could hope for the WEBGL_draw_buffers extension for WebGL,
-// but why bother with that when your browser could really just have WebGL2?
+import someSampleImage from "../textures/mysterious_capybara.png";
 
 export default {
     title: "Stochastic Ray Tracing",
@@ -26,14 +24,25 @@ export default {
         );
 
         state.location.previousRender = gl.getUniformLocation(state.program, "iPreviousRender");
-        state.location.renderToScreen = gl.getUniformLocation(state.program, "iRenderToScreen");
+        state.location.passIndex = gl.getUniformLocation(state.program, "iPassIndex");
         state.location.iFrame = gl.getUniformLocation(state.program, "iFrame");
         state.frameIndex = 0;
 
         // Hinweis: useProgram muss nur in der Renderschleife stehen, wenn es mehrere Shaderprogram gibt
         //          Es ist aber effizienter, beim selben zu bleiben.
-        //          -> probiert aber mal den Unterschied aus, vielleicht merkt mans hier auch kaum.
+        //          -> mit uniform flags zwischen verschiedenem Verhalten umschalten
+        //          -> bereits erwähnter Nachteil:
+        //             kleine Änderungen in großen Shadern erfordern komplette Neukompilation
+        //          Probiert gerne mal den Unterschied aus, vielleicht merkt mans hier auch kaum.
         gl.useProgram(state.program);
+
+        // Ein Bild als Textur laden, um schnell ein Beispiel als Renderziel zu haben
+        state.sampleTexture = createTextureFromImage(gl, someSampleImage, {
+            wrapS: gl.REPEAT,
+            wrapT: gl.CLAMP_TO_EDGE,
+            minFilter: gl.LINEAR,
+        });
+        state.location.iSampleImage = gl.getUniformLocation(state.program, "iSampleImage");
 
         return state;
     },
@@ -62,6 +71,10 @@ function render(gl, state) {
     gl.uniform2fv(state.location.iResolution, state.resolution);
     gl.uniform1i(state.location.iFrame, state.frameIndex);
 
+    gl.activeTexture(gl.TEXTURE1);
+    gl.bindTexture(gl.TEXTURE_2D, state.sampleTexture);
+    gl.uniform1i(state.location.iSampleImage, 1);
+
     // "Frame Buffer Ping Pong": wir beschreiben die Framebuffer immer abwechselnd:
     // "ping": [fbo 0, texture 1]
     // "pong": [fbo 1, texture 0]
@@ -75,11 +88,12 @@ function render(gl, state) {
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, read.texture);
     gl.uniform1i(state.location.previousRender, 0);
-    gl.uniform1i(state.location.renderToScreen, 0);
+
+    gl.uniform1i(state.location.passIndex, 0);
     gl.drawArrays(gl.TRIANGLES, 0, 6);
 
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-    gl.uniform1i(state.location.renderToScreen, 1);
+    gl.uniform1i(state.location.passIndex, 1);
     gl.drawArrays(gl.TRIANGLES, 0, 6);
 
     /**

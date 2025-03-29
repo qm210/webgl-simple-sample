@@ -38,7 +38,8 @@ export function withSymbolsHighlighted(code, analyzedSymbols, lineNumber) {
         result = result.replaceAll(
             symbol.pattern,
             () => {
-                const isDefinition = lineNumber === symbol.definedInLine && firstMatch;
+                const isDefinition =
+                    lineNumber === symbol.definedInLine && firstMatch;
                 firstMatch = false;
                 const element = isDefinition
                     ? highlightedDefinition(symbol)

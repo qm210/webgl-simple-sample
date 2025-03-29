@@ -54,7 +54,6 @@ export function asResolution({width, height, aspectRatio}) {
     };
 }
 
-
 export function loadImage(imageSource, onLoad) {
     const img = new Image();
     img.onload = () => onLoad(img);

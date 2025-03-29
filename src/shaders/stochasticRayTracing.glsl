@@ -4,8 +4,9 @@ out vec4 fragColor;
 uniform vec2 iResolution;
 uniform float iTime;
 uniform int iFrame;
-uniform int iRenderToScreen;
+uniform int iPassIndex;
 uniform sampler2D iPreviousRender;
+uniform sampler2D iSampleImage;
 
 vec3 rgb2hsv(vec3 c)
 {
@@ -85,12 +86,36 @@ vec3 oklch2rgb(vec3 lch) {
     return xyz2rgb_srgb(oklab2xyz(oklch2oklab(lch)));
 }
 
+float hash14(vec4 p)
+{
+    // Hashes werden so gewählt,
+    // a) möglichst frei von auffälligen Mustern zu sein,
+    // b) gleichzeitg billig auszurechnen
+    // zweiteres bedingt oft Stellen, an denen ersteres nicht erreicht werden kann
+    // Man schaue das hier z.B. mal in der Nähe von p = vec4(0) an.
+    uvec4 q = uvec4(ivec4(p)) * uvec4(1597334673U, 3812015801U, 2798796415U, 1979697957U);
+    uint n = (q.x ^ q.y ^ q.z ^ q.w) * 1597334673U;
+    return float(n) * 2.328306437080797e-10;
+}
+
+float hash14(vec2 p)
+{
+    // funny enough, with 0. the glitches stay.
+    return hash14(vec4(p, 1., 1.));
+}
+
+float onlyInRow(float y, float index, float divisions) {
+    float row = (y + 1.) * 0.5 * divisions;
+    return float(row >= index && row < index + 1.);
+}
 
 void main() {
     vec2 uv = (2.0 * gl_FragCoord.xy - iResolution.xy) / iResolution.y;
     vec2 st = gl_FragCoord.xy / iResolution.xy;
     vec4 renderResult = texture(iPreviousRender, st);
-    if (iRenderToScreen == 1) {
+    if (iPassIndex == 1) {
+        // hier wäre auch Platz für Post Processing,
+        // vor Allem wollen wir aber nicht alles neu ausrechnen, was eh schon in der Textur steht.
         fragColor = renderResult;
         return;
     }
@@ -103,13 +128,25 @@ void main() {
         )
     );
 
-    float testRows = 50.;
-    float testFrameIndex = mod(float(iFrame), testRows);
-    float limitRange = 1.;
-    float row = (uv.y + 1.) * 0.5 * testRows;
-    float onlyRow = float(row >= testFrameIndex && row < testFrameIndex + 1.);
-    col *= onlyRow;
+    float frame = float(iFrame);
+    float rowDivisions = 150.;
 
+    // Erster Versuch: linear durchscannen (y reicht für die Demonstration)
+    float currentRowIndex = mod(frame, rowDivisions);
+    float onlyCurrentRow = onlyInRow(uv.y, currentRowIndex, rowDivisions);
+
+    // Zweiter Versuch: "random"
+//    float randomRowIndex = rowDivisions * hash14(vec2(frame, 1.));
+//    onlyCurrentRow = onlyInRow(uv.y, randomRowIndex, rowDivisions);
+
+    // Nächstes Beispiel: Wir zeichnen nur ein Bild ab
+    // Problem: Zeitabhängigkeit, z.B. mal  c.yx * 0.05 * iTime bewegen -- Scanzeilen kommen kaum hinterher
+//    float scrollY = .0;
+//    vec2 imageSt = fract(0.5 * (uv + c.yx) + scrollY * c.yx * iTime);
+//    imageSt.y = 1. - imageSt.y; // Erinnerung: Unterschied in der Konvention, wo bei einem Bild "oben" ist
+//    col = texture(iSampleImage, imageSt).rgb;
+
+    col *= onlyCurrentRow;
     fragColor = vec4(col, 1.);
 
     if (iFrame == 0) {
@@ -128,6 +165,7 @@ void main() {
         // Der Faktor (leicht unterhalb 1) hier mal nur, damit nicht all zu alte Farben stehen bleiben.
         fragColor.rgb = max(col, renderResult.rgb * 0.95);
 
+        /*
         vec3 previousOklab = rgb2oklab(renderResult.rgb);
         vec3 colOklab = rgb2oklab(col);
         float colWeight;
@@ -140,5 +178,6 @@ void main() {
         // colOklab = previousOklab.x * previousOklab + colOklab.x * colOklab;
         // hmhmhmh. nee...
         fragColor.rgb = oklab2rgb(colOklab);
+        */
     }
 }

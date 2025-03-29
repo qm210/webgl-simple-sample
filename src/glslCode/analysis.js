@@ -57,18 +57,13 @@ export function analyzeShader(source, errorLog, shaderKey) {
         }
 
         let changed = diff.added && stored !== "";
-        try {
-            const onlyWhiteSpaceChanged =
-                changed &&
-                code.trimmed === storedLines[cursor.index]?.trim();
-            if (onlyWhiteSpaceChanged) {
-                changed = false;
-                cursor.removedBefore = [];
-            }
-        } catch (err) {
-            console.warn("Error Comparing", err, `"${code.original}"`, storedLines);
+        const onlyWhiteSpaceChanged =
+            changed &&
+            code.trimmed === storedLines[cursor.index]?.trim();
+        if (onlyWhiteSpaceChanged) {
+            changed = false;
+            cursor.removedBefore = [];
         }
-
 
         const lineNumber = cursor.index + 1;
         const symbols = parseSymbols(code.trimmed, lineNumber);
