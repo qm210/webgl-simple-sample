@@ -265,26 +265,6 @@ function parseFunctionSignatures(analyzed) {
 
     return result;
 }
-//
-// function parseFunctions(code) {
-//     const result = [];
-//
-//     for (const match of code.matchAll(REGEX.FUNCTION)) {
-//         const falsePositive = (
-//             REGEX.KEYWORD.test(match.groups.name) ||
-//             match.groups.returnType === "return"
-//         );
-//         if (falsePositive) {
-//             continue;
-//         }
-//
-//         const code = match[0].trim();
-//         const lineOfCode = code.split("\n")[0];
-//         result.push({...match.groups, code, lineOfCode});
-//     }
-//
-//     return result;
-// }
 
 function parseErrors(errorLog) {
     if (!errorLog) {
