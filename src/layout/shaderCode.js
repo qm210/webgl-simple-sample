@@ -1,5 +1,5 @@
 import {createDiv} from "./helpers.js";
-import {analyzeShader} from "../glslCode/analysis.js";
+import {analyzeShader, extendAnalysis} from "../glslCode/analysis.js";
 import {withGlslHighlighting, withSymbolsHighlighted} from "../glslCode/highlighting.js";
 import {addShaderCodeEventListeners, scrollToElementId} from "./eventListeners.js";
 
@@ -18,19 +18,34 @@ export function appendShaderCode(elements, shaderSource, errorLog, shaderKey, ti
     codeBlock.appendChild(sources);
 
     const analyzed = analyzeShader(shaderSource, errorLog, shaderKey);
-    enrichHeader(header, analyzed);
+    const references = {};
 
     for (const line of analyzed.lines) {
-        const elements = prepareElements(line, shaderKey)
+        const elements = prepareElements(line, shaderKey);
         sources.appendChild(elements.line);
 
-        let code = elements.code.innerHTML;
-        code = withGlslHighlighting(code);
-        code = withSymbolsHighlighted(code, analyzed.symbols, line.number);
-        elements.code.innerHTML = code;
+        references[line.number] = elements;
     }
 
-    addShaderCodeEventListeners(sources, elements.scrollStack);
+    extendAnalysis(analyzed).then(() => {
+        enrichHeader(header, analyzed);
+
+        for (const line of analyzed.lines) {
+            const element = references[line.number];
+
+            let code = element.code.innerHTML;
+            code = withGlslHighlighting(code);
+            code = withSymbolsHighlighted(code, analyzed.symbols, line.number);
+            element.code.innerHTML = code;
+
+            if (line.belongsToUnusedDefinition) {
+                element.line.classList.add("unused-definition");
+                element.annotation.textContent = "unused";
+            }
+        }
+
+        addShaderCodeEventListeners(sources, elements.scrollStack);
+    });
 }
 
 function idForLine(shaderKey, lineNumber) {
@@ -38,26 +53,30 @@ function idForLine(shaderKey, lineNumber) {
 }
 
 function prepareElements(line, shaderKey) {
-    const element = createDiv("", "line");
-    element.id = idForLine(shaderKey, line.number);
+    const elements = {
+        line: createDiv("", "line"),
+        code: createDiv(line.code.original, "code"),
+        number: createDiv(line.number, "line-number"),
+        annotation: createDiv("", "annotation"),
+    };
+    elements.line.appendChild(elements.number);
+    elements.line.appendChild(elements.code);
+    elements.line.appendChild(elements.annotation);
+    elements.line.id = idForLine(shaderKey, line.number);
 
     let annotation = "";
 
     if (line.code.empty) {
-        element.classList.add("empty");
+        elements.line.classList.add("empty");
     }
     if (line.changed) {
-        element.classList.add("changed");
-        element.title = "Line Changed"
+        elements.line.classList.add("changed");
+        elements.line.title = "Line Changed"
         annotation = "changed";
     }
     if (line.removedBefore.length > 0) {
-        element.classList.add("removed-before");
-        element.title = "Was Removed: " + line.removedBefore.join("\n").trim();
-    }
-    if (line.belongsToUnusedDefinition) {
-        element.classList.add("unused-definition");
-        annotation = "unused";
+        elements.line.classList.add("removed-before");
+        elements.line.title = "Was Removed: " + line.removedBefore.join("\n").trim();
     }
 
     const errors = line.error
@@ -65,36 +84,23 @@ function prepareElements(line, shaderKey) {
         .map(error => error.message)
         .join('; ') ?? "";
     if (errors) {
-        element.classList.add("error");
-        element.title = errors;
+        elements.line.classList.add("error");
+        elements.line.title = errors;
         annotation = errors;
     }
 
-    const numberElement = createDiv(line.number, "line-number");
-    element.appendChild(numberElement);
-
-    const codeElement = createDiv(line.code.original, "code");
-    element.appendChild(codeElement);
+    elements.annotation.textContent = annotation;
 
     if (annotation) {
-        element.appendChild(
-            createDiv(annotation, "annotation")
-        );
-        element.classList.add("annotated");
+        elements.annotation.classList.add("annotated");
     }
 
-    return {
-        line: element,
-        code: codeElement,
-    };
+    return elements;
 }
 
 function enrichHeader(element, analyzed) {
     const main = analyzed.symbols.find(f => f.name === "main");
     if (!main) {
-        element.appendChild(
-            createDiv("no main() found!", "error")
-        )
         return;
     }
 
@@ -104,8 +110,4 @@ function enrichHeader(element, analyzed) {
     mainLink.addEventListener("click", () => {
         scrollToElementId(idForLine(analyzed.shaderKey, main.definedInLine))
     });
-}
-
-function deemphasizedIfUnused(element) {
-
 }

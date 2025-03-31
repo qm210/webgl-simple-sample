@@ -91,7 +91,7 @@
     @media (min-width: 800px) {
         /* width: 50vw; */
         height: 60vh;
-        min-height: 400px;
+        min-height: min(100%, 400px);
     }
 }
 

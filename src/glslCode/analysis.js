@@ -4,8 +4,9 @@ import REGEX from "./regex.js";
 export const SymbolType = {
     DefineDirective: "DefineDirective",
     ShaderVariable: "ShaderVariable",
-    CustomConstant: "CustomConstant",
-    CustomFunction: "CustomFunction"
+    Constant: "CustomConstant",
+    CustomFunction: "CustomFunction",
+    Struct: "CustomStruct",
 };
 
 export function analyzeShader(source, errorLog, shaderKey) {
@@ -65,13 +66,10 @@ export function analyzeShader(source, errorLog, shaderKey) {
             cursor.removedBefore = [];
         }
 
-        const lineNumber = cursor.index + 1;
-        const symbols = parseSymbols(code.trimmed, lineNumber);
-
         analyzed.lines.push({
             code,
             changed,
-            number: lineNumber,
+            number: cursor.index + 1,
             removedBefore: cursor.removedBefore,
             error: errors[cursor.index],
             belongsToUnusedDefinition: false,
@@ -79,7 +77,6 @@ export function analyzeShader(source, errorLog, shaderKey) {
             scopeLevelAtStart: cursor.scopeLevel,
             consecutiveEmpty: cursor.consecutiveEmpty,
         });
-        analyzed.symbols.push(...symbols);
 
         cursor.index++;
         cursor.removedBefore = [];
@@ -91,8 +88,19 @@ export function analyzeShader(source, errorLog, shaderKey) {
         l => l.consecutiveEmpty < 2
     );
 
+    return analyzed;
+}
+
+export async function extendAnalysis(analyzed) {
+    for (const line of analyzed.lines) {
+        const symbols = parseSymbols(line.code.trimmed, line.number);
+        analyzed.symbols.push(...symbols);
+    }
     analyzed.scopes = parseScopes(analyzed);
-    analyzed.functionMatches = parseFunctionSignatures(analyzed);
+    analyzed.matches = {
+        functions: parseFunctionSignatures(analyzed),
+        structs: [...analyzed.source.matchAll(REGEX.STRUCT)],
+    };
     enhanceSymbols(analyzed);
 
     console.log("Analyzed Shader", analyzed);
@@ -103,7 +111,7 @@ export function analyzeShader(source, errorLog, shaderKey) {
 const SymbolRegex = {
     [SymbolType.DefineDirective]: REGEX.DEFINE_DIRECTIVE,
     [SymbolType.ShaderVariable]: REGEX.SHADER_VARIABLE,
-    [SymbolType.CustomConstant]: REGEX.CONSTANT,
+    [SymbolType.Constant]: REGEX.CONSTANT,
     [SymbolType.CustomFunction]: REGEX.FUNCTION_SIGNATURE,
 }
 
@@ -114,7 +122,6 @@ function parseSymbols(code, lineNumber) {
         const regex = SymbolRegex[symbolType];
         const matches = code.matchAll(regex);
         for (const match of matches) {
-
             const name = match.groups?.name;
 
             if (!name) {
@@ -306,9 +313,12 @@ function enhanceSymbols(analyzed) {
         symbol.definitionSpansLines = 1;
 
         if (symbol.symbolType === SymbolType.CustomFunction) {
-            const functionMatch = analyzed.functionMatches.find(
+            const functionMatch = analyzed.matches.functions.find(
                 match => match.name === symbol.name
             );
+            if (!functionMatch) {
+                continue;
+            }
             symbol.definitionSpansLines = functionMatch.functionScope.closesIn + 1 - functionMatch.startsAtLine;
         }
     }

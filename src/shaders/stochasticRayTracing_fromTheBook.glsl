@@ -299,6 +299,8 @@ void mainImage( out vec4 frag_color, in vec2 frag_coord ) {
         frag_color = iResolution.xyxy;
     } else {
         g_seed = float(base_hash(floatBitsToUint(frag_coord)))/float(0xffffffffU)+iTime;
+        // Abschalten der stochastischen Variation:
+        // g_seed = 0.;
 
         vec2 uv = (frag_coord + hash2(g_seed))/iResolution.xy;
         float aspect = iResolution.x/iResolution.y;

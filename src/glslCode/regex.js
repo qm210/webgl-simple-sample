@@ -9,6 +9,8 @@ const REGEX = {
         /(?:^|\n)\s*(?<returnType>\w+)\s+(?<name>\w+)\s*\((?<args>[^()]*)\)(?:\s*\{\s*(?<body>[^}]*)(?<=\n)})?\s*;?\n?/mg,
     FUNCTION_SIGNATURE:
         /(?:^|\n)\s*(?<returnType>\w+)\s+(?<name>\w+)\s*\((?<args>[^()]*)\)\s*\{/g,
+    STRUCT:
+        /\bstruct\s+(?<name>\w+)\s*\{(?<content>[^}]*)}/mg,
 
     MAGIC_SYMBOL:
         /\b(gl_Position|gl_PointSize|gl_FragCoord|gl_FrontFacing|gl_PointCoord|main)\b/g,

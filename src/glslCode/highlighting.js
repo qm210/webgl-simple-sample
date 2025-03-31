@@ -55,7 +55,7 @@ export function withSymbolsHighlighted(code, analyzedSymbols, lineNumber) {
 const SymbolClass = {
     [SymbolType.DefineDirective]: "is-defined",
     [SymbolType.ShaderVariable]: "is-global",
-    [SymbolType.CustomConstant]: "is-constant",
+    [SymbolType.Constant]: "is-constant",
     [SymbolType.CustomFunction]: "is-custom-function",
 };
 
