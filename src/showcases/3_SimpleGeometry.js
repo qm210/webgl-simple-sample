@@ -3,6 +3,7 @@ import {compile, createStaticVertexBuffer, initVertices} from "../webgl/setup.js
 import vertexShaderSource from "../shaders/basic.vertex.glsl";
 import defaultFragmentShaderSource from "../shaders/simpleGeometry.glsl";
 import {startRenderLoop} from "../webgl/render.js";
+import {translateShaderToyFormat} from "../webgl/compatibility.js";
 
 export default {
     title: "Simple Geometry",

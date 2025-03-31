@@ -131,7 +131,7 @@ void main() {
     float frame = float(iFrame);
     float rowDivisions = 150.;
 
-    // Erster Versuch: linear durchscannen (y reicht für die Demonstration)
+    // Erster Versuch: linear durchscannen von unten nach oben (für die Demonstration)
     float currentRowIndex = mod(frame, rowDivisions);
     float onlyCurrentRow = onlyInRow(uv.y, currentRowIndex, rowDivisions);
 

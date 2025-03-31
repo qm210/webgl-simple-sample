@@ -2,7 +2,13 @@ import standardSetup from "./3_SimpleGeometry.js";
 import {startRenderLoop} from "../webgl/render.js";
 import {createFramebufferWithTexture, createTextureFromImage} from "../webgl/helpers.js";
 
-import fragmentShaderSource from "../shaders/stochasticRayTracing.glsl";
+// import fragmentShaderSource from "../shaders/stochasticRayTracing_preparePingPong.glsl";
+// import fragmentShaderSource from "../shaders/stochasticRayTracing.glsl";
+
+// dieses Beispiel basiert auf dem bekannten "Ray Tracing In One Weekend" von Peter Shirley
+// https://raytracing.github.io/books/RayTracingInOneWeekend.html#wherenext?
+// siehe auch diese Implementierung von reinder:
+import fragmentShaderSource from "../shaders/stochasticRayTracing_fromTheBook.glsl";
 
 import someSampleImage from "../textures/mysterious_capybara.png";
 

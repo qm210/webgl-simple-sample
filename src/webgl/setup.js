@@ -1,4 +1,5 @@
 import {asResolution, createShader} from "./helpers.js";
+import {translateShaderToyFormat} from "./compatibility.js";
 
 /**
  *
@@ -62,6 +63,9 @@ function createInitialState(vertexSrc, fragmentSrc) {
     };
 }
 
+// quick way to include Shader Toy shaders: add ?shadertoy-Flag to URL Query (value doesn't matter)
+const shaderToyFlag = window.location.search.includes("shadertoy");
+
 /**
  *
  * @param gl - the WebGl context (browser needs to support this)
@@ -69,6 +73,10 @@ function createInitialState(vertexSrc, fragmentSrc) {
  * @param fragmentSrc - the Fragment Shader Source
  */
 export function compile(gl, vertexSrc, fragmentSrc) {
+    if (shaderToyFlag) {
+        fragmentSrc = translateShaderToyFormat(fragmentSrc);
+    }
+
     const result = createInitialState(vertexSrc, fragmentSrc);
 
     const v = createShader(gl, gl.VERTEX_SHADER, vertexSrc);
