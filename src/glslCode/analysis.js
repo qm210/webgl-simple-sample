@@ -1,5 +1,5 @@
 import {diffLines} from "diff";
-import REGEX from "./regex.js";
+import REGEX, {MAGIC_SYMBOLS} from "./regex.js";
 
 export const SymbolType = {
     DefineDirective: "DefineDirective",
@@ -27,7 +27,7 @@ export function analyzeShader(source, errorLog, shaderKey) {
         lines: [],
         symbols: [],
         scopes: [],
-        matches: {},
+        functions: [],
     };
     const cursor = {
         index: 0,
@@ -92,15 +92,9 @@ export function analyzeShader(source, errorLog, shaderKey) {
 }
 
 export async function extendAnalysis(analyzed) {
-    for (const line of analyzed.lines) {
-        const symbols = parseSymbols(line.code.trimmed, line.number);
-        analyzed.symbols.push(...symbols);
-    }
-    analyzed.scopes = parseScopes(analyzed);
-    analyzed.matches = {
-        functions: parseFunctionSignatures(analyzed),
-        structs: [...analyzed.source.matchAll(REGEX.STRUCT)],
-    };
+    analyzed.scopes = parseScopes(analyzed.lines);
+    analyzed.symbols = parseSymbols(analyzed.source);
+    analyzed.functions = enhancedFunctionsWithBody(analyzed);
     enhanceSymbols(analyzed);
 
     console.log("Analyzed Shader", analyzed);
@@ -113,36 +107,56 @@ const SymbolRegex = {
     [SymbolType.ShaderVariable]: REGEX.SHADER_VARIABLE,
     [SymbolType.Constant]: REGEX.CONSTANT,
     [SymbolType.CustomFunction]: REGEX.FUNCTION_SIGNATURE,
+    [SymbolType.Struct]: REGEX.STRUCT,
 }
 
-function parseSymbols(code, lineNumber) {
-    const result = [];
+function parseSymbols(source) {
+    const results = [];
     for (const symbolType in SymbolType) {
 
-        const regex = SymbolRegex[symbolType];
-        const matches = code.matchAll(regex);
+        const matches = source.matchAll(SymbolRegex[symbolType]);
+
         for (const match of matches) {
             const name = match.groups?.name;
-
             if (!name) {
                 continue;
             }
+            if (typeof name !== "string") {
+                console.error("Symbol Parsing Error: Name cannot be", name);
+            }
 
-            const pattern =
-                    new RegExp(`\\b${name}\\b`, "g");
+            // TODO: can not yet parse whether the block is disabled via #if-directive etc...
 
-            // TODO: might check whether we are in a block defined that is disabled via directive...
+            const matched = match[0].trim();
+            const matchedLines = matched.split('\n');
 
-            result.push({
+            const result = {
                 ...match.groups,
-                pattern,
                 symbolType,
-                lineOfCode: code,
-                definedInLine: lineNumber,
-            });
+                sourcePosition: match.index,
+                pattern:
+                    new RegExp(`\\b${name}\\b`, "g"),
+                matched: {
+                    string: matched,
+                    lines: matchedLines,
+                    start: matchedLines[0].trim(),
+                },
+                isMagic: MAGIC_SYMBOLS.includes(name),
+            };
+
+            if (result.args) {
+                result.argString = result.args
+                    .trim()
+                    .replaceAll(/\s+/g, ' ')
+                    .replaceAll(/\s*,\s*/g, ', ');
+                result.argArray = result.argString
+                    .split(', ');
+            }
+
+            results.push(result);
         }
     }
-    return result;
+    return results;
 }
 
 function countBraces(code) {
@@ -152,7 +166,7 @@ function countBraces(code) {
     };
 }
 
-export function parseScopes(analyzed) {
+function parseScopes(analyzedLines) {
     const scopes = {
         result: [],
         stack: [],
@@ -163,7 +177,7 @@ export function parseScopes(analyzed) {
         },
     };
 
-    for (const line of analyzed.lines) {
+    for (const line of analyzedLines) {
         if (line.code.empty) {
             continue;
         }
@@ -207,7 +221,7 @@ export function parseScopes(analyzed) {
     }
     scopes.result.push({
         ...scopes.cursor,
-        closesIn: analyzed.lines.length
+        closesIn: analyzedLines.length
     });
 
     scopes.result.sort(
@@ -217,55 +231,38 @@ export function parseScopes(analyzed) {
     return scopes.result;
 }
 
-function parseFunctionSignatures(analyzed) {
-    const result = [];
-
-    for (const match of analyzed.source.matchAll(REGEX.FUNCTION_SIGNATURE)) {
-        const argString = match.groups.args
-            .trim()
-            .replaceAll(/\s+/g, ' ')
-            .replaceAll(/\s*,\s*/g, ', ');
-        const argArray = argString
-            .split(', ');
-        const matchString = match[0]
-            .replaceAll(/^(\s*\n)*/g, '');
-
-        result.push({
-            ...match.groups,
-            argString,
-            argArray,
-            matchString,
-            sourcePosition: match.index
-        });
-    }
+function enhancedFunctionsWithBody(analyzed) {
+    const functions = analyzed.symbols.filter(
+        s => s.symbolType === SymbolType.CustomFunction
+    );
 
     let nextIndex = 0;
     for (const line of analyzed.lines) {
 
-        const nextSignature = result[nextIndex];
-        if (!nextSignature) {
+        const nextFunction = functions[nextIndex];
+        if (!nextFunction) {
             break;
         }
 
+        const match = nextFunction.matched.string;
         const possibleSourceMatch = analyzed.source.slice(
             line.positionInSource,
-            line.positionInSource + nextSignature.matchString.length
+            line.positionInSource + match.length
         );
-        const startsHere = nextSignature.matchString === possibleSourceMatch;
+        const startsHere = possibleSourceMatch === match;
         if (startsHere) {
-            nextSignature.startsAtLine = line.number;
-            nextSignature.lineSpan = nextSignature.matchString.split('\n').length;
-            nextSignature.endsAtLine = line.number + nextSignature.lineSpan - 1;
+            nextFunction.startsAtLine = line.number;
+            nextFunction.endsAtLine = line.number + nextFunction.matched.lines.length - 1;
 
             // needs the scopes to be sorted!
-            nextSignature.functionScope = analyzed.scopes
-                .find(scope => scope.openedIn >= nextSignature.endsAtLine);
+            nextFunction.scope = analyzed.scopes
+                .find(scope => scope.openedIn >= nextFunction.endsAtLine);
 
             nextIndex++;
         }
     }
 
-    return result;
+    return functions;
 }
 
 function parseErrors(errorLog) {
@@ -302,24 +299,30 @@ function parseErrors(errorLog) {
 }
 
 function enhanceSymbols(analyzed) {
+    for (const symbol of analyzed.symbols) {
+        for (const line of analyzed.lines) {
+            if (line.positionInSource > symbol.sourcePosition) {
+                break;
+            }
+            symbol.definedInLine = line.number;
+        }
+    }
 
     for (const symbol of analyzed.symbols) {
         // -1 because the definition itself doesn't count as usage :)
         symbol.usageCount = [...analyzed.source.matchAll(symbol.pattern)].length - 1;
-
-        symbol.unused = symbol.usageCount === 0
-            && !REGEX.MAGIC_SYMBOL.test(symbol.name);
+        symbol.unused = symbol.usageCount < 1 && !symbol.isMagic;
 
         symbol.definitionSpansLines = 1;
 
         if (symbol.symbolType === SymbolType.CustomFunction) {
-            const functionMatch = analyzed.matches.functions.find(
+            const functionMatch = analyzed.functions.find(
                 match => match.name === symbol.name
             );
-            if (!functionMatch) {
+            if (!functionMatch?.scope) {
                 continue;
             }
-            symbol.definitionSpansLines = functionMatch.functionScope.closesIn + 1 - functionMatch.startsAtLine;
+            symbol.definitionSpansLines = functionMatch.scope.closesIn + 1 - functionMatch.startsAtLine;
         }
     }
 
@@ -329,7 +332,11 @@ function enhanceSymbols(analyzed) {
     for (const symbol of analyzed.unusedSymbols) {
         for (let l = 0; l < symbol.definitionSpansLines; l++ ) {
             const lineIndex = symbol.definedInLine + l - 1;
+            // console.log("CHECK?", symbol.name, analyzed.lines, lineIndex, symbol.definedInLine);
             const analyzedLine = analyzed.lines[lineIndex];
+            if (!analyzedLine) {
+                break;
+            }
             analyzedLine.belongsToUnusedDefinition = true;
         }
     }

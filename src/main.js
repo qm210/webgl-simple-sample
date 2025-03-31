@@ -19,7 +19,7 @@ import showcase9 from "./showcases/9_Volumetric.js";
 import showcase10 from "./showcases/10_StochasticRayTracing.js";
 
 // choose wisely :)
-const showcase = showcase10;
+const showcase = showcase9;
 
 const autoRenderOnLoad = true;
 

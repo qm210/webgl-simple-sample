@@ -1,16 +1,16 @@
 const REGEX = {
     DEFINE_DIRECTIVE:
-        /^\s*#define\s*(?<name>\w*)(?<args>\(.*?\))?\s*(?<value>.*)\s*$/mg,
+        /^#define\s*(?<name>\w*)(?<args>\(.*?\))?\s*(?<value>.*)\s*$/mg,
     SHADER_VARIABLE:
-        /^\s*(layout\s*\(location\s*=\s*(?<location>\d+)\)\s*)?(?<keyword>out|uniform|varying|attribute)\s*(?<type>\w+)\s*(?<name>\w*);$/mg,
+        /^\b(layout\s*\(location\s*=\s*(?<location>\d+)\)\s*)?(?<keyword>out|uniform|varying|attribute)\s*(?<type>\w+)\s*(?<name>\w*);$/mg,
     CONSTANT:
         /\bconst\s*(?<type>float|u?int|bool|[iu]vec[2-4]|mat[2-4])\s*(?<name>\w*)\s*=\s*(?<value>\S*);/g,
     FUNCTION:
-        /(?:^|\n)\s*(?<returnType>\w+)\s+(?<name>\w+)\s*\((?<args>[^()]*)\)(?:\s*\{\s*(?<body>[^}]*)(?<=\n)})?\s*;?\n?/mg,
+        /\b(?<returnType>\w+)\s+(?<name>\w+)\s*\((?<args>[^()]*)\)(?:\s*\{\s*(?<body>[^}]*)(?<=\n)})?\s*;?\n?/mg,
     FUNCTION_SIGNATURE:
-        /(?:^|\n)\s*(?<returnType>\w+)\s+(?<name>\w+)\s*\((?<args>[^()]*)\)\s*\{/g,
+        /\b(?<returnType>\w+)\s+(?<name>\w+)\s*\((?<args>[^()]*)\)\s*\{/g,
     STRUCT:
-        /\bstruct\s+(?<name>\w+)\s*\{(?<content>[^}]*)}/mg,
+        /\bstruct\s+(?<name>\w+)\s*\{(?<body>[^}]*)}/mg,
 
     MAGIC_SYMBOL:
         /\b(gl_Position|gl_PointSize|gl_FragCoord|gl_FrontFacing|gl_PointCoord|main)\b/g,
@@ -31,3 +31,17 @@ const REGEX = {
 };
 
 export default REGEX;
+
+
+// TODO: unify with the REGEX above
+export const MAGIC_SYMBOLS = [
+    "gl_Position",
+    "gl_PointSize",
+    "gl_FragCoord",
+    "gl_Position",
+    "gl_PointSize",
+    "gl_FragCoord",
+    "gl_FrontFacing",
+    "gl_PointCoord",
+    "main",
+];

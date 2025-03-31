@@ -1,22 +1,22 @@
-import REGEX from "./regex.js";
+import REGEX, {MAGIC_SYMBOLS} from "./regex.js";
 import {createSpan} from "../layout/helpers.js";
 import {SymbolType} from "./analysis.js";
 
 export function withGlslHighlighting(code) {
     return code
-        .replace(REGEX.MAGIC_SYMBOL, match =>
+        .replaceAll(REGEX.MAGIC_SYMBOL, match =>
             `<span class="magic keyword">${match}</span>`
         )
-        .replace(REGEX.DIRECTIVE, match =>
+        .replaceAll(REGEX.DIRECTIVE, match =>
             `<span class="directive">${match}</span>`
         )
-        .replace(REGEX.BUILTIN_FUNCTION, match =>
+        .replaceAll(REGEX.BUILTIN_FUNCTION, match =>
             `<span class="builtin">${match}</span>`
         )
-        .replace(REGEX.KEYWORD, match =>
+        .replaceAll(REGEX.KEYWORD, match =>
             `<span class="keyword">${match}</span>`
         )
-        .replace(REGEX.NUMBER, match =>
+        .replaceAll(REGEX.NUMBER, match =>
             `<span class="number">${match}</span>`
         );
 }
@@ -27,7 +27,7 @@ export function withSymbolsHighlighted(code, analyzedSymbols, lineNumber) {
 
     for (const symbol of analyzedSymbols) {
         if (replacedNames.includes(symbol.name)) {
-            // TODO. we cannot yet handle preprocessor directives. just ignore for now.
+            // TODO. we cannot yet handle branching preprocessor directives. just ignore for now.
             continue;
         }
 
@@ -35,18 +35,23 @@ export function withSymbolsHighlighted(code, analyzedSymbols, lineNumber) {
 
         let firstMatch = true;
 
-        result = result.replaceAll(
-            symbol.pattern,
-            () => {
-                const isDefinition =
-                    lineNumber === symbol.definedInLine && firstMatch;
-                firstMatch = false;
-                const element = isDefinition
-                    ? highlightedDefinition(symbol)
-                    : highlightedUsage(symbol)
-                return element.outerHTML;
-            }
-        );
+        try {
+            result = result.replaceAll(
+                symbol.pattern,
+                () => {
+                    const isDefinition =
+                        lineNumber === symbol.definedInLine && firstMatch;
+                    firstMatch = false;
+                    const element = isDefinition
+                        ? highlightedDefinition(symbol)
+                        : highlightedUsage(symbol);
+                    return element.outerHTML;
+                }
+            );
+        }
+        catch (error) {
+            console.warn("Could not replace", symbol, result.length);
+        }
     }
 
     return result;
@@ -60,14 +65,19 @@ const SymbolClass = {
 };
 
 function highlightedDefinition(symbol) {
+    const classes = [];
+    if (!MAGIC_SYMBOLS.includes(symbol.name)) {
+        classes.push(SymbolClass[symbol.symbolType]);
+    }
     const element = createSpan({
         text: symbol.name,
         id: symbol.name,
+        classes,
     });
     if (symbol.unused) {
         element.classList.add("unused");
         element.title = `"${symbol.name}" appears unused.`;
-    } else {
+    } else if (symbol.usageCount > 0) {
         element.title = `"${symbol.name}": ${symbol.usageCount}x used`;
     }
     return element;
@@ -75,13 +85,9 @@ function highlightedDefinition(symbol) {
 
 function highlightedUsage(symbol) {
     const classes = ["symbol", SymbolClass[symbol.symbolType]];
-    const code = symbol.code ?? symbol.lineOfCode;
-    const lineInfo = `line ${symbol.definedInLine}`;
-    const title = `${lineInfo}: ${code}`;
     return createSpan({
         text: symbol.name,
         classes,
-        title,
         data: symbol.name,
     });
 }

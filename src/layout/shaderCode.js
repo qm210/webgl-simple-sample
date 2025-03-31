@@ -27,15 +27,15 @@ export function appendShaderCode(elements, shaderSource, errorLog, shaderKey, ti
         references[line.number] = elements;
     }
 
-    extendAnalysis(analyzed).then(() => {
-        enrichHeader(header, analyzed);
+    extendAnalysis(analyzed).then((extended) => {
+        enrichHeader(header, extended);
 
-        for (const line of analyzed.lines) {
+        for (const line of extended.lines) {
             const element = references[line.number];
 
             let code = element.code.innerHTML;
             code = withGlslHighlighting(code);
-            code = withSymbolsHighlighted(code, analyzed.symbols, line.number);
+            code = withSymbolsHighlighted(code, extended.symbols, line.number);
             element.code.innerHTML = code;
 
             if (line.belongsToUnusedDefinition) {
@@ -45,6 +45,17 @@ export function appendShaderCode(elements, shaderSource, errorLog, shaderKey, ti
         }
 
         addShaderCodeEventListeners(sources, elements.scrollStack);
+
+        for (const element of sources.getElementsByClassName("symbol")) {
+            const symbolName = element.getAttribute("data");
+            const symbol = extended.symbols.find(symbol => symbol.name === symbolName);
+            if (!symbol) {
+                continue;
+            }
+            const code = symbol.code ?? symbol.matched.string;
+            const lineInfo = `line ${symbol.definedInLine}`;
+            element.title = `${lineInfo}: ${code}`;
+        }
     });
 }
 
