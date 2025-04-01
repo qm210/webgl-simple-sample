@@ -1,7 +1,8 @@
 import {addButton, addInput, addValueLabel} from "./controls.js";
-import {appendShaderCode} from "./shaderCode.js";
+import {registerShaderCode} from "./shaderCode.js";
 import {appendText} from "./helpers.js";
-import {addStartupListeners, createScrollStackOn} from "./eventListeners.js";
+import {createScrollStackOn, scrollToFirstInterestingLine} from "./events.js";
+import {deferExtendedAnalysis} from "../glslCode/deferredAnalysis.js";
 
 
 const generatePage = (elements, state, controls, autoRenderOnLoad) => {
@@ -15,14 +16,16 @@ const generatePage = (elements, state, controls, autoRenderOnLoad) => {
 
     elements.scrollStack = createScrollStackOn(elements.shaders);
 
-    appendShaderCode(
+    elements.register = [];
+
+    registerShaderCode(
         elements,
         state.source.fragment,
         state.error.fragment,
         "fragment.source",
         "Fragment Shader"
     );
-    appendShaderCode(
+    registerShaderCode(
         elements,
         state.source.vertex,
         state.error.vertex,
@@ -36,14 +39,14 @@ const generatePage = (elements, state, controls, autoRenderOnLoad) => {
             "h4",
             "Second Program (Post Processing):"
         );
-        appendShaderCode(
+        registerShaderCode(
             elements,
             state.post.source.fragment,
             state.post.error.fragment,
             "fragment.post.source",
             "Fragment Shader"
         );
-        appendShaderCode(
+        registerShaderCode(
             elements,
             state.post.source.vertex,
             state.post.error.vertex,
@@ -52,7 +55,10 @@ const generatePage = (elements, state, controls, autoRenderOnLoad) => {
         );
     }
 
-    addStartupListeners();
+    deferExtendedAnalysis(elements).then(() => {
+        scrollToFirstInterestingLine();
+    });
+
     addControlsToPage(elements, state, controls, autoRenderOnLoad);
 
     elements.initialRenderMs = performance.now() - elements.startRendering;

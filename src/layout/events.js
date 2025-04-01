@@ -1,34 +1,6 @@
 import {assignGloballyUniqueClass, findParentOfClass} from "./helpers.js";
 
 
-const storedLineId = sessionStorage.getItem("selected.line.id");
-
-// TODO: think about whether this is actually good...
-const initiallyScrollToLineId = false;
-
-export function addStartupListeners() {
-
-
-    document.addEventListener("DOMContentLoaded", () => {
-        let interestingLine =
-            document.querySelector(".line.error")
-            ?? document.querySelector(".line.annotated");
-
-        if (!interestingLine && storedLineId && initiallyScrollToLineId) {
-            interestingLine = document.getElementById(storedLineId);
-            selectContainingLine(interestingLine);
-        }
-
-        if (interestingLine) {
-            interestingLine.scrollIntoView({
-                behaviour: "smooth",
-                block: "center"
-            });
-        }
-    });
-
-}
-
 export function createScrollStackOn(parent) {
     const scrollStack = [];
 
@@ -40,7 +12,7 @@ export function createScrollStackOn(parent) {
 
         event.preventDefault();
         stackElement.scrollIntoView({
-            behaviour: "smooth",
+            behavior: "smooth",
             block: "center"
         });
         selectContainingLine(stackElement);
@@ -78,7 +50,7 @@ export function scrollToElementId(id, sourceElement, scrollStack) {
     }
 
     target.scrollIntoView({
-        behaviour: "smooth",
+        behavior: "smooth",
         block: "center"
     });
     selectContainingLine(target);
@@ -94,5 +66,22 @@ function selectContainingLine(element) {
 
     if (lineParent?.id) {
         sessionStorage.setItem("selected.line.id", lineParent.id);
+    }
+}
+
+
+export function scrollToFirstInterestingLine() {
+    let interestingLine =
+        document.querySelector(".line.error")
+        ?? document.querySelector(".line.changed")
+        ?? document.querySelector(".line.removed-before");
+
+    if (interestingLine) {
+        setTimeout(() => {
+            interestingLine.scrollIntoView({
+                behavior: "smooth",
+                block: "center"
+            });
+        }, 200);
     }
 }

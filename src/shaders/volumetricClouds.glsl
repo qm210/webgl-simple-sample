@@ -310,6 +310,7 @@ float IntersectOpaqueScene(in vec3 rayOrigin, in vec3 rayDirection, out int mate
     normal = vec3(0, 0, 0);
     materialID = INVALID_MATERIAL_ID;
 
+
     for(int lightIndex = 0; lightIndex < NUM_LIGHTS; lightIndex++)
     {
         UpdateIfIntersected(
@@ -322,7 +323,6 @@ float IntersectOpaqueScene(in vec3 rayOrigin, in vec3 rayDirection, out int mate
         );
     }
 
-
     UpdateIfIntersected(
         t,
         PlaneIntersection(rayOrigin, rayDirection, vec3(0, 0, 0), vec3(0, 1, 0), intersectionNormal),
@@ -332,19 +332,20 @@ float IntersectOpaqueScene(in vec3 rayOrigin, in vec3 rayDirection, out int mate
         materialID
     );
 
-
     return t;
 }
 
 float QueryVolumetricDistanceField( in vec3 pos)
 {
+    // Hint: für unsere Zwecke ist das jetzt mehr Schneemann-Lavalampe als Wolke. Deal with it.
+
     // Fuse a bunch of spheres, slap on some fbm noise,
     // merge it with ground plane to get some ground fog
     // and viola! Big cloudy thingy!
     // vec3 fbmCoord = (pos + 2.0 * vec3(iTime, 0.0, iTime)) / 1.5f;
     vec3 cloudPos = vec3(-8.0, 6.0, -1);
     float sdfValue = sdSphere(pos, cloudPos, 8.0);
-    cloudPos += vec3(.0, 11., 0);
+    cloudPos += vec3(.0, 11. + 6. * sin(1.33 * iTime), 0);
     sdfValue = sdSmoothUnion(sdfValue,sdSphere(pos, cloudPos, 4.5), 8.0f + 6. * sin(iTime));
 //    sdfValue = sdSmoothUnion(sdfValue, sdSphere(pos, vec3(5.0 * sin(iTime), 3.0, 0), 8.0), 3.0) + 7.0 * fbm_4(fbmCoord / 3.2);
     //sdfValue = sdSmoothUnion(sdfValue, sdPlane(pos + vec3(0, 0.4, 0)), 22.0);
@@ -577,8 +578,6 @@ void main()
         lensPoint = Camera.LookAt - CameraView * ViewLength;
     }
 
-    // Technically this could be calculated offline but I like
-    // being able to iterate quickly
     vec3 CameraRight = cross(CameraView, vec3(0, 1, 0));
     vec3 CameraUp = cross(CameraRight, CameraView);
 

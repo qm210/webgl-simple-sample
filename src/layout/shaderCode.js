@@ -1,9 +1,9 @@
 import {createDiv} from "./helpers.js";
 import {analyzeShader, extendAnalysis} from "../glslCode/analysis.js";
 import {withGlslHighlighting, withSymbolsHighlighted} from "../glslCode/highlighting.js";
-import {addShaderCodeEventListeners, scrollToElementId} from "./eventListeners.js";
+import {addShaderCodeEventListeners, scrollToElementId} from "./events.js";
 
-export function appendShaderCode(elements, shaderSource, errorLog, shaderKey, title = "") {
+export function registerShaderCode(elements, shaderSource, errorLog, shaderKey, title = "") {
     if (!shaderSource) {
         return;
     }
@@ -18,7 +18,8 @@ export function appendShaderCode(elements, shaderSource, errorLog, shaderKey, ti
     codeBlock.appendChild(sources);
 
     const analyzed = analyzeShader(shaderSource, errorLog, shaderKey);
-    const references = {};
+
+    const references = {header, sources};
 
     for (const line of analyzed.lines) {
         const elements = prepareElements(line, shaderKey);
@@ -27,39 +28,10 @@ export function appendShaderCode(elements, shaderSource, errorLog, shaderKey, ti
         references[line.number] = elements;
     }
 
-    extendAnalysis(analyzed).then((extended) => {
-        enrichHeader(header, extended);
-
-        for (const line of extended.lines) {
-            const element = references[line.number];
-
-            let code = element.code.innerHTML;
-            code = withGlslHighlighting(code);
-            code = withSymbolsHighlighted(code, extended.symbols, line.number);
-            element.code.innerHTML = code;
-
-            if (line.belongsToUnusedDefinition) {
-                element.line.classList.add("unused-definition");
-                element.annotation.textContent = "unused";
-            }
-        }
-
-        addShaderCodeEventListeners(sources, elements.scrollStack);
-
-        for (const element of sources.getElementsByClassName("symbol")) {
-            const symbolName = element.getAttribute("data");
-            const symbol = extended.symbols.find(symbol => symbol.name === symbolName);
-            if (!symbol) {
-                continue;
-            }
-            const code = symbol.code ?? symbol.matched.string;
-            const lineInfo = `line ${symbol.definedInLine}`;
-            element.title = `${lineInfo}: ${code}`;
-        }
-    });
+    elements.register.push({shaderKey, references, analyzed});
 }
 
-function idForLine(shaderKey, lineNumber) {
+export function idForLine(shaderKey, lineNumber) {
     return `${shaderKey}.line.${lineNumber}`;
 }
 
@@ -107,18 +79,4 @@ function prepareElements(line, shaderKey) {
     }
 
     return elements;
-}
-
-function enrichHeader(element, analyzed) {
-    const main = analyzed.symbols.find(f => f.name === "main");
-    if (!main) {
-        return;
-    }
-
-    const mainLink = createDiv(`main() in l. ${main.definedInLine}`, "quicklink");
-    element.appendChild(mainLink);
-
-    mainLink.addEventListener("click", () => {
-        scrollToElementId(idForLine(analyzed.shaderKey, main.definedInLine))
-    });
 }
