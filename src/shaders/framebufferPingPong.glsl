@@ -104,10 +104,10 @@ float hash14(vec2 p)
     return hash14(vec4(p, 1., 1.));
 }
 
-#define SCAN_DIVISIONS 100.
+#define SCAN_DIVISIONS 120.
 
 #define RANDOM_SCANLINES 0
-#define DRAW_CAPYBARA 1
+#define DRAW_CAPYBARA 0
 
 float onlyOneDivision(float y, float index) {
     float row = (y + 1.) * 0.5 * SCAN_DIVISIONS;
