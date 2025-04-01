@@ -9,11 +9,11 @@ import showcase5b from "./showcases/5b_RayTracingCubeExtended.js";
 import showcase6 from "./showcases/6_Textures.js";
 import showcase7 from "./showcases/7_ColorMixing.js";
 import showcase8 from "./showcases/8_Multipass.js";
-import showcase9 from "./showcases/9_Volumetric.js";
-import showcase10 from "./showcases/10_FramebufferPingPong.js";
-import showcase11 from "./showcases/11_StochasticRayTracing.js";
+import showcase9 from "./showcases/9_FramebufferPingPong.js";
+import showcase10 from "./showcases/10_StochasticRayTracing.js";
+import showcase11 from "./showcases/11_Volumetric.js";
 
-const defaultShowcase = showcase11;
+const defaultShowcase = showcase9;
 
 export function selectShowcase() {
 

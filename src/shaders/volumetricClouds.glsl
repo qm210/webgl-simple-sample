@@ -13,7 +13,7 @@ const vec2 iMouse = vec2(0., 0.);
 // Created by Christopher Wallis
 #define PI 3.14
 
-#define NUM_LIGHTS 7
+#define NUM_LIGHTS 3
 #define NUM_LIGHT_COLORS 3
 
 #define CHECKER_FLOOR_MATERIAL_ID 0
@@ -89,7 +89,7 @@ OrbLightDescription GetLight(int lightIndex)
     OrbLightDescription orbLight;
     orbLight.Position = vec3(radius * cos(theta), 6.0 + sin(theta * 2.0) * 2.5, radius * sin(theta));
     orbLight.LightColor = GetLightColor(lightIndex) * lightMultiplier;
-    orbLight.Radius = 0.8f;
+    orbLight.Radius = 0.4f;
 
     return orbLight;
 }
