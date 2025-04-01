@@ -263,11 +263,12 @@ float gold_noise(in vec2 xy, in float seed) {
 #define DO_NOTHING false
 // <-- anders definiert als der Rest, weil meine IDE mich genervt hat. Macht nichts.
 #define PIXELATE 0
-#define GAUSS_BLUR 1
+#define GAUSS_BLUR 0
 #define VIGNETTE 1
 #define GRAYSCALE 0
-#define OKLCH_TRANSFORMATION 1
-#define DEPTH_OF_FIELD 1
+#define OKLCH_TRANSFORMATION 0
+#define DEPTH_OF_FIELD 0
+#define DEPTH_OF_FIELD_WITH_GOLDEN_RATIO 1
 
 void main() {
     vec2 uv = (2.0 * gl_FragCoord.xy - iResolution.xy) / iResolution.y;
@@ -313,23 +314,33 @@ void main() {
             vec3 dofColor = vec3(0.);
             float sumWeight = 0.;
             float radius = 20. * PIXELSIZE * coc;
-            for (int i = 0; i < samples; i++) {
-                float r = sqrt(float(i) / float(samples));
-                float theta = float(i) * PHI; // golden ratio
-                vec2 tapUv = st + vec2(sin(theta), cos(theta)) * radius * r;
-                float weight = exp(-r*r);
-                dofColor += texture(iImage, tapUv).rgb * weight;
-                sumWeight += weight;
-            }
-            // <-- golden-ratio-sampling, viel effizienter als O(n^2) Loop
-    //        for (int i = -samples; i <= samples; i++) {
-    //            for (int j = -samples; j <= samples; j++) {
-    //                vec2 offset = vec2(i, j) * radius;
-    //                float weight = exp(-dot(vec2(i, j), vec2(i, j)));
-    //                dofColor += texture(iImage, st + offset).rgb * weight;
-    //                sumWeight += weight;
-    //            }
-    //        }
+
+            #if DEPTH_OF_FIELD_WITH_GOLDEN_RATIO
+
+                // Golden-Ratio-Sampling, viel effizienter als O(n^2) Loop
+                for (int i = 0; i < samples; i++) {
+                    float r = sqrt(float(i) / float(samples));
+                    float theta = float(i) * PHI; // golden ratio
+                    vec2 tapUv = st + vec2(sin(theta), cos(theta)) * radius * r;
+                    float weight = exp(-r*r);
+                    dofColor += texture(iImage, tapUv).rgb * weight;
+                    sumWeight += weight;
+                }
+
+            #else
+
+                // "Quadratisches" Samplen
+                for (int i = -samples; i <= samples; i++) {
+                    for (int j = -samples; j <= samples; j++) {
+                        vec2 offset = vec2(i, j) * radius;
+                        float weight = exp(-dot(vec2(i, j), vec2(i, j)));
+                        dofColor += texture(iImage, st + offset).rgb * weight;
+                        sumWeight += weight;
+                    }
+                }
+
+            #endif
+
             dofColor /= sumWeight;
             col = dofColor;
         }

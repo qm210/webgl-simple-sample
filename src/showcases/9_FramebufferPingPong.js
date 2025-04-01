@@ -19,9 +19,10 @@ export default {
                 width: gl.drawingBufferWidth,
                 height: gl.drawingBufferHeight,
                 colorAttachment: gl.COLOR_ATTACHMENT0,
-                // internalFormat: gl.RGBA32F,
+                // Diese Formate werden später wichtig, können hier aber auf dem Default bleiben:
+                // internalFormat: gl.RGBA,
                 // dataFormat: gl.RGBA,
-                // dataType: gl.FLOAT,
+                // dataType: gl.UNSIGNED_BYTE,
             })
         );
 
