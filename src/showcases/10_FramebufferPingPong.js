@@ -92,9 +92,6 @@ function render(gl, state) {
 
     const {write, read} = takePingPongFramebuffers(state);
 
-    // for us: stop after this loop.
-    // state.stopSignal = true;
-
     gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo);
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, read.texture);
@@ -106,9 +103,10 @@ function render(gl, state) {
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.uniform1i(state.location.passIndex, 1);
     gl.drawArrays(gl.TRIANGLES, 0, 6);
+
     /*
-     * Wem das mit dem Ping Pong zu aufwändig vorkommt,
-     * hier ein bisschen Kontext, wie wir es sonst versuchen könnten:
+     * Wem das mit dem Ping Pong nach zu viel Aufwand scheint...
+     * hier ein bisschen Kontext, wohin andere Versuche führen könnten:
      */
 
     /**

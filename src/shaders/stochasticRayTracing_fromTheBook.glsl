@@ -354,8 +354,10 @@ void main() {
     float frameScale = 1./float(iFrame + 1);
 
     vec2 st = gl_FragCoord.xy / iResolution.xy;
-    vec4 data = texture(iChannel0, st);
-    // vec4 data = texelFetch(iChannel0, ivec2(gl_FragCoord.xy), 0);
+    vec4 image = texture(iChannel0, st);
+    // manchmal sieht da so aus - hat genau denselben Zweck, Hauptunterschied sind: Integerkoordinaten statt normiert.
+    // vec4 image = texelFetch(iChannel0, ivec2(gl_FragCoord.xy), 0);
+
 
     g_seed = float(base_hash(floatBitsToUint(gl_FragCoord.xy)))/float(0xffffffffU)+iTime;
     // Demo: Abschalten der stochastischen Variation:
@@ -372,29 +374,24 @@ void main() {
 
     if (iPassIndex == 1) {
         // ähnlich wie im Framebuffer-Ping-Pong-Shader,
-        // aber noch mit Post Processing:
-        // - bisher Werte nur aufaddiert -> nimm Mittelwert
-        // - Einfaches Color Grading. ( Quadratwurzel sqrt(...) == pow(..., 0.5) )
-        // frag_color = vec4(sqrt(data.rgb), 1.);
+        // aber braucht noch Bearbeitung:
+        // 1) bisher ist im Alphakanal gemessen, wie viele Rays den Pixel getroffen haben
+        //    --> es wird dadurch geteilt, damit die Farbe dem Mittelwert entspricht.
+        //    --> OBACHT: Damit das geht, muss die Textur im richtigen Format aufgesetzt sein. Das ist tricky!
+        // 2) (nur für hübsch) Simples Color Grading. ( Quadratwurzel sqrt(...) == pow(..., 0.5) )
 
-        frag_color = vec4(sqrt(data.rgb / data.a), 1.);
-
+        frag_color = vec4(sqrt(image.rgb / image.a), 1.);
         return;
     }
 
     frag_color = vec4(col, 1);
 
     if (iFrame > 0) {
-        frag_color += data;
-        //        frag_color += data; // texelFetch(iChannel0, ivec2(gl_FragCoord.xy), 0);
+
+        frag_color += image;
+
+        // s. Anmerkung oben -- im RenderPass 0 erlauben wir uns, einfach alle Strahlentreffer aufzusummieren.
+        // wenn wir im Hintergrund eine gewöhnliche "Fixed Point" Textur aufgesetzt haben, wird auf [0..1] geclampt.
+        // In solche Fehler kann man Stunden stecken...
     }
-
-    // cannot escape the alpha [0,1] clamping right now, so let's fake it.
-    // Maximum possible amount of hits equals iFrame;
-    // -> prescale it with 1./(iFrame + 1)
-
-
-    // hier wird in "alpha" die Anzahl der Treffer aufsummiert.
-    // dazu muss das Datenformat der Textur Werte größer 1 erlauben!
-
 }
