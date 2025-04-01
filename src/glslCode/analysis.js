@@ -121,6 +121,9 @@ function parseSymbols(source) {
             if (!name) {
                 continue;
             }
+            if (name.match(REGEX.KEYWORD)) {
+                continue;
+            }
             if (typeof name !== "string") {
                 console.error("Symbol Parsing Error: Name cannot be", name);
             }
@@ -141,7 +144,7 @@ function parseSymbols(source) {
                     lines: matchedLines,
                     start: matchedLines[0].trim(),
                 },
-                isMagic: MAGIC_SYMBOLS.includes(name),
+                isMagic: name.match(REGEX.MAGIC_SYMBOL),
             };
 
             if (result.args) {

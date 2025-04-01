@@ -19,6 +19,20 @@ export function setupWebGl(canvas, geometry) {
         // https://caniuse.com/webgl2
     }
 
+    // WebGL2-spezifisch müsen manche Erweiterungen für manche Anwendungszwecke nachgeladen werden,
+    // https://developer.mozilla.org/en-US/docs/Web/API/WebGL_API/Using_Extensions
+    // wir brauchen hier erstmal nur:
+    const WEBGL_EXTENSIONS = ["EXT_color_buffer_float"];
+    gl.ext = {};
+    for (const extension of WEBGL_EXTENSIONS) {
+        const ext = gl.getExtension(extension);
+        if (!ext) {
+            console.warn("Extension not available:", extension);
+        }
+        gl.ext[extension] = ext;
+    }
+    // <-- kann man als Anfänger ignorieren, aber wir brauchen das später für Float-Texturen / Framebuffer
+
     const canvasRect = canvas.getBoundingClientRect();
     if (!geometry.height) {
         geometry.height = canvasRect.height;

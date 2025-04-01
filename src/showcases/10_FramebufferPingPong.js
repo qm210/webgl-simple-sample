@@ -2,14 +2,7 @@ import standardSetup from "./3_SimpleGeometry.js";
 import {startRenderLoop} from "../webgl/render.js";
 import {createFramebufferWithTexture, createTextureFromImage} from "../webgl/helpers.js";
 
-// import fragmentShaderSource from "../shaders/stochasticRayTracing_preparePingPong.glsl";
-// import fragmentShaderSource from "../shaders/stochasticRayTracing.glsl";
-
-// dieses Beispiel basiert auf dem bekannten "Ray Tracing In One Weekend" von Peter Shirley
-// https://raytracing.github.io/books/RayTracingInOneWeekend.html#wherenext?
-// siehe auch diese Implementierung von reinder:
-import fragmentShaderSource from "../shaders/stochasticRayTracing_fromTheBook.glsl";
-
+import fragmentShaderSource from "../shaders/framebufferPingPong.glsl";
 import someSampleImage from "../textures/mysterious_capybara.png";
 
 export default {
@@ -25,7 +18,10 @@ export default {
             createFramebufferWithTexture(gl, {
                 width: gl.drawingBufferWidth,
                 height: gl.drawingBufferHeight,
-                colorAttachment: gl.COLOR_ATTACHMENT0
+                colorAttachment: gl.COLOR_ATTACHMENT0,
+                // internalFormat: gl.RGBA32F,
+                // dataFormat: gl.RGBA,
+                // dataType: gl.FLOAT,
             })
         );
 
@@ -69,6 +65,19 @@ export default {
     ]
 };
 
+export function takePingPongFramebuffers(state) {
+    // "Frame Buffer Ping Pong": wir beschreiben die Framebuffer immer abwechselnd:
+    // "ping": write fbo 0, read texture 1
+    // "pong": write fbo 1, read texture 0
+    // etc.
+    const pingIndex = state.frameIndex % 2;
+    const pongIndex = 1 - pingIndex;
+    return {
+        write: state.framebuffer[pingIndex],
+        read: state.framebuffer[pongIndex],
+    }
+}
+
 function render(gl, state) {
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.bindTexture(gl.TEXTURE_2D, null);
@@ -81,14 +90,10 @@ function render(gl, state) {
     gl.bindTexture(gl.TEXTURE_2D, state.sampleTexture);
     gl.uniform1i(state.location.iSampleImage, 1);
 
-    // "Frame Buffer Ping Pong": wir beschreiben die Framebuffer immer abwechselnd:
-    // "ping": [fbo 0, texture 1]
-    // "pong": [fbo 1, texture 0]
-    // etc.
-    const pingIndex = state.frameIndex % 2;
-    const pongIndex = 1 - pingIndex;
-    const write = state.framebuffer[pingIndex];
-    const read = state.framebuffer[pongIndex];
+    const {write, read} = takePingPongFramebuffers(state);
+
+    // for us: stop after this loop.
+    // state.stopSignal = true;
 
     gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo);
     gl.activeTexture(gl.TEXTURE0);
@@ -101,6 +106,10 @@ function render(gl, state) {
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.uniform1i(state.location.passIndex, 1);
     gl.drawArrays(gl.TRIANGLES, 0, 6);
+    /*
+     * Wem das mit dem Ping Pong zu aufwändig vorkommt,
+     * hier ein bisschen Kontext, wie wir es sonst versuchen könnten:
+     */
 
     /**
      * Naivster Ansatz:

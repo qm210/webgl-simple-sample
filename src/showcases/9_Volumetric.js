@@ -39,5 +39,4 @@ function render(gl, state) {
     gl.uniform2fv(state.location.iResolution, state.resolution);
 
     gl.drawArrays(gl.TRIANGLES, 0, 6);
-
 }

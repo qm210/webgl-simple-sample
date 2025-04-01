@@ -9,6 +9,57 @@
 //
 // [1] http://in1weekend.blogspot.com/2016/01/ray-tracing-in-one-weekend.html
 //
+// Raytracing in one weekend, chapter 12: Where next? Created by Reinder Nijhoff 2018
+// Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International License.
+// @reindernijhoff
+//
+// https://www.shadertoy.com/view/XlycWh
+//
+// These shaders are my implementation of the raytracer described in the (excellent)
+// book "Raytracing in one weekend" [1] by Peter Shirley (@Peter_shirley). I have tried
+// to follow the code from his book as much as possible, but I had to make some changes
+// to get it running in a fragment shader:
+//
+// - There are no classes (and methods) in glsl so I use structs and functions instead.
+//   Inheritance is implemented by adding a type variable to the struct and adding ugly
+//   if/else statements to the (not so overloaded) functions.
+// - The scene description is procedurally implemented in the world_hit function to save
+//   memory.
+// - The color function is implemented using a loop because it is not possible to have a
+//   recursive function call in glsl.
+// - Only one sample per pixel per frame is calculated. Samples of all frames are added
+//   in Buffer A and averaged in the Image tab.
+//
+// You can find the raytracer / pathtracer in Buffer A.
+//
+// = Ray tracing in one week =
+// Chapter  7: Diffuse                           https://www.shadertoy.com/view/llVcDz
+// Chapter  9: Dielectrics                       https://www.shadertoy.com/view/MlVcDz
+// Chapter 11: Defocus blur                      https://www.shadertoy.com/view/XlGcWh
+// Chapter 12: Where next?                       https://www.shadertoy.com/view/XlycWh
+//
+// = Ray tracing: the next week =
+// Chapter  6: Rectangles and lights             https://www.shadertoy.com/view/4tGcWD
+// Chapter  7: Instances                         https://www.shadertoy.com/view/XlGcWD
+// Chapter  8: Volumes                           https://www.shadertoy.com/view/XtyyDD
+// Chapter  9: A Scene Testing All New Features  https://www.shadertoy.com/view/MtycDD
+//
+// This particular shader can be optimized (a lot) by using an acceleration structure,
+// as done in my shader "More spheres": https://www.shadertoy.com/view/lsX3DH
+//
+// [1] http://in1weekend.blogspot.com/2016/01/ray-tracing-in-one-weekend.html
+//
+
+
+#version 300 es
+precision highp float;
+out vec4 frag_color;
+
+uniform vec2 iResolution;
+uniform float iTime;
+uniform int iFrame;
+uniform int iPassIndex;
+uniform sampler2D iChannel0;
 
 #define MAX_FLOAT 1e5
 #define MAX_RECURSION (6+min(0,iFrame))
@@ -275,6 +326,10 @@ vec3 color(in ray r) {
         if (world_hit(r, 0.001, MAX_FLOAT, rec)) {
             ray scattered;
             vec3 attenuation;
+            // Demo: mal durchprobieren (siehe Definitionen oben)
+            // rec.mat.type = LAMBERTIAN;
+            // rec.mat.type = METAL;
+            // rec.mat.type = DIELECTRIC;
             if (material_scatter(r, rec, attenuation, scattered)) {
                 col *= attenuation;
                 r = scattered;
@@ -294,27 +349,52 @@ vec3 color(in ray r) {
 // Main
 //
 
-void mainImage( out vec4 frag_color, in vec2 frag_coord ) {
-    if (ivec2(frag_coord) == ivec2(0)) {
-        frag_color = iResolution.xyxy;
-    } else {
-        g_seed = float(base_hash(floatBitsToUint(frag_coord)))/float(0xffffffffU)+iTime;
-        // Abschalten der stochastischen Variation:
-        // g_seed = 0.;
+void main() {
+    float frame = float(iFrame + 1);
+    float frameScale = 1./float(iFrame + 1);
 
-        vec2 uv = (frag_coord + hash2(g_seed))/iResolution.xy;
-        float aspect = iResolution.x/iResolution.y;
-        vec3 lookfrom = vec3(13,2,3);
-        vec3 lookat = vec3(0);
+    vec2 st = gl_FragCoord.xy / iResolution.xy;
+    vec4 data = texture(iChannel0, st);
+    // vec4 data = texelFetch(iChannel0, ivec2(gl_FragCoord.xy), 0);
 
-        camera cam = camera_const(lookfrom, lookat, vec3(0,1,0), 20., aspect, .1, 10.);
-        ray r = camera_get_ray(cam, uv);
-        vec3 col = color(r);
+    g_seed = float(base_hash(floatBitsToUint(gl_FragCoord.xy)))/float(0xffffffffU)+iTime;
+    // Demo: Abschalten der stochastischen Variation:
+    // g_seed = 0.;
 
-        if (texelFetch(iChannel0, ivec2(0),0).xy == iResolution.xy) {
-            frag_color = vec4(col,1) + texelFetch(iChannel0, ivec2(frag_coord), 0);
-        } else {
-            frag_color = vec4(col,1);
-        }
+    vec2 uv = (gl_FragCoord.xy + hash2(g_seed))/iResolution.xy;
+    float aspect = iResolution.x/iResolution.y;
+    vec3 lookfrom = vec3(13,2,3);
+    vec3 lookat = vec3(0);
+
+    camera cam = camera_const(lookfrom, lookat, vec3(0,1,0), 20., aspect, .1, 10.);
+    ray r = camera_get_ray(cam, uv);
+    vec3 col = color(r);
+
+    if (iPassIndex == 1) {
+        // ähnlich wie im Framebuffer-Ping-Pong-Shader,
+        // aber noch mit Post Processing:
+        // - bisher Werte nur aufaddiert -> nimm Mittelwert
+        // - Einfaches Color Grading. ( Quadratwurzel sqrt(...) == pow(..., 0.5) )
+        // frag_color = vec4(sqrt(data.rgb), 1.);
+
+        frag_color = vec4(sqrt(data.rgb / data.a), 1.);
+
+        return;
     }
+
+    frag_color = vec4(col, 1);
+
+    if (iFrame > 0) {
+        frag_color += data;
+        //        frag_color += data; // texelFetch(iChannel0, ivec2(gl_FragCoord.xy), 0);
+    }
+
+    // cannot escape the alpha [0,1] clamping right now, so let's fake it.
+    // Maximum possible amount of hits equals iFrame;
+    // -> prescale it with 1./(iFrame + 1)
+
+
+    // hier wird in "alpha" die Anzahl der Treffer aufsummiert.
+    // dazu muss das Datenformat der Textur Werte größer 1 erlauben!
+
 }

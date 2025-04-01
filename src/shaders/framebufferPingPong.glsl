@@ -104,8 +104,13 @@ float hash14(vec2 p)
     return hash14(vec4(p, 1., 1.));
 }
 
-float onlyInRow(float y, float index, float divisions) {
-    float row = (y + 1.) * 0.5 * divisions;
+#define SCAN_DIVISIONS 100.
+
+#define RANDOM_SCANLINES 0
+#define DRAW_CAPYBARA 1
+
+float onlyOneDivision(float y, float index) {
+    float row = (y + 1.) * 0.5 * SCAN_DIVISIONS;
     return float(row >= index && row < index + 1.);
 }
 
@@ -128,31 +133,34 @@ void main() {
         )
     );
 
+    // Wir rendern hier mal zur Simulation pro Renderschritt ("Frame") nur einen Ausschnitt,
+    // um so zu tun, als ob es zu aufwändig wäre, das ganze Bild zu berechnen.
+    // -> s. Showcase für Stochastic Ray Tracing später
+
+    // Erstes Beispiel: Zeilen linear durchscannen, bei iFrame == SCAN_DIVISIONS von vorne anfangen
     float frame = float(iFrame);
-    float rowDivisions = 150.;
 
-    // Erster Versuch: linear durchscannen von unten nach oben (für die Demonstration)
-    float currentRowIndex = mod(frame, rowDivisions);
-    float onlyCurrentRow = onlyInRow(uv.y, currentRowIndex, rowDivisions);
+    #if RANDOM_SCANLINES
+        // Zweites Beispiel: Zugeordneten Zeilenindex pro Frame "random" wählen
+        frame = floor(hash14(vec2(frame, 1.)) * SCAN_DIVISIONS);
 
-    // Zweiter Versuch: "random"
-//    float randomRowIndex = rowDivisions * hash14(vec2(frame, 1.));
-//    onlyCurrentRow = onlyInRow(uv.y, randomRowIndex, rowDivisions);
+    #endif
 
-    // Nächstes Beispiel: Wir zeichnen nur ein Bild ab
-    // Problem: Zeitabhängigkeit, z.B. mal  c.yx * 0.05 * iTime bewegen -- Scanzeilen kommen kaum hinterher
-//    float scrollY = .0;
-//    vec2 imageSt = fract(0.5 * (uv + c.yx) + scrollY * c.yx * iTime);
-//    imageSt.y = 1. - imageSt.y; // Erinnerung: Unterschied in der Konvention, wo bei einem Bild "oben" ist
-//    col = texture(iSampleImage, imageSt).rgb;
+    float currentRowIndex = mod(frame, SCAN_DIVISIONS);
+    float onlyInRow = onlyOneDivision(uv.y, currentRowIndex);
 
-    col *= onlyCurrentRow;
+    #if DRAW_CAPYBARA
+        // Nächstes Beispiel: Wir zeichnen ein Bild aus einer Textur ab
+        // Problem: Zeitabhängigkeit, z.B. mal  c.yx * 0.05 * iTime bewegen -- Scanzeilen kommen kaum hinterher
+        float scrollY = .0;
+        vec2 imageSt = fract(0.5 * (uv + c.yx) + scrollY * c.yx * iTime);
+        imageSt.y = 1. - imageSt.y; // Erinnerung: Unterschied in der Konvention, wo bei einem Bild "oben" ist
+        col = texture(iSampleImage, imageSt).rgb;
+
+    #endif
+
+    col *= onlyInRow;
     fragColor = vec4(col, 1.);
-
-    if (iFrame == 0) {
-        // Im ersten Frame gibt es ja kein altes Bild. Was will man tun.
-        return;
-    }
 
     // Vergleich zum Test: in der rechten Hälfte mischen wir das alte Bild bei.
     if (uv.x > 0.) {
@@ -161,9 +169,9 @@ void main() {
 
         // Nur zum ersten Check -- Erinnerung: Bei max() gewinnt pro RGB-Wert der Hellere.
         // (Ist wenig sinnvoll, wenn z.B: "Grün" durch "Rot" aktualisiert wird und dann "Gelb" rauskommt.)
-        // Reicht aber um zu sehen dass die Methode funktioniert.
+        // Reicht aber um zu sehen dass die Methode funktioniert. Auch nur für die Demo eingebaut:
         // Der Faktor (leicht unterhalb 1) hier mal nur, damit nicht all zu alte Farben stehen bleiben.
-        fragColor.rgb = max(col, renderResult.rgb * 0.95);
+        fragColor.rgb = max(col, renderResult.rgb * 0.98);
 
         /*
         vec3 previousOklab = rgb2oklab(renderResult.rgb);

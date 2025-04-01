@@ -18,6 +18,7 @@ export function startRenderLoop (renderFunction, state, elements) {
     cancelAnimationFrame(state.animationFrame);
     state.startTime = performance.now();
     state.frameIndex = -1;
+    state.stopSignal = false;
     state.animationFrame = requestAnimationFrame(() =>
         runLoop(renderFunction, state, elements)
     );
@@ -30,6 +31,10 @@ function runLoop(renderFunction, state, elements) {
     renderFunction(state);
 
     elements.iTime.innerHTML = state.time.toFixed(2) + " sec";
+
+    if (state.stopSignal) {
+        return;
+    }
 
     requestAnimationFrame(() =>
         runLoop(renderFunction, state, elements)

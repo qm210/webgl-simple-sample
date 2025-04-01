@@ -99,12 +99,22 @@ export function createTextureFromImage(gl, imageSource, options) {
 }
 
 export function createFramebufferWithTexture(gl, options) {
+    const width = options?.width ?? gl.drawingBufferWidth;
+    const height = options?.height ?? gl.drawingBufferHeight;
+
     const wrapS = options?.wrapS ?? gl.CLAMP_TO_EDGE;
     const wrapT = options?.wrapT ?? gl.CLAMP_TO_EDGE;
     const minFilter = options?.minFilter ?? gl.LINEAR;
     const magFilter = options?.magFilter ?? gl.LINEAR;
-    const width = options?.width ?? gl.drawingBufferWidth;
-    const height = options?.height ?? gl.drawingBufferHeight;
+
+    // Diese Parameter beschreiben den Typ der geschriebenen Pixeldaten.
+    // ACHTUNG: Diese müssen aufeinander abgestimmt sein. Wird sonst nicht klappen.
+    // https://registry.khronos.org/OpenGL-Refpages/gl4/html/glTexImage2D.xhtml
+    const internalFormat = options?.internalFormat ?? gl.RGBA8;
+    const dataFormat = options?.dataFormat ?? gl.RGBA;
+    const dataType = options?.dataType ?? gl.UNSIGNED_BYTE;
+
+    // Attachment beschreiben die Direktverknüpfung zwischen einer Textur und einem Framebuffer
     const colorAttachment = options?.colorAttachment ?? gl.COLOR_ATTACHMENT0;
 
     const texture = gl.createTexture();
@@ -114,8 +124,11 @@ export function createFramebufferWithTexture(gl, options) {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, wrapS);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, wrapT);
 
-    // Alloziert den Speicher, lässt ihn aber leer (letztes Argument: null)
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+    // Alloziert den Speicher, lässt ihn aber - siehe letztes Argument - leer
+    gl.texImage2D(gl.TEXTURE_2D, 0, internalFormat, width, height, 0, dataFormat, dataType, null);
+    // gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, width, height, 0, gl.RGBA, gl.FLOAT, null);
+    // gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+
 
     const fbo = gl.createFramebuffer();
     gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
@@ -124,9 +137,7 @@ export function createFramebufferWithTexture(gl, options) {
     gl.framebufferTexture2D(gl.FRAMEBUFFER, colorAttachment, gl.TEXTURE_2D, texture, 0 );
 
     const status = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
-    if (status !== gl.FRAMEBUFFER_COMPLETE) {
-        console.error("[GL] Framebuffer creation failed, status flag:", status);
-    }
+    warnAboutBadFramebufferStatus(gl, status);
 
     // Kann (und sollte) jetzt aufgeräumt werden, Attachment gilt weiterhin.
     gl.bindTexture(gl.TEXTURE_2D, null);
@@ -137,4 +148,23 @@ export function createFramebufferWithTexture(gl, options) {
         fbo,
         status
     };
+}
+
+function warnAboutBadFramebufferStatus(gl, status) {
+    switch (status) {
+        case gl.FRAMEBUFFER_COMPLETE:
+            // der Wunschzustand.
+            break;
+        case gl.FRAMEBUFFER_INCOMPLETE_ATTACHMENT:
+            console.error('FRAMEBUFFER_INCOMPLETE_ATTACHMENT: Attachment is not renderable');
+            break;
+        case gl.FRAMEBUFFER_INCOMPLETE_MISSING_ATTACHMENT:
+            console.error('FRAMEBUFFER_INCOMPLETE_MISSING_ATTACHMENT: No valid attachments');
+            break;
+        case gl.FRAMEBUFFER_UNSUPPORTED:
+            console.error('FRAMEBUFFER_UNSUPPORTED: Combination of internal formats used by attachments is not supported');
+            break;
+        default:
+            console.error('Framebuffer error:', status);
+    }
 }

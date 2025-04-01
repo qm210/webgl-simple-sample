@@ -4,9 +4,9 @@ out vec4 fragColor;
 uniform vec2 iResolution;
 uniform float iTime;
 
-//uniform float focusDistance;
-//uniform float focalLength;
-//uniform float aperture;
+uniform float focusDistance;
+uniform float focalLength;
+uniform float aperture;
 
 uniform sampler2D iImage;
 
@@ -267,7 +267,7 @@ float gold_noise(in vec2 xy, in float seed) {
 #define VIGNETTE 1
 #define GRAYSCALE 0
 #define OKLCH_TRANSFORMATION 1
-#define DEPTH_OF_FIELD 0
+#define DEPTH_OF_FIELD 1
 
 void main() {
     vec2 uv = (2.0 * gl_FragCoord.xy - iResolution.xy) / iResolution.y;
@@ -300,10 +300,10 @@ void main() {
     float sd = image.w * 100.;
 
     #if DEPTH_OF_FIELD == 1
-        float focusDistance = 5.;
-        float focalLength = 2.5;
-        float aperture = 0.5;
-        // <-- können auch über uniforms kommen :)
+        // Parameter kommen über Uniforms rein, aber wir könnten hier im Scope auch lokal andere definieren:
+//        float focusDistance = 5.;
+//        float focalLength = 2.5;
+//        float aperture = 5.0;
         float coc = abs(
             (focalLength * (focusDistance - sd)) / (sd * (focusDistance - focalLength)) * aperture
         );
