@@ -13,7 +13,7 @@ import showcase9 from "./showcases/9_FramebufferPingPong.js";
 import showcase10 from "./showcases/10_StochasticRayTracing.js";
 import showcase11 from "./showcases/11_Volumetric.js";
 
-const defaultShowcase = showcase8;
+const defaultShowcase = showcase1;
 
 export function selectShowcase() {
 
