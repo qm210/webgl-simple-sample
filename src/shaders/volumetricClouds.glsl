@@ -346,7 +346,7 @@ float QueryVolumetricDistanceField( in vec3 pos)
     vec3 cloudPos = vec3(-8.0, 6.0, -1);
     float sdfValue = sdSphere(pos, cloudPos, 8.0);
     cloudPos += vec3(.0, 11. + 6. * sin(1.33 * iTime), 0);
-    sdfValue = sdSmoothUnion(sdfValue,sdSphere(pos, cloudPos, 4.5), 8.0f + 6. * sin(iTime));
+    sdfValue = sdSmoothUnion(sdfValue,sdSphere(pos, cloudPos, 3.), 8.0f + 6. * sin(iTime));
 //    sdfValue = sdSmoothUnion(sdfValue, sdSphere(pos, vec3(5.0 * sin(iTime), 3.0, 0), 8.0), 3.0) + 7.0 * fbm_4(fbmCoord / 3.2);
     //sdfValue = sdSmoothUnion(sdfValue, sdPlane(pos + vec3(0, 0.4, 0)), 22.0);
     return sdfValue;

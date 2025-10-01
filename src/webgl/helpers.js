@@ -92,7 +92,7 @@ export function createTextureFromImage(gl, imageSource, options) {
             gl.RGBA,
             gl.UNSIGNED_BYTE,
             img
-        )
+        );
     });
 
     return texture;

@@ -11,15 +11,15 @@ uniform float iCameraTilt;
 uniform sampler2D iTexture0;
 uniform sampler2D iTexture1;
 uniform sampler2D iTexture2;
-uniform sampler2D iBumpMap;
 
 const int MATERIAL_CONST = 0;
 const int MATERIAL_BOX = 1;
 const int MATERIAL_FLOOR = 2;
+const int MATERIAL_SPHERE = 3;
 
 const float pi = 3.141593;
 
-const int MAX_MARCHING_STEPS = 255;
+const int MAX_MARCHING_STEPS = 125;
 const float MIN_DIST = 0.0;
 const float MAX_DIST = 100.0;
 const float PRECISION = 0.001;
@@ -71,14 +71,14 @@ mat3 identity() {
     return diagonalMatrix(1., 1., 1.);
 }
 
-struct Surface {
+struct MarchResult {
     float sd; // Abstand des Rays vom Objekt
-    vec3 col; // <-- die Objekte dürfen eine intrinsische Farbe haben
+    vec3 col; // <-- die Objekte hatten bisher nur eine intrinsische Farbe
     int material; // wir verlagern die Zuweisung der Farben auf nach dem Ray Marching...
-    vec2 uv; // wir müssen aber mitführen
+    vec2 uv; // wir müssen die Oberflächenkoodinaten kennen für Texturen
 };
 
-void wobbleDistort(inout Surface surface, vec3 p, float amp, vec3 scale) {
+void wobbleDistort(inout MarchResult surface, vec3 p, float amp, vec3 scale) {
     surface.sd += amp * sin(scale.x*p.x) * sin(scale.y*p.y) * sin(scale.z*p.z);
 }
 
@@ -89,36 +89,40 @@ float checkerboard(vec2 p, float scale) {
 
 float surfaceCheckerPattern(vec3 p, float checkerSize) {
     vec2 surface = vec2(
-        atan(p.z, p.x) / (2. * 3.14159) + 0.5,
+        atan(p.z, p.x) / (2. * pi) + 0.5,
         p.y / 2. + 0.5
     );
     return checkerboard(surface, checkerSize);
 }
 
-Surface sdPatternSphere( vec3 p, vec3 b, vec3 offset, vec3 col, mat3 transform, vec3 checkerCol, float nSegments) {
+MarchResult sdPatternSphere( vec3 p, vec3 b, vec3 offset, vec3 col, mat3 transform, vec3 checkerCol, float nSegments) {
     p = (p - offset) * transform;
     vec3 q = abs(p) - b;
     float d = length(p / b) - 1.;
     col = mix(col, checkerCol, surfaceCheckerPattern(p, nSegments));
-    return Surface(d, col, 0, vec2(0.));
+    vec2 surface = vec2(
+    atan(p.z, p.x) / (2. * pi) + 0.5,
+    p.y / 2. + 0.5
+    );
+    return MarchResult(d, col, MATERIAL_SPHERE, surface);
 }
 
-Surface sdSphere( vec3 p, vec3 b, vec3 offset, vec3 col, mat3 transform) {
+MarchResult sdSphere( vec3 p, vec3 b, vec3 offset, vec3 col, mat3 transform) {
     p = (p - offset) * transform;
     vec3 q = abs(p) - b;
     float d = length(p / b) - 1.;
-    return Surface(d, col, 0, vec2(0));
+    return MarchResult(d, col, 0, vec2(0));
 }
 
-Surface sdBox( vec3 p, vec3 b, vec3 offset, vec3 col, mat3 transform) {
+MarchResult sdBox( vec3 p, vec3 b, vec3 offset, vec3 col, mat3 transform) {
     p = (p - offset) * transform;
     vec3 q = abs(p) - b;
     float d = length(max(q,0.0)) + min(max(q.x,max(q.y,q.z)),0.0);
-    return Surface(d, col, 0, vec2(0));
+    return MarchResult(d, col, 0, vec2(0));
 }
 
-Surface sdTexturedBox( vec3 p, vec3 b, vec3 offset, vec3 col, mat3 transform) {
-    p = (p - offset) * transform;
+MarchResult sdTexturedBox( vec3 p, vec3 b, vec3 offset, vec3 col, mat3 transform) {
+    p = p - offset * transform;
     vec3 q = abs(p) - b;
     float d = length(max(q,0.0)) + min(max(q.x,max(q.y,q.z)),0.0);
 
@@ -136,6 +140,8 @@ Surface sdTexturedBox( vec3 p, vec3 b, vec3 offset, vec3 col, mat3 transform) {
         0.5 + a.x,
         0.5 - a.z // aber zu Farbmischungen kommen wir noch.
     );
+
+    int material = MATERIAL_BOX;
 
     vec2 uv;
     // Um Zuordnung zu verstehen:
@@ -162,10 +168,10 @@ Surface sdTexturedBox( vec3 p, vec3 b, vec3 offset, vec3 col, mat3 transform) {
 //        step(0.5, abs(a.x))
 //    );
 
-    return Surface(d, col, MATERIAL_BOX, uv);
+    return MarchResult(d, col, material, uv);
 }
 
-Surface sdTetraeder( vec3 p, vec3 b, vec3 offset, vec3 col, mat3 transform) {
+MarchResult sdTetraeder( vec3 p, vec3 b, vec3 offset, vec3 col, mat3 transform) {
     p = (p - offset) * transform;
     vec3 q = p / b;
     float d = sqrt(1./3.) * (
@@ -174,7 +180,7 @@ Surface sdTetraeder( vec3 p, vec3 b, vec3 offset, vec3 col, mat3 transform) {
             abs(q.x-q.y)+q.z
         )-1.);
     vec2 uv = q.xy;
-    return Surface(d, col, MATERIAL_BOX, uv);
+    return MarchResult(d, col, MATERIAL_BOX, uv);
 }
 
 float dot2( in vec3 v ) { return dot(v,v); }
@@ -199,17 +205,21 @@ float udTriangle( vec3 p, vec3 a, vec3 b, vec3 c )
     dot(nor,pa)*dot(nor,pa)/dot2(nor) );
 }
 
-Surface sdTriangle( vec3 p, vec3 b, vec3 offset, vec3 col, mat3 transform) {
-    // was heißt es bildlich, das auszukommentieren?
-    p = (p - offset) * transform;
+#define SIMPLE_TRIANGLE 0
 
+MarchResult sdTriangle( vec3 p, vec3 b, vec3 offset, vec3 col, mat3 transform) {
     vec3 v1 = vec3(b.x, 0., 0.);
     vec3 v2 = vec3(0., b.y, 0.);
     vec3 v3 = vec3(0., 0., b.z);
-//
-//    v1 = vec3(0., 0.5 - 0.5 * cos(iTime), 0.);
-//    v2 = vec3(-1., 0., 0.);
-//    v3 = vec3(0., -1., 0.);
+
+    #if SIMPLE_TRIANGLE == 1
+        v1 = vec3(0., 0.,  0.);
+        v2 = vec3(-1., 0., 0.);
+        v3 = vec3(0., -1., 0.);
+    #else
+        p = (p - offset) * transform; // was passiert hiermit also bildlich?
+    #endif
+
 
     float d = udTriangle(p, v1, v2, v3);
 
@@ -229,7 +239,7 @@ Surface sdTriangle( vec3 p, vec3 b, vec3 offset, vec3 col, mat3 transform) {
 
     vec2 uv = vec2(u, 1. - v);
 
-    return Surface(d, col, MATERIAL_BOX, uv);
+    return MarchResult(d, col, MATERIAL_BOX, uv);
 }
 
 // Hash function for noise generation
@@ -276,7 +286,7 @@ float noise(vec2 p){
 }
 
 // Fractional Brownian Motion for low-frequency noise
-#define FBM_ITERATIONS 5
+#define FBM_ITERATIONS 6
 float fbm(vec2 p) {
     float f = 0.0;
     float amp = 0.5;
@@ -289,10 +299,10 @@ float fbm(vec2 p) {
 }
 
 float floorLevel = -2.;
-float noiseHeight = 5.; // was passiert bei zu hohen Werten, v.A. in Verbindung mit hohen FBM_ITERATIONS?
-float noiseFreq = 0.1;
+float noiseHeight = 3.; // was passiert bei zu hohen Werten, v.A. in Verbindung mit hohen FBM_ITERATIONS?
+float noiseFreq = 0.2;
 
-Surface sdFloor(vec3 p) {
+MarchResult sdFloor(vec3 p) {
     vec3 floorColor = vec3(1.);
     // bisher: wurde hier definiert -> man verfolge MATERIAL_FLOOR
     // floorColor = (0.5 + 0.15 * mod(floor(p.x) + floor(p.z), 4.0)) * vec3(0.9, 1., .95);
@@ -312,10 +322,10 @@ Surface sdFloor(vec3 p) {
 //    vec2 st = clamp(0.033 * p.xz + vec2(.5,.8), vec2(0), vec2(1));
 //    d += 3. * texture(iBumpMap, st).r;
 
-    return Surface(d, floorColor, MATERIAL_FLOOR, floorUv);
+    return MarchResult(d, floorColor, MATERIAL_FLOOR, floorUv);
 }
 
-Surface takeCloser(Surface obj1, Surface obj2) {
+MarchResult takeCloser(MarchResult obj1, MarchResult obj2) {
     if (obj2.sd < obj1.sd) {
         return obj2;
     }
@@ -324,40 +334,43 @@ Surface takeCloser(Surface obj1, Surface obj2) {
 
 vec3 firstCubePos = vec3(1.5, -0.87, -2.);
 
-Surface sdScene(vec3 p) {
-    Surface obj;
-    Surface co = sdFloor(p);
+MarchResult sdScene(vec3 p) {
+    MarchResult obj;
+    MarchResult co = sdFloor(p);
+
+    mat3 transform = rotateX(0.3 * iTime);
+//    obj = sdTriangle(p, vec3(1.), firstCubePos + vec3(-1.6,1.2 * sin(iTime),-2.6), vec3(0.2, 0.7, 0.9), transform);
+//    co = takeCloser(co, obj);
+
+    #if SIMPLE_TRIANGLE == 1
+        return co;
+    #endif
 
     obj = sdTexturedBox(p, vec3(0.6), firstCubePos, vec3(0.3, 0.65, 0.9), rotateX(-0.2 * pi + iTime));
     co = takeCloser(co, obj);
 
-    vec3 secondCubePos = firstCubePos + vec3(-3.0, 0., 0.);
-    // this is advanced. dithering the time parameter for less glitchs. ist echt so.
+    //    vec3 secondCubePos = firstCubePos + vec3(-3.0, 0., 0.);
+//    // this is advanced. dithering the time parameter for less glitchs. ist echt so.
 //    float phi = 20. * (iTime + 1.e-3 * hash14(p.xz));
 //    secondCubePos += 1. * vec3(cos(phi), 0., sin(phi));
-    mat3 transformLeft = rotateY(+0.3 * pi + iTime);
-    //transformLeft = identity();
-    obj = sdTexturedBox(p, vec3(0.6), secondCubePos, vec3(0.3, 0.65, 0.9), transformLeft);
-    co = takeCloser(co, obj);
-
-//    obj = sdTriangle(p, vec3(1.), firstCubePos + vec3(-3.,0.2 * sin(iTime),-.5), vec3(0.2, 0.7, 0.9), rotateY(iTime));
+//    mat3 transformLeft = rotateY(+0.3 * pi + iTime);
+//    //transformLeft = identity();
+//    obj = sdTexturedBox(p, vec3(0.6), secondCubePos, vec3(0.3, 0.65, 0.9), transformLeft);
 //    co = takeCloser(co, obj);
 
-    /*
     obj = sdPatternSphere(p, vec3(1.), vec3(-2., floorLevel + 1., -2.), vec3(1, 0.1, 0.8), identity(), vec3(0.5, 0.2, 0.8), 8.);
 
     mat3 ballTransform = rotateY(0.5 * iTime);
-    obj = sdSphere(p, vec3(1.), vec3(-2., floorLevel + 1., -2.), vec3(1, 0.6, 0.8), ballTransform);
+    // obj = sdSphere(p, vec3(1.), vec3(-2., floorLevel + 1., -2.), vec3(1, 0.6, 0.8), ballTransform);
     co = takeCloser(co, obj);
-    */
     return co;
 }
 
-void applyMaterial(inout Surface s, vec3 ray) {
+void applyMaterial(inout MarchResult s, vec3 ray) {
     if (s.material == MATERIAL_BOX) {
         s.col *= texture(iTexture0, s.uv).rgb;
         // Bock auf Holz?
-        float scale = 4.;
+        float scale = 1.;
         vec3 holz = texture(iTexture2, s.uv / scale).rgb;
         // naive Farbmischung: mal mit Grundrechenarten rumprobieren.
         // s.col = holz;
@@ -365,37 +378,25 @@ void applyMaterial(inout Surface s, vec3 ray) {
         // s.col = min(s.col, holz);
         // s.col = max(s.col, holz);
         // s.col = pow(s.col + holz, vec3(1.4));  // <-- etc... you know the drill
-        // s.col = mix(s.col, holz, 0.5);
+        // s.col = mix(s.col, holz, 0.5 + 0.5 * sin(iTime));
         // s.col = mix(s.col, holz, 0.5 - 0.5 * cos(iTime));
-//         s.col = 1. - (1. - s.col) * (1. - holz); // "Screen"
+        // s.col = 1. - (1. - s.col) * (1. - holz); // "Screen"
         // "Overlay":
 //        s.col = length(s.col) < 0.5
 //            ? 2. * s.col * holz
 //            : 1. - 2. * (1. - s.col) * (1. - holz);
-//         s.col = s.col - holz + 2. * s.col * holz; // "Soft Light"
+         s.col = s.col - holz + 2. * s.col * holz; // "Soft Light"
 //         s.col = holz - s.col + 2. * s.col * holz; // "Soft Light", invers
+    }
+    else if (s.material == MATERIAL_SPHERE) {
+        vec3 holz = texture(iTexture0, s.uv * 1.).rgb;
+        // holz = pow(holz, vec3(0.5));
+        s.col = holz;
     }
     else if (s.material == MATERIAL_FLOOR) {
         s.col *= (0.5 + 0.15 * mod(floor(ray.x) + floor(ray.z), 4.0)) * vec3(0.9, 1., .95);
     }
     s.col = clamp(s.col, vec3(0.), vec3(1.));
-}
-
-Surface rayMarch(vec3 ro, vec3 rd, float start, float end) {
-    float rayLength = start; // rayLength is usually just called t
-    Surface co;
-
-    for (int i = 0; i < MAX_MARCHING_STEPS; i++) {
-        co = sdScene(ro + rayLength * rd);
-        rayLength += co.sd;
-
-        if (co.sd < PRECISION || rayLength > end) {
-            break;
-        }
-    }
-
-    co.sd = rayLength;
-    return co;
 }
 
 float rayMarchShadow( in vec3 ro, in vec3 rd)
@@ -443,182 +444,57 @@ float gold_noise(in vec2 xy, in float seed) {
     return fract(tan(distance(xy * PHI, xy) * seed) * xy.x);
 }
 
+vec3 c = vec3(1,0,-1);
+
+MarchResult rayMarch(vec3 ro, vec3 rd) {
+    float rayLength = MIN_DIST;
+    MarchResult hit;
+
+    for (int i = 0; i < MAX_MARCHING_STEPS; i++) {
+        hit = sdScene(ro + rayLength * rd);
+        rayLength += hit.sd;
+
+        if (hit.sd < PRECISION || rayLength > MAX_DIST) {
+            break;
+        }
+    }
+
+    hit.sd = rayLength;
+    return hit;
+}
+
 void main() {
-    vec2 uv = (2.0 * gl_FragCoord.xy - iResolution.xy) / iResolution.y;
+    vec2 uv = (2.0 * gl_FragCoord.xy - iResolution) / iResolution.y;
 
-    // firstCubePos += 0.25 * cursorWalk;
-
-    // transform uv but only for background
-    vec2 bgUv = uv + 0.0 * vec2(0.1 * iTime, 0.);
-    float bgRotationSpeed = 0.0; // 0.1;
-    float bgScale = 1.; // z.B. mal 0.6 - wie üblich: invers denken
-    bgUv = bgScale * (rotateZ(bgRotationSpeed * iTime) * vec3(bgUv, 1.)).xy;
-    vec2 st = fract(bgUv);
-    vec4 bgColor = texture(iTexture1, st);
-
-    // Beispiel Textur-Processing: Radial Motion Blur
-    // man achte aber auf die Ecken -> Granularität sichtbar
-//    bgColor.xyz = vec3(0);
-//    float blurSteps = 32.;
-//    float blurLength = 5.;
-//    float phi = 0.03 * iTime;
-//    for (float step=0.; step < blurSteps; step += 1.) {
-//        phi -= 0.005;
-//        bgUv = (rotateZ(phi) * vec3(uv, 1.)).xy;
-//        st = fract(bgUv);
-//        vec3 texColor = texture(iTexture1, st).xyz * exp(-step / blurLength);
-//        bgColor.xyz = max(texColor, bgColor.xyz);
-//    }
-
-    // anderes Beispiel: Radial Blur
-//    bgColor.xyz = vec3(0);
-//    float blurSteps = 32.;
-//    float blurLength = 15.;
-//    float factor = 0.005;
-//    vec2 center = vec2(0., 0.6 + 0.2 * sin(iTime));
-//    for (float step=0.; step < blurSteps; step += 1.) {
-//        bgScale = 1. + factor * step;
-//        bgUv = bgScale * (uv - center) + center;
-//        st = fract(bgUv);
-//        vec3 texColor = texture(iTexture1, st).xyz * exp(-step / blurLength);
-//        bgColor.xyz = max(texColor, bgColor.xyz);
-//    }
-
+    vec4 bgColor = c.xyxx;
     vec4 col = vec4(0.);
     float d;
 
-    float fov = iFieldOfView * pi / 180.;
-    vec3 ro = vec3(0., 0., 1.) + 0.25 * cursorWalk;
-    float uvz = -1. / tan(fov / 2.);
-    vec3 rd = normalize(vec3(uv, uvz));
-    rd *= rotateX(iCameraTilt * pi / 180.);
+    vec3 ro = vec3(0., -.5, 1.);
+    vec3 rd = normalize(vec3(uv, -1.23));
 
-    Surface co = rayMarch(ro, rd, MIN_DIST, MAX_DIST);
+    MarchResult hit = rayMarch(ro, rd);
 
-    if (co.sd < MAX_DIST) {
-        vec3 p = ro + rd * co.sd;
-        applyMaterial(co, p);
+    if (hit.sd < MAX_DIST) {
+        vec3 p = ro + rd * hit.sd;
+        applyMaterial(hit, p);
+
         vec3 normal = calcNormal(p);
-        vec3 lightPosition = vec3(1.5, 3., 2.);
-        lightPosition.x += 5. * cos(iTime);
-        lightPosition.z += 3. * sin(iTime);
-        vec3 lightDirection = normalize(lightPosition - p);
 
-        float lightArea = clamp(dot(rd, lightDirection), 0., 1.);
+        vec3 lightDirection = normalize(vec3(-1, 1, 1));
 
-        // lightDirection = normalize(vec3(2. * cos(iTime), 0.5, 0.));
-        // lightDirection = normalize(vec3(0., 1., 0.));
+        vec3 r = reflect(lightDirection, normal);
+        float shadeA = dot(r, normalize(p));
+        shadeA = clamp(shadeA, 0., 1.);
+        shadeA = pow(shadeA, 0.1);
 
-        // Erinnerung: _irgendwie_ muss Abstand "d" zu einer Farbe werden.
-        // wie, sind quasi nur noch die Details :)
-        // d = co.sd;
-        d = clamp(co.sd, 0., 1.);
+        float shadeB = dot(normal, lightDirection);
+        shadeB = clamp(shadeB, 0., 1.);
 
-        // could also have parallel light
-        // lightDirection = normalize(vec3(0., 1., 0.));
-
-        // Lambertian reflection:
-        // proportional to amount of light hitting the surface
-        // i.e. dot(normal, lightDir) ~ large if Angle between normal and light is low
-        // Quasi "perfekte" Diffusion, warum?
-        float diffuse = dot(normal, lightDirection);
-        diffuse = clamp(diffuse, 0., 1.);
-        d = mix(d, diffuse, 1.);
-
-        // sekundäres Ray Marching für Schatten
-        float shadow = rayMarchShadow(p, lightDirection);
-        d = mix(d, shadow, 0.8);
-
-        // Specular reflection:
-        // proportional to angle between ray and reflections
-        vec3 refl = reflect(lightDirection, normal);
-        float specular = dot(refl, normalize(p));
-        specular = clamp(specular, 0., 1.);
-        specular = pow(specular, 3.);
-        // Idee: unterschiedliche Materialien spiegeln unterschiedlich stark.
-        specular = co.material == MATERIAL_FLOOR ? 0.1 : 1.;
-
-        d = mix(d, specular, 0.5);
-
-
-        // verschiedenartiges Color Grading
-        // col.xyz = pow(co.sd, 0.1) * co.col;
-
-        col.xyz = pow(d, 0.3) * co.col;
-
-        //        dif = mix(dif, co.sd, 0.03);
-        //        dif = mix(dif, dif * co.sd, 0.24);
-        //        float clamped_dif = clamp(dif, 0., 1.);
-        //        float graded_dif = atan(dif);
-        //        dif = mix(clamped_dif, graded_dif, 1.);
-        //        dif = pow(dif, 2.);
-
-        // aufhellen, je mehr Blick Richtung Licht
-        //col.xyz = mix(col.xyz, vec3(1), pow(clamp(dot(p, lightDirection), 0., 1.), 100.));
-        // float richtungInsLicht = clamp(dot(rd, lightPosition - ro), 0., 1.);
-        // col.xyz *= exp(-1. * (1. - richtungInsLicht));
-
-        col.xyz = mix(col.xyz, vec3(1), pow(lightArea, 9.));
-
-        // Distance Fog: Abschwächen je nach durchlaufenem Abstand
-        float fog = exp(-0.00001 * pow(co.sd, 4.));
-        col.xyz *= fog;
-        col.a = step(0.1, fog);
-        // col.a = exp(-0.0001 * pow(co.sd, 3.));
-        // col.a = 1. - clamp(pow(length(col.xyz), 50.), 0., 1.);
+        d = mix(shadeB, shadeA, .5);
+        col.xyz = pow(d, 0.3) * hit.col;
+        col.a = exp(-0.2 * hit.sd);
     }
 
-    // Beispiel Post-Processing (transformiert nur noch Farbe -> Farbe, nicht mehr Geometrie)
-    // col = atan(8. * pow(col, vec3(5.)));
-
-//    float rnd;
-//    rnd = fract(1000000. * sin(321231. * uv.x + 34928. * uv.y)); // see it flickering?
-//    rnd = hash14(floor(0.1 * gl_FragCoord));
-//    col.xyz = vec3(rnd);
-
-    //uv = floor(2. * uv);
-
-
-//    rnd = fract(
-//        sin(
-//            dot(uv.xy, vec2(12.9898,78.233))
-//        ) * 43758.5453123
-//    );
-
-    // exkursion ins pseudochaos
-//    col.xyz = vec3(1.);
-//    col.xyz *= rnd;
-//    col.a = 1.;
-
-    // col.xyz = vec3(gold_noise(uv, iTime));
-
-
     fragColor = mix(bgColor, vec4(col.xyz, 1.), col.a);
-    //fragColor = mix(backgroundColor, col, col.a);
-
-    // quick check: so sähe das direkt gemappt aus.
-    // Man achte auf die Werte der Koordinaten und die Texturparameter.
-    // (v.A. bei einer Textur, die keinen schwarzen Rand hat.)
-//    fragColor = texture(iTexture2, uv);
-
-    // Post Processing - Vignette
-    vec3 post = fragColor.xyz;
-
-    //    post *= exp( -0.03 * pow(length(uv), 5.7));
-//    post = clamp(post, 0.0, 1.0);
-//    post = pow(post, vec3(0.7));
-//    post = post * 0.4 + 0.6 * smoothstep(vec3(0), vec3(1), post) + vec3(0.0,0.0,0.04);
-//
-    // Einfacher RGB-basierter Filter wäre z.B. so einer. Aber damit geht nicht viel.
-    // post.r = max(post.g, post.b);
-
-    // --> verschoben auf multiPassPost.glsl, wird in 8_Multipass.js als 2nd Pass genutzt.
-
-    fragColor.xyz = post;
-
-    // wenn wir Alpha ignorieren, haben wir noch Platz für einen Parameter in den 2nd Pass
-    // ohne dass wir unsere Pipeline anfassen müssen (ansonsten: mehr Framebuffer).
-    // wir merken uns die Signed Distance vom Raymarching, weil das für Depth-of-Field nützlich ist.
-    // aber: Alpha-Werte sind von 0 bis 1 begrenzt, also müssen wir skalieren. (s. MAX_DIST)
-    fragColor.w = co.sd / MAX_DIST;
 }

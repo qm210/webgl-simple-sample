@@ -106,8 +106,8 @@ float hash14(vec2 p)
 
 #define SCAN_DIVISIONS 120.
 
-#define RANDOM_SCANLINES 0
-#define DRAW_CAPYBARA 0
+#define RANDOM_SCANLINES 1
+#define DRAW_CAPYBARA 1
 
 float onlyOneDivision(float y, float index) {
     float row = (y + 1.) * 0.5 * SCAN_DIVISIONS;
@@ -171,7 +171,7 @@ void main() {
         // (Ist wenig sinnvoll, wenn z.B: "Grün" durch "Rot" aktualisiert wird und dann "Gelb" rauskommt.)
         // Reicht aber um zu sehen dass die Methode funktioniert. Auch nur für die Demo eingebaut:
         // Der Faktor (leicht unterhalb 1) hier mal nur, damit nicht all zu alte Farben stehen bleiben.
-        fragColor.rgb = max(col, renderResult.rgb * 0.98);
+        fragColor.rgb = max(col, renderResult.rgb * 1.);
 
         /*
         vec3 previousOklab = rgb2oklab(renderResult.rgb);
