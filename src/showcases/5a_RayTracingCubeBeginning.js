@@ -1,5 +1,5 @@
 // we now take the end state of VL3 as a basis
-import simpleGeometrySetup from "./3_SimpleGeometry.js";
+import simpleGeometrySetup from "./retired/3_SimpleGeometry.js";
 
 import fragmentShaderSource from "../shaders/spring-2025/cubeRayMarchingBeginning.glsl";
 

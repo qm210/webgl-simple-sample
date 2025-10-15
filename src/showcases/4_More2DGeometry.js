@@ -1,5 +1,5 @@
 // we now take the end state of VL3 as a basis
-import standardSetup from "./3_SimpleGeometry.js";
+import standardSetup from "./retired/3_SimpleGeometry.js";
 
 import fragmentShaderSource from "../shaders/spring-2025/moreGeometry.glsl";
 

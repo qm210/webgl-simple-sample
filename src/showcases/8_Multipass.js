@@ -1,4 +1,4 @@
-import standardSetup from "./3_SimpleGeometry.js";
+import standardSetup from "./retired/3_SimpleGeometry.js";
 import {startRenderLoop} from "../webgl/render.js";
 import {createTextureFromImage} from "../webgl/helpers.js";
 

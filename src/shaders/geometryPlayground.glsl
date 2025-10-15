@@ -10,7 +10,7 @@ out vec4 fragColor;
 
 uniform vec2 iResolution;
 uniform float iTime;
-uniform float iWhatever;
+uniform float helloThere;
 
 vec4 c = vec4(1., 0., -1., .5);
 
@@ -60,7 +60,10 @@ float sdEquilateralTriangle(vec2 p, float size) {
 }
 
 float hash(float n) {
+    // _eine_ Möglichkeit für pseudorandom.
     return fract(sin(n) * 43758.5453123);
+    // return fract(n * 17.0 * fract(n * 0.3183099));
+    // könnte auch
 }
 
 float smootherstep(float x) {
@@ -227,15 +230,13 @@ void vectorStuff(inout vec3  col, in vec2 uv) {
     d = arrow(col, uv, someShift + vecF, someShift + vecF + vecGF);
     col = mix(col, c.wyx, d);
 
-    demonstrateNormalVector(col, uv);
+    // demonstrateNormalVector(col, uv);
 }
 
 void main() {
     vec2 uv = (2. * gl_FragCoord.xy - iResolution.xy) / iResolution.y;
 
-    vec3 col = 0.5 + 0.5*cos(uv.xyx+vec3(4, 0, 4));
-
-    col.b = 0.2 * iWhatever;
+    vec3 col = 0.5 + 0.25 * cos(uv.xyx + vec3(4, 0, 4));
 
     if (length(uv) < 0.04) {
         col = vec3(0);
@@ -308,6 +309,10 @@ void main() {
     vectorStuff(col, uv);
 
     whatAmI(col, uv);
+
+    // Beispiel: Color Grading (Gammakorrektur) - nächste Woche mehr zu Farben
+    float contrast = helloThere;
+    col = (col - 0.5) * contrast + 0.5;
 
     // Output to screen
     fragColor = vec4(col, 1.0);
