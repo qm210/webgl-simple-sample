@@ -178,16 +178,18 @@ export const addFloatInput = (parent, state, control) => {
     function update(full = false) {
         const value = round(state[control.name]);
         if (full) {
-            const defaultMin = value === 0
-                ? -1
-                : value < 0
-                    ? 2 * value
-                    : 0;
-            const defaultMax = value === 0
-                ? +1
-                : value > 0
-                    ? 2 * value
-                    : 0;
+            const defaultMin =
+                value === 0
+                    ? -1
+                    : value < 0
+                        ? 2 * value
+                        : 0;
+            const defaultMax =
+                value === 0
+                    ? +1
+                    : value > 0
+                        ? 2 * value
+                        : 0;
             input.min = control.min ?? round(defaultMin);
             input.max = control.max ?? round(defaultMax);
             minLabel.textContent = (+input.min).toFixed(digits);

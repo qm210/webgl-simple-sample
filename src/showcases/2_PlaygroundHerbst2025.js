@@ -1,11 +1,11 @@
 import {compile, createStaticVertexBuffer, initVertices} from "../webgl/setup.js";
 
-import vertexShaderSource from "../shaders/basic.vertex.glsl";
-import fragmentShaderSource from "../shaders/shadertoyFixed.glsl";
+import vertexShaderSource from "../shaders/playground.vertex.glsl";
+import fragmentShaderSource from "../shaders/fragmentPlayground.glsl";
 
 
 export default {
-    title: "Hello Shadertoy (fixed)",
+    title: "Fragment Shader Playground",
     init: (gl) => {
         createStaticVertexBuffer(
             gl,
@@ -19,15 +19,15 @@ export default {
 
         initVertices(gl, state, "aPosition");
 
-        // oh hey, look at this! (optional)
         gl.clearColor(0.0, 0.0, 0.0, 1.0);
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
         state.location.iTime = gl.getUniformLocation(state.program, "iTime");
         state.location.iResolution = gl.getUniformLocation(state.program, "iResolution");
-
-        // custom field, why not add right here.
+        state.location.iWhatever = gl.getUniformLocation(state.program, "iWhatever");
         state.resolution = [gl.drawingBufferWidth, gl.drawingBufferHeight];
+
+        console.log(state);
 
         return state;
     },
@@ -44,6 +44,12 @@ export default {
     }, {
         type: "label",
         name: "iTime",
+    }, {
+        type: "floatInput",
+        name: "iWhatever",
+        defaultValue: 1.00,
+        min: 0,
+        max: 100.,
     }]
 }
 
@@ -54,6 +60,7 @@ function renderLoop(gl, state, elements) {
 
     gl.uniform1f(state.location.iTime, state.time);
     gl.uniform2fv(state.location.iResolution, state.resolution);
+    gl.uniform1f(state.location.iWhatever, state.iWhatever)
 
     gl.drawArrays(gl.TRIANGLES, 0, 6);
 

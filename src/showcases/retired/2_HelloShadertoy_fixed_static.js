@@ -1,7 +1,7 @@
-import {compile, createStaticVertexBuffer, initVertices} from "../webgl/setup.js";
+import {compile, createStaticVertexBuffer, initVertices} from "../../webgl/setup.js";
 
-import vertexShaderSource from "../shaders/basic.vertex.glsl";
-import fragmentShaderSource from "../shaders/shadertoyFixed.glsl";
+import vertexShaderSource from "../../shaders/basic.vertex.glsl";
+import fragmentShaderSource from "../../shaders/spring-2025/shadertoyFixed.glsl";
 
 
 export default {

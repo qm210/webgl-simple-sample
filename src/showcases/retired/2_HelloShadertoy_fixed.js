@@ -1,13 +1,12 @@
-import {compile, createStaticVertexBuffer, initVertices} from "../webgl/setup.js";
+import {compile, createStaticVertexBuffer, initVertices} from "../../webgl/setup.js";
 
-import vertexShaderSource from "../shaders/basic.vertex.glsl";
-import defaultFragmentShaderSource from "../shaders/spring-2025/simpleGeometry.glsl";
-import {startRenderLoop} from "../webgl/render.js";
-import {translateShaderToyFormat} from "../webgl/compatibility.js";
+import vertexShaderSource from "../../shaders/basic.vertex.glsl";
+import fragmentShaderSource from "../../shaders/spring-2025/shadertoyFixed.glsl";
+
 
 export default {
-    title: "Simple Geometry",
-    init: (gl, fragmentShaderSource = defaultFragmentShaderSource) => {
+    title: "Hello Shadertoy (fixed)",
+    init: (gl) => {
         createStaticVertexBuffer(
             gl,
             [-1, -1, +1, -1, -1, +1, -1, +1, +1, -1, +1, +1]
@@ -15,7 +14,6 @@ export default {
 
         const state = compile(gl, vertexShaderSource, fragmentShaderSource);
         if (!state.program) {
-            // remember: need to exist because otherwise we cannot display any errors...
             return state;
         }
 
@@ -37,27 +35,29 @@ export default {
         type: "renderButton",
         title: "Render",
         onClick: () => {
-            startRenderLoop(
-                state => render(gl, state),
-                state,
-                elements
-            );
+            cancelAnimationFrame(state.animationFrame);
+            state.startTime = performance.now();
+            state.animationFrame = requestAnimationFrame(
+                () => renderLoop(gl, state, elements)
+            )
         }
     }, {
         type: "label",
         name: "iTime",
     }]
-};
+}
 
-function render(gl, state) {
+function renderLoop(gl, state, elements) {
+    state.time = 0.001 * (performance.now() - state.startTime);
+
     gl.useProgram(state.program);
 
     gl.uniform1f(state.location.iTime, state.time);
-    try {
-        gl.uniform2fv(state.location.iResolution, state.resolution);
-    } catch (err) {
-        console.warn(err, state);
-    }
+    gl.uniform2fv(state.location.iResolution, state.resolution);
 
     gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+    elements.iTime.innerHTML = state.time.toFixed(2) + " sec";
+
+    requestAnimationFrame(() => renderLoop(gl, state, elements))
 }

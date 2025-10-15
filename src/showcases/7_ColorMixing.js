@@ -1,7 +1,7 @@
 import standardSetup from "./3_SimpleGeometry.js";
 import {startRenderLoop} from "../webgl/render.js";
 
-import fragmentShaderSource from "../shaders/colorMixing.glsl";
+import fragmentShaderSource from "../shaders/spring-2025/colorMixing.glsl";
 
 export default {
     title: "Color Mixing",
