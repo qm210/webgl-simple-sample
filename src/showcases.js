@@ -1,5 +1,5 @@
 import showcase1 from "./showcases/1_PlainColor.js";
-import showcase2 from "./showcases/2_PlaygroundHerbst2025.js";
+import showcase2 from "./showcases/2a_GeometryPlayground.js";
 import showcase3 from "./showcases/3_SimpleGeometry.js";
 import showcase4 from "./showcases/4_More2DGeometry.js";
 import showcase5a from "./showcases/5a_RayTracingCubeBeginning.js";

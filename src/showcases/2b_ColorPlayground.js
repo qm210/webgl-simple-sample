@@ -1,7 +1,7 @@
 import {compile, createStaticVertexBuffer, initVertices} from "../webgl/setup.js";
 
 import vertexShaderSource from "../shaders/playground.vertex.glsl";
-import fragmentShaderSource from "../shaders/fragmentPlayground.glsl";
+import fragmentShaderSource from "../shaders/geometryPlayground.glsl";
 
 
 export default {
@@ -49,7 +49,7 @@ export default {
         name: "iWhatever",
         defaultValue: 1.00,
         min: 0,
-        max: 100.,
+        max: 10.,
     }]
 }
 
