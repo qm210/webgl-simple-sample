@@ -10,7 +10,6 @@ uniform vec3 palA;
 uniform vec3 palB;
 uniform vec3 palC;
 uniform vec3 palD;
-uniform float iSeed;
 uniform float iWhatever;
 
 vec4 c = vec4(1., 0., -1., .5);
@@ -138,6 +137,9 @@ float sdCircle( in vec2 p, in float r )
 }
 
 vec3 cosPalette(float t, vec3 a, vec3 b, vec3 c, vec3 d){
+    // cf. https://iquilezles.org/articles/palettes/
+    //     https://dev.thi.ng/gradients/
+    //
     return a + b * cos(twoPi*(c * t + d));
 }
 
@@ -154,33 +156,28 @@ float polar(vec2 v) {
     return angle;
 }
 
-void applyGrid(inout vec3 col, in vec2 uv, bool right) {
+void applyGrid(inout vec3 col, in vec2 uv) {
     const float gridSize = 0.5;
-    float thick = 0.02;
     uv = mod(uv, gridSize);
     float dMin = min(uv.x, uv.y);
     float dMax = max(uv.x, uv.y);
-    float frame;
-    if (right) {
-        frame = step(thick, dMin);
-    } else {
-        thick /= 2.;
-        frame = step(thick, dMin) * step(dMax, gridSize - thick);
-    }
+    float thick = 0.01;
+    float frame = step(thick, dMin) * step(dMax, gridSize - thick);
     // note: in 1D this is the same, but in 2D these differ:
     // frame = step(thick, dMin) - step(gridStep - thick, dMax);
     col *= 0.5 + 0.5 * frame;
 }
 
-void background(out vec3 col, vec2 uv, bool right) {
+void background(out vec3 col, vec2 uv) {
     col = c.yyy;
     col = uniformPalette(uv.x + 1.);
 
-    applyGrid(col, uv, right);
+    applyGrid(col, uv);
 
     // Ursprung markieren
     float d = sdCircle(uv, 0.02);
-    col = mix(c.xwy, col, smoothstep(0., 0.001, d));
+    d = abs(d) - 0.005;
+    col = mix(c.yyy, col, smoothstep(0., 0.001, d));
 }
 
 void gammaCorrection(inout vec3 col) {
@@ -197,7 +194,7 @@ void drawPaletteRing(inout vec3 col, vec2 uv, float theta) {
 }
 
 void drawRing(inout vec3 col, vec2 uv, bool right) {
-    // (*) was ist das hier anschaulich, nochmal?
+    // (*) was ist das hier anschaulich, welche Werte nimmt es an?
     float theta = polar(uv) / twoPi;
 
     drawPaletteRing(col, uv, theta);
@@ -215,13 +212,15 @@ void main() {
 
     if (uv.x < -0.005) {
         uv.x += 0.5 * aspRatio;
-        background(col, uv, false);
+        background(col, uv);
         drawRing(col, uv, false);
-    } else if (uv.x > 0.005) {
+    }
+    else if (uv.x > 0.005) {
         uv.x -= 0.5 * aspRatio;
-        background(col, uv, true);
+        background(col, uv);
         drawRing(col, uv, true);
-    } else {
+    }
+    else {
         discard;
     }
 

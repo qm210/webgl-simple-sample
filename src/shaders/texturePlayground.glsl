@@ -168,5 +168,10 @@ void main() {
     float gray = dot(col, vec3(0.299, 0.587, 0.114));
     col = mix(col, vec3(gray), iGray);
 
+    if (uv.x > -0.32) {
+        col.r -= 0.1;
+        col.g += 0.1;
+    }
+
     fragColor.rgb = col;
 }
