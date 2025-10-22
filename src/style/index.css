@@ -13,7 +13,7 @@
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 
-  --font-size-large: 1.3em;
+  --font-size-large: 1.25em;
 
   @media (max-width: 400px) {
     font-size: 8pt;
@@ -94,7 +94,7 @@ pre {
 
 label {
   font-family: monospace;
-  margin: 0.5rem 0;
+  margin: 0.3rem 0;
   font-size: var(--font-size-large);
 }
 

@@ -1,4 +1,4 @@
-import {addButton, createInput, addValueLabel} from "./controls.js";
+import {addButton, createInputElements, addValueRow} from "./controls.js";
 import {registerShaderCode} from "./shaderCode.js";
 import {appendText} from "./helpers.js";
 import {createScrollStackOn, scrollToFirstInterestingLine} from "./events.js";
@@ -61,6 +61,7 @@ const generatePage = (elements, state, controls, autoRenderOnLoad) => {
     });
 
     addControlsToPage(elements, state, controls, autoRenderOnLoad);
+    addCanvasControls(elements, state);
 
     elements.initialRenderMs = performance.now() - elements.startRendering;
 };
@@ -91,20 +92,24 @@ export const addControlsToPage = (elements, state, controls, autoRenderOnLoad) =
 
         if (control.type === "label") {
             elements[control.name] =
-                addValueLabel(elements.controls, {
+                addValueRow(elements.controls, {
                     label: control.name + " = ",
                     id: control.name
                 });
             continue;
         }
 
-        const input = createInput(state, control);
+        const input = createInputElements(state, control);
         if (!input) {
             console.warn("Undefined Control", control);
             continue;
         }
-        elements[control.name] = input.container;
-        elements.controls.appendChild(input.container);
+        elements.controls.appendChild(input.nameLabel);
+        elements.controls.appendChild(input.valueLabel);
+        elements.controls.appendChild(input.minLabel);
+        elements.controls.appendChild(input.input ?? input.container);
+        elements.controls.appendChild(input.maxLabel);
+        elements.controls.appendChild(input.resetButton);
     }
 
     document.addEventListener("keydown", event => {
@@ -180,4 +185,32 @@ function renderCompileStepStatus(title, error, successMessage) {
             ${content}
         </div>    
     `;
+}
+
+function addCanvasControls(elements, state) {
+    const plusButton = document.createElement("button");
+    plusButton.textContent = "+";
+    plusButton.addEventListener("click", resizeHandler(1.05));
+    const minusButton = document.createElement("button");
+    minusButton.textContent = "\u2013";
+    minusButton.addEventListener("click", resizeHandler(0.95));
+
+    elements.canvasControls.appendChild(plusButton);
+    elements.canvasControls.appendChild(minusButton);
+
+    function resizeHandler(factor) {
+        return () => {
+            let width = elements.canvas.width;
+            let height = elements.canvas.height;
+            width = Math.max(Math.round(width * factor), 1);
+            height = Math.max(Math.round(height * factor), 1);
+            elements.canvas.style.width = `${width}px`;
+            elements.canvas.style.height = `${height}px`;
+            // TODO: should we respect window.devicePixelRatio here?
+            elements.canvas.width = width;
+            elements.canvas.height = height;
+            elements.canvas.getContext("webgl2").viewport(0, 0, width, height);
+            state.resolution = [width, height];
+        };
+    }
 }

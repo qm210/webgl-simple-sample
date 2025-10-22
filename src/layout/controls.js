@@ -1,4 +1,5 @@
 import REGEX from "../glslCode/regex.js";
+import {createDiv} from "./helpers.js";
 
 export function addButton(parent, {onClick, onRightClick, title = "", className = ""}) {
     const button = document.createElement("button");
@@ -16,17 +17,16 @@ export function addButton(parent, {onClick, onRightClick, title = "", className 
     return button;
 }
 
-export const addValueLabel = (parent, {label, name}) => {
-    const container = document.createElement("label");
+export const addValueRow = (parent, {label, name}) => {
+    const container = createDiv(`${label} `, "value-row");
     const span = document.createElement("span");
     span.id = name;
-    container.textContent = `${label} `;
     container.appendChild(span);
     parent.appendChild(container);
     return span;
 };
 
-export function createInput(state, control) {
+export function createInputElements(state, control) {
     if (control.hidden) {
         return;
     }
@@ -133,17 +133,12 @@ export const createFloatInput = (state, control, onUpdate = undefined) => {
     const digits = -Math.log10(control.step);
 
     const container = document.createElement("div");
-
     const input = document.createElement("input");
-    const valueLabel = document.createElement("label");
+    const nameLabel = document.createElement("label");
+    const valueLabel = createDiv("", "value-label");
     const minLabel = document.createElement("label");
     const maxLabel = document.createElement("label");
     const resetButton = createSmallButton(`reset: ${control.defaultValue}`);
-    container.appendChild(valueLabel);
-    container.appendChild(minLabel);
-    container.appendChild(input);
-    container.appendChild(maxLabel);
-    container.appendChild(resetButton);
 
     state[control.name] ??= control.defaultValue;
 
@@ -151,9 +146,9 @@ export const createFloatInput = (state, control, onUpdate = undefined) => {
     input.type = "range";
     input.step = control.step;
     input.style.flex = "3";
-    valueLabel.style.flex = "1";
+    minLabel.style.fontSize = "small";
     minLabel.style.width = "0.1";
-    maxLabel.style.flex = "0.1";
+    maxLabel.style.fontSize = "small";
 
     update(true);
 
@@ -174,7 +169,7 @@ export const createFloatInput = (state, control, onUpdate = undefined) => {
         sessionStorage.removeItem(control.storageKey);
     });
 
-    return {container, valueLabel, minLabel, input, maxLabel, resetButton};
+    return {container, nameLabel, valueLabel, minLabel, input, maxLabel, resetButton};
 
     function round(value) {
         return Math.round(parseFloat(value) / control.step) * control.step;
@@ -201,7 +196,8 @@ export const createFloatInput = (state, control, onUpdate = undefined) => {
             maxLabel.textContent = (+input.max).toFixed(digits);
         }
         input.value = value.toFixed(digits);
-        valueLabel.textContent = `${control.name} = ${value.toFixed(digits)}`;
+        nameLabel.textContent = control.name;
+        valueLabel.textContent = ` = ${value.toFixed(digits)}`;
         if (onUpdate) {
             onUpdate(input.value);
         }
@@ -211,26 +207,21 @@ export const createFloatInput = (state, control, onUpdate = undefined) => {
 export const createVec3Input = (state, control) => {
     const container = document.createElement("div");
     container.style.gap = "0.5rem";
-    const valueSpan = document.createElement("label");
+    const nameLabel = document.createElement("label");
+    const valueLabel = createDiv("", "value-label");
+    let minLabel, maxLabel;
     const resetButton = createSmallButton("reset");
-    container.appendChild(valueSpan);
 
     const componentInputs = [];
     for (let i = 0; i < 3; i++) {
         const inputs = createFloatInput(state, control, updateAll);
         componentInputs.push(inputs.input);
         inputs.input.value = control.defaultValue[i];
-
-        const separator = document.createElement("label");
-        separator.textContent = "|";
-        container.appendChild(separator);
-
-        valueSpan.appendChild(inputs.valueLabel);
-        container.appendChild(inputs.minLabel);
         container.appendChild(inputs.input);
-        container.appendChild(inputs.maxLabel);
+
+        minLabel = inputs.minLabel;
+        maxLabel = inputs.maxLabel;
     }
-    container.appendChild(resetButton);
 
     resetButton.addEventListener("click", () => {
         state[control.name] = control.defaultValue;
@@ -241,13 +232,14 @@ export const createVec3Input = (state, control) => {
     });
 
     updateAll();
-    return {container};
+    return {container, nameLabel, valueLabel, resetButton, minLabel, maxLabel};
 
     function updateAll() {
         state[control.name] = componentInputs.map(i => +i.value);
         const componentsText = state[control.name]
             .map(i => i.toFixed(2))
             .join(", ");
-        valueSpan.textContent = `${control.name} = vec3(${componentsText})`;
+        nameLabel.textContent = control.name;
+        valueLabel.textContent = ` = vec3(${componentsText})`;
     }
 };

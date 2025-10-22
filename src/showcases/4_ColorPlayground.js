@@ -33,9 +33,6 @@ export default {
         state.location.palD = gl.getUniformLocation(state.program, "palD");
         state.location.iWhatever = gl.getUniformLocation(state.program, "iWhatever");
         state.location.iGamma = gl.getUniformLocation(state.program, "iGamma");
-        state.location.iSeed = gl.getUniformLocation(state.program, "iSeed");
-        state.location.iNoiseFreq = gl.getUniformLocation(state.program, "iNoiseFreq");
-        state.location.iNoiseAmp = gl.getUniformLocation(state.program, "iNoiseAmp");
         state.resolution = [gl.drawingBufferWidth, gl.drawingBufferHeight];
 
         console.log(state);
@@ -81,10 +78,6 @@ export default {
             step: 0.001
         }, {
             type: "floatInput",
-            name: "iSeed",
-            defaultValue: 0,
-        }, {
-            type: "floatInput",
             name: "iWhatever",
             defaultValue: 1.00,
             min: 0,
@@ -104,7 +97,6 @@ function render(gl, state) {
     gl.uniform3fv(state.location.palD, state.palD);
     gl.uniform1f(state.location.iWhatever, state.iWhatever);
     gl.uniform1f(state.location.iGamma, state.iGamma);
-    gl.uniform1f(state.location.iSeed, state.iSeed);
 
     gl.drawArrays(gl.TRIANGLES, 0, 6);
 }
