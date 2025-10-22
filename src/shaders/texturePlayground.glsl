@@ -6,12 +6,19 @@ out vec4 fragColor;
 uniform vec2 iResolution;
 uniform float iTime;
 uniform float iGamma;
-uniform float iSomething;
-uniform float iSeed;
+uniform float iContrast;
+uniform float iGray;
+uniform float iFree1;
+uniform float iFree2;
+uniform float iFree3;
+uniform float iFree4;
 uniform sampler2D iTexture0;
 uniform sampler2D iTexture1;
 uniform sampler2D iTexture2;
 uniform float iTexture2AspectRatio;
+uniform float iNoiseFreq;
+uniform float iNoiseLevel;
+uniform float iNoiseSeed;
 
 vec4 c = vec4(1., 0., -1., .5);
 
@@ -34,99 +41,136 @@ void applyGrid(inout vec3 col, in vec2 uv, float gridStep) {
     // https://graphtoy.com/?f1(x,t)=1-0.5*(step(x,0.1))&v1=true&f2(x,t)=step(0.,x)&v2=true&f3(x,t)=&v3=false&f4(x,t)=&v4=false&f5(x,t)=&v5=false&f6(x,t)=&v6=false&grid=1&coords=0.055959188393239614,-0.021704530457179908,1.6215668511724766
 }
 
-vec2 hash22(vec2 p)
-{
-    p = p*mat2(127.1,311.7,269.5,183.3);
-    p = -1.0 + 2.0 * fract(sin(p)*43758.5453123);
-    return sin(p*6.283 + iSeed);
+vec3 grayscale(vec3 col) {
+    // Gewichtet in etwa nach dem menschlichen Empfinden (-> Spektren der Zapfen)
+    float gray = dot(col, vec3(0.299, 0.587, 0.114));
+    return vec3(gray);
 }
-
-float perlin_noise(vec2 p)
-{
-    vec2 pi = floor(p);
-    vec2 pf = p-pi;
-
-    vec2 w = pf*pf*(3.-2.*pf);
-
-    float f00 = dot(hash22(pi+vec2(.0,.0)),pf-vec2(.0,.0));
-    float f01 = dot(hash22(pi+vec2(.0,1.)),pf-vec2(.0,1.));
-    float f10 = dot(hash22(pi+vec2(1.0,0.)),pf-vec2(1.0,0.));
-    float f11 = dot(hash22(pi+vec2(1.0,1.)),pf-vec2(1.0,1.));
-
-    float xm1 = mix(f00,f10,w.x);
-    float xm2 = mix(f01,f11,w.x);
-
-    float ym = mix(xm1,xm2,w.y);
-    return ym;
-}
-
-const int fractionSteps = 1;
-const float fractionalScale = 2.;
-const float fractionalWeight = 0.5;
-
-float fractionalNoiseSum(vec2 p){
-    // p *= 4.;
-    float a = 1., r = 0., s = 0.;
-    for (int i=0; i < fractionSteps; i++) {
-        r += a * perlin_noise(p);
-        s += a;
-        p *= fractionalScale;
-        a *= fractionalWeight;
-    }
-    return r / s;
-}
-
 
 void main() {
     vec2 uv = (2. * gl_FragCoord.xy - iResolution.xy) / iResolution.y;
 
-    vec3 col = c.xxx;
+    fragColor = c.yyyx;
+    vec3 col, bg, col0, col1, col2;
 
     // (*) just for orientation, a small circle
     float d = sdCircle(uv, 0.02);
-    // Compare: a) draw pure d
-    col = mix(col, c.xxx, d); // or even just: d * c.xxx;
-    // With: b) common shape drawing via smoothstep() and mix():
-    // col = mix(c.yyy, c.xxx, smoothstep(0., 0.001, d));
+    // Zum Einstieg nochmal vergleichen:
+    // a) was ist d, für sich genommen?
+    bg = d * c.xxx;
+    // b) Gewöhnliche Behandlung des Rands (d==0) der Geometrie:
+    // bg = mix(c.yyy, c.xxx, smoothstep(0., 0.001, d));
 
-    applyGrid(col, uv, 0.5);
+    applyGrid(bg, uv, 0.5);
+    fragColor.rgb = bg;
 
+    col0 = texture(iTexture0, uv).rgb; // .rgb == .xyz
     if (uv.x > 0. && uv.y > 0.) {
-        // (*) vergleicht das mit der Quelldatei, passt das so?
-        col = texture(iTexture0, uv).rgb; // .rgb == .xyz
+        fragColor.rgb = col0;
+    }
+
+    if (false) {
+        return;
     }
 
     vec2 st = gl_FragCoord.xy / iResolution.y;
-    st.x /= iTexture2AspectRatio;
-    st.y = 1. - st.y;
-    // Als Oneliner:
-    // st = gl_FragCoord.xy * vec2(1. / iTexture2AspectRatio, -1.) / iResolution.y + vec2(0, 1);
-    vec3 col1 = texture(iTexture1, st).rgb;
-    vec3 col2 = texture(iTexture2, st).rgb;
-    col = col2;
+    // st <-> uv? was ist mathematisch der Unterschied, was optisch?
+    if (false) {
+        col1 = texture(iTexture1, uv).rgb;
+    } else {
+        col1 = texture(iTexture1, st).rgb;
+    }
+    if (false) {
+        fragColor.rgb = col1;
+        return;
+    }
 
-    // Blending Methods:
-    // Maximum = Nur Aufhellen
-    // col = max(col, col2);
-    // Minimum = Nur Abdunkeln
-    // col = min(col, col2);
-    // Multiplizieren: Dunkelt auch ab
-    // col *= col2;
-    // Dividieren: ist Quatsch (eher "artsy")
-    // col /= col2;
-    // col = (1. - (1. - col) * (1. - col2));
+    col2 = texture(iTexture2, st).rgb;
+    if (true) {
+        st.x /= iTexture2AspectRatio;
+        st.y = 1. - st.y;
+        // Oneliner: st = gl_FragCoord.xy * vec2(1. / iTexture2AspectRatio, -1.) / iResolution.y + vec2(0, 1);
+        col2 = texture(iTexture2, st).rgb;
+    }
+    fragColor.xyz = col2;
 
-    float gray = dot(col, vec3(0.299, 0.587, 0.114));
-    col = vec3(gray);
+    // "Hello Shadertoy"-Gradient für die Mischbeispiele
+    vec3 colGradient = 0.5 + 0.5*cos(iTime+uv.xyx+vec3(0,2,4));
+
+    // Blending Methods zweier Texturen (oder allgemein "Ebenen")
+    // - Linear Mischen
+    col = mix(col2, colGradient, iFree1);
+    col = clamp(col, 0., 1.);
+    if (false) {
+        fragColor.rgb = col;
+        return;
+    }
+    // - Maximum = kann nur Aufhellen
+    if (false) {
+        fragColor.rgb = max(col, col2);
+        return;
+    }
+    // - Minimum = kann nur Abdunkeln
+    if (false) {
+        fragColor.rgb = min(col, col2);
+        return;
+    }
+    // Multiplizieren:
+    if (false) {
+        fragColor.rgb = col * col2;
+        // fragColor.rgb = col * (1. - col2);
+        // fragColor.rgb = (1. - col0) * col2;
+        return;
+    }
+    // Dividieren: ... eher... "artsy" bis unnütz.
+    if (false) {
+        fragColor.rgb = col2 / col1;
+        return;
+    }
+    // "Screen":
+    vec3 colScreen = (1. - (1. - colGradient) * (1. - col2));
+    if (false) {
+        fragColor.rgb = colScreen;
+        return;
+    }
+    col = mix(col, colScreen, iFree2);
+    col = clamp(col, 0., 1.);
+    // "Soft Light"
+    vec3 colSoftLight = colGradient - col2 + 2. * colGradient * col2;
+    if (false) {
+        fragColor.rgb = colSoftLight;
+        return;
+    }
+    col = mix(col, colSoftLight, iFree3);
+    col = clamp(col, 0., 1.);
+    // "Overlay" (nur zur Demo, muss nicht direkt verstanden werden)
+    vec3 colOverlay = length(col2) < 0.5
+        ? 2. * col2 * colGradient
+        : 1. - 2. * (1. - col2) * (1. - colGradient);
+    if (false) {
+        fragColor.rgb = colOverlay;
+        return;
+    }
+    col = mix(col, colOverlay, iFree4);
+    col = clamp(col, 0., 1.);
+
+    // einfache Farbtransformationen -- könnt ihr die nachvollziehen?
+    fragColor.rgb = col;
+    col = fragColor.rgb;
+    // Gammakorrektur:
     col = pow(col, vec3(1./iGamma));
 
-    col = mix(col, col2, iSomething);
+    // Kontrast
+    col = (col - 0.5) * iContrast + 0.5;
 
-    // contrast
-//    float contrast = iSomething + 1.;
-//    col = (col - 0.5) * contrast + 0.5;
+    // Greyscale: Auf Grautöne reduzieren
+    float gray = dot(col, vec3(0.299, 0.587, 0.114));
+    col = mix(col, vec3(gray), iGray);
 
-    // Einfacher Gauß'scher Weichzeichner (Gaussian Blur)
+    fragColor.rgb = col;
+
+    // Eine andere Exkursion:
+    // Ein Gauß'scher Weichzeichner (Gaussian Blur)
     /*
     col = c.yyy;
     float weightSum = 0.;
@@ -141,14 +185,7 @@ void main() {
             weightSum += weight;
         }
     }
-    // col /= weightSum;
-    */
-
-    /*
-    col = vec3(fractionalNoiseSum(uv * 2.));
-    col = 0.5 + 0.5 * col;
-
-    applyGrid(col, uv, 0.25);
+    col /= weightSum;
     */
 
     fragColor = vec4(col, 1.0);

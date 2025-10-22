@@ -200,8 +200,7 @@ void drawRing(inout vec3 col, vec2 uv, bool right) {
     // (*) was ist das hier anschaulich, nochmal?
     float theta = polar(uv) / twoPi;
 
-    // drawPaletteRing(col, uv, theta);
-
+    drawPaletteRing(col, uv, theta);
 
     if (right) {
         gammaCorrection(col);

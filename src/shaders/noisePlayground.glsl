@@ -1,0 +1,111 @@
+#version 300 es
+precision highp float;
+
+out vec4 fragColor;
+
+uniform vec2 iResolution;
+uniform float iTime;
+uniform vec3 iFree;
+uniform sampler2D iTexture0;
+uniform sampler2D iTexture1;
+uniform float iNoiseFreq;
+uniform float iNoiseLevel;
+uniform float iNoiseOffset;
+uniform int iFractionSteps;
+uniform float iFractionScale;
+uniform float iFractionAmplitude;
+
+vec4 c = vec4(1., 0., -1., .5);
+
+const float twoPi = 6.28319;
+
+float sdCircle( in vec2 p, in float r )
+{
+    return length(p)-r;
+}
+
+void applyGrid(inout vec3 col, in vec2 uv, float gridStep) {
+    uv = mod(uv, gridStep);
+    // <-- verallgemeinert fract(x) == mod(x, 1.)
+    float dMin = min(uv.x, uv.y);
+    col *= 1. - 0.5 * (step(dMin, 0.005));
+    // (*) Ein Problem hiermit kann sein, dass die Gitterlinien immer direkt _nach_ der
+    //     gemeinten Koordinate liegen. Daher z.B. unten die horizonale Linie sichtbar, oben nicht.
+    //     Wie kann man hier Symmetrie herstellen, d.h. die Linie mittig um die Gitterwerte legen?
+    // Hint:
+    // https://graphtoy.com/?f1(x,t)=1-0.5*(step(x,0.1))&v1=true&f2(x,t)=step(0.,x)&v2=true&f3(x,t)=&v3=false&f4(x,t)=&v4=false&f5(x,t)=&v5=false&f6(x,t)=&v6=false&grid=1&coords=0.055959188393239614,-0.021704530457179908,1.6215668511724766
+}
+
+vec2 hash22(vec2 p)
+{
+    p = p*mat2(127.1,311.7,269.5,183.3);
+    p = -1.0 + 2.0 * fract(sin(p + .01 * iNoiseOffset)*43758.5453123);
+    return sin(p*6.283);
+}
+
+float perlin2D(vec2 p)
+{
+    p *= iNoiseFreq;
+    vec2 pi = floor(p);
+    vec2 pf = p - pi;
+    vec2 w = pf * pf * (3.-2.*pf);
+
+    float f00 = dot(hash22(pi+vec2(.0,.0)),pf-vec2(.0,.0));
+    float f01 = dot(hash22(pi+vec2(.0,1.)),pf-vec2(.0,1.));
+    float f10 = dot(hash22(pi+vec2(1.0,0.)),pf-vec2(1.0,0.));
+    float f11 = dot(hash22(pi+vec2(1.0,1.)),pf-vec2(1.0,1.));
+
+    float xm1 = mix(f00,f10,w.x);
+    float xm2 = mix(f01,f11,w.x);
+    float ym = mix(xm1,xm2,w.y);
+    return ym;
+}
+
+float fractionalNoiseSum(vec2 p){
+    p *= 4.;
+    float a = 1., r = 0., s = 0., noise;
+    for (int i=0; i < iFractionSteps; i++) {
+        noise = perlin2D(p);
+        r += a * noise;
+        s += a;
+        p *= iFractionScale;
+        a *= iFractionAmplitude;
+    }
+    return r/s;
+}
+// interesting modifications possible,
+// e.g. see "marble", ... at https://www.shadertoy.com/view/Md3SzB
+
+vec3 gradientNoise(vec2 p) {
+    p *= 2.;
+    vec3 col = vec3(fractionalNoiseSum(p));
+    // brighten up
+    return 0.5 + 0.5 * col;
+}
+
+void main() {
+    vec2 uv = (2. * gl_FragCoord.xy - iResolution.xy) / iResolution.y;
+
+    vec3 col = c.xxx;
+
+    float d = sdCircle(uv, 0.02);
+    col = mix(c.yyy, c.xxx, smoothstep(0., 0.001, d));
+
+    applyGrid(col, uv, 0.5);
+
+    float gray = dot(col, vec3(0.299, 0.587, 0.114));
+    col = vec3(gray);
+
+    // col = mix(col, col2, iSomething);
+
+    applyGrid(col, uv, 0.25);
+
+    vec3 colNoise = gradientNoise(uv);
+    float gamma = 1. + iFree.x - iFree.y;
+    colNoise = pow(colNoise, vec3(gamma));
+    colNoise = (colNoise - 0.5) * (1. + 2. * iFree.z) + 0.5;
+
+    col = mix(col, colNoise, iNoiseLevel);
+
+    fragColor = vec4(col, 1.0);
+}
