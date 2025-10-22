@@ -9,6 +9,12 @@ export const SymbolType = {
     Struct: "CustomStruct",
 };
 
+export const ChangeType = {
+    Added: "Added",
+    Changed: "Changed",
+    Removed: "Removed",
+};
+
 export function analyzeShader(source, errorLog, shaderKey) {
     const stored = sessionStorage.getItem(shaderKey) ?? "";
     if (shaderKey) {
@@ -28,6 +34,7 @@ export function analyzeShader(source, errorLog, shaderKey) {
         symbols: [],
         scopes: [],
         functions: [],
+        changedBlocks: [],
     };
     const cursor = {
         index: 0,
@@ -35,11 +42,33 @@ export function analyzeShader(source, errorLog, shaderKey) {
         scopeLevel: 0,
         removedBefore: [],
         consecutiveEmpty: 0,
+        currentChangedBlock: {type: null},
     };
+
+    function handleChangedBlock(diff, type) {
+        if (type !== null && cursor.currentChangedBlock.type !== null) {
+            if (cursor.currentChangedBlock.type !== type) {
+                cursor.currentChangedBlock.type = ChangeType.Changed;
+            }
+            cursor.currentChangedBlock.endIndex = cursor.index;
+            cursor.currentChangedBlock.diffs.push(diff);
+        } else {
+            if (cursor.currentChangedBlock.type !== null) {
+                analyzed.changedBlocks.push(cursor.currentChangedBlock);
+            }
+            cursor.currentChangedBlock = {
+                type,
+                startIndex: cursor.index,
+                endIndex: cursor.index,
+                diffs: type === null ? [] : [diff]
+            };
+        }
+    }
 
     for (const diff of differences) {
         if (diff.removed) {
             cursor.removedBefore.push(diff.value);
+            handleChangedBlock(diff, ChangeType.Removed);
             continue;
         }
 
@@ -65,6 +94,8 @@ export function analyzeShader(source, errorLog, shaderKey) {
             changed = false;
             cursor.removedBefore = [];
         }
+
+        handleChangedBlock(diff, changed ? ChangeType.Added : null);
 
         analyzed.lines.push({
             code,

@@ -106,6 +106,7 @@ void main() {
     #endif
     fragColor.xyz = col2;
     col = col2;
+    vec3 shit = vec3(3.3);
 
     #if APPLY_BLENDING_METHODS
         // "Hello Shadertoy"-Gradient für die Mischbeispiele
