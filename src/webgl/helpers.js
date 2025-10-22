@@ -77,10 +77,10 @@ export function createTextureFromImage(gl, imageSource, options) {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, minFilter);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, magFilter);
     // <-- TEXTURE_MAG_FILTER kann auch ausgelassen werden, ist aber oft sinnvoll.
-    // wir lass hier Mipmaps aus, aber es sei erwähnt, dass sie existieren.
+    // wir lassen hier das Konzept "Mipmaps" aus, das ist aber prinzipiell nicht uninteressant.
 
     // Laden im Browser notwendigerweise asynchron.
-    // -> wird kurz flackern, aber das akzeptieren wir mal
+    // -> wird kurz flackern, aber das akzeptieren wir mal (WebGL-Limitierung).
 
     loadImage(imageSource, (img) => {
         // -> daher auch: Textur lieber neu binden, weil inzwischen alles mögliche passiert sein kann.

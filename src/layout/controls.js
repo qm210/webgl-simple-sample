@@ -26,7 +26,7 @@ export const addValueLabel = (parent, {label, name}) => {
     return span;
 };
 
-export function addInput (parent, state, control) {
+export function createInput(state, control) {
     if (control.hidden) {
         return;
     }
@@ -47,11 +47,13 @@ export function addInput (parent, state, control) {
 
     switch (control.type) {
         case "cursorInput":
-            return addCursorInput(parent, state, control);
+            return createCursorInput(state, control);
         case "floatInput":
-            return addFloatInput(parent, state, control);
+            return createFloatInput(state, control);
+        case "vec3Input":
+            return createVec3Input(state, control);
         default:
-            console.warn("Unknown input control", control);
+            return undefined;
     }
 }
 
@@ -62,12 +64,12 @@ function sessionStoreControlState(state, control) {
     );
 }
 
-const addCursorInput = (parent, state, control) => {
+const createCursorInput = (state, control) => {
     // control.keys needs 7 key names like ["W", "A", "S", "D", "R", "F", "Q"]
     const [front, left, back, right, up, down, reset] =
         control.keys.map(k => k.toUpperCase());
 
-    const element = document.createElement("label");
+    const container = document.createElement("label");
     const moveKeys = control.keys.slice(0, 6).join("").toUpperCase();
 
     update();
@@ -109,31 +111,34 @@ const addCursorInput = (parent, state, control) => {
         sessionStoreControlState(state, control);
     });
 
-    parent.append(element);
-    return element;
+    return {container};
 
     function update() {
         let content = `${control.name} = vec3(${state[control.name]})`
         content += ` -> use <kbd>${moveKeys}</kbd> to move, <kbd>${reset}</kbd> to reset.`;
-        element.innerHTML = content;
+        container.innerHTML = content;
     }
 }
 
-export const addFloatInput = (parent, state, control) => {
+function createSmallButton(title) {
+    const button = document.createElement("button");
+    button.classList.add("small-button");
+    button.textContent = title;
+    return button;
+}
+
+export const createFloatInput = (state, control, onUpdate = undefined) => {
     control.defaultValue ??= 0;
     control.step ??= 0.01;
     const digits = -Math.log10(control.step);
 
     const container = document.createElement("div");
-    parent.appendChild(container);
 
     const input = document.createElement("input");
     const valueLabel = document.createElement("label");
     const minLabel = document.createElement("label");
     const maxLabel = document.createElement("label");
-    const resetButton = document.createElement("button");
-    resetButton.classList.add("small-button");
-    resetButton.textContent = `reset: ${control.defaultValue}`;
+    const resetButton = createSmallButton(`reset: ${control.defaultValue}`);
     container.appendChild(valueLabel);
     container.appendChild(minLabel);
     container.appendChild(input);
@@ -169,7 +174,7 @@ export const addFloatInput = (parent, state, control) => {
         sessionStorage.removeItem(control.storageKey);
     });
 
-    return container;
+    return {container, valueLabel, minLabel, input, maxLabel, resetButton};
 
     function round(value) {
         return Math.round(parseFloat(value) / control.step) * control.step;
@@ -197,6 +202,52 @@ export const addFloatInput = (parent, state, control) => {
         }
         input.value = value.toFixed(digits);
         valueLabel.textContent = `${control.name} = ${value.toFixed(digits)}`;
+        if (onUpdate) {
+            onUpdate(input.value);
+        }
     }
+};
 
+export const createVec3Input = (state, control) => {
+    const container = document.createElement("div");
+    container.style.gap = "0.5rem";
+    const valueSpan = document.createElement("label");
+    const resetButton = createSmallButton("reset");
+    container.appendChild(valueSpan);
+
+    const componentInputs = [];
+    for (let i = 0; i < 3; i++) {
+        const inputs = createFloatInput(state, control, updateAll);
+        componentInputs.push(inputs.input);
+        inputs.input.value = control.defaultValue[i];
+
+        const separator = document.createElement("label");
+        separator.textContent = "|";
+        container.appendChild(separator);
+
+        valueSpan.appendChild(inputs.valueLabel);
+        container.appendChild(inputs.minLabel);
+        container.appendChild(inputs.input);
+        container.appendChild(inputs.maxLabel);
+    }
+    container.appendChild(resetButton);
+
+    resetButton.addEventListener("click", () => {
+        state[control.name] = control.defaultValue;
+        componentInputs.forEach((input, index) => {
+            input.value = control.defaultValue[index];
+        });
+        updateAll();
+    });
+
+    updateAll();
+    return {container};
+
+    function updateAll() {
+        state[control.name] = componentInputs.map(i => +i.value);
+        const componentsText = state[control.name]
+            .map(i => i.toFixed(2))
+            .join(", ");
+        valueSpan.textContent = `${control.name} = vec3(${componentsText})`;
+    }
 };

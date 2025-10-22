@@ -1,8 +1,9 @@
-import {addButton, addInput, addValueLabel} from "./controls.js";
+import {addButton, createInput, addValueLabel} from "./controls.js";
 import {registerShaderCode} from "./shaderCode.js";
 import {appendText} from "./helpers.js";
 import {createScrollStackOn, scrollToFirstInterestingLine} from "./events.js";
 import {deferExtendedAnalysis} from "../glslCode/deferredAnalysis.js";
+import {shiftTime} from "../webgl/render.js";
 
 
 const generatePage = (elements, state, controls, autoRenderOnLoad) => {
@@ -66,6 +67,7 @@ const generatePage = (elements, state, controls, autoRenderOnLoad) => {
 
 export default generatePage;
 
+
 export const addControlsToPage = (elements, state, controls, autoRenderOnLoad) => {
     if (!state.program) {
         elements.controls.innerHTML = `
@@ -76,40 +78,73 @@ export const addControlsToPage = (elements, state, controls, autoRenderOnLoad) =
         return;
     }
 
-    for (const control of controls) {
-
-        switch (control.type) {
-            case "renderButton":
-                if (autoRenderOnLoad) {
-                    control.onClick();
-                } else {
-                    addButton(elements.controls, {
-                        title: control.title,
-                        onClick: control.onClick,
-                    });
-                }
-                break;
-
-            case "label":
-                elements[control.name] =
-                    addValueLabel(elements.controls, {
-                        label: control.name + " = ",
-                        id: control.name
-                    });
-                break;
-
-            case "cursorInput":
-            case "floatInput":
-                elements[control.name] =
-                    addInput(elements.controls, state, control);
-                break;
-
-            default:
-                console.warn("Undefined Control", control);
-        }
-
+    if (autoRenderOnLoad) {
+        controls.onRender();
+    } else {
+        addButton(elements.controls, {
+            title: "Render!",
+            onClick: controls.onRender,
+        });
     }
 
+    for (const control of controls.uniforms ?? []) {
+
+        if (control.type === "label") {
+            elements[control.name] =
+                addValueLabel(elements.controls, {
+                    label: control.name + " = ",
+                    id: control.name
+                });
+            continue;
+        }
+
+        const input = createInput(state, control);
+        if (!input) {
+            console.warn("Undefined Control", control);
+            continue;
+        }
+        elements[control.name] = input.container;
+        elements.controls.appendChild(input.container);
+    }
+
+    document.addEventListener("keydown", event => {
+        // Some global time control features, by pressing Ctrl + something.
+        if (!event.ctrlKey) {
+            return;
+        }
+        if (document.activeElement !== document.body) {
+            return;
+        }
+        // cf. render.js for how the state variables work
+        switch (event.key) {
+            case "Backspace":
+                state.time = 0.;
+                state.startTime = performance.now();
+                break;
+            case " ":
+                if (state.timeRunning) {
+                    state.timeRunning = false;
+                } else {
+                    state.timeRunning = true;
+                    state.startTime = performance.now() - 1000. * state.time;
+                }
+                break;
+            case "ArrowLeft":
+                shiftTime(state, -1);
+                break;
+            case "ArrowRight":
+                shiftTime(state, +1);
+                break;
+            case "ArrowUp":
+                shiftTime(state, +0.05);
+                break;
+            case "ArrowDown":
+                shiftTime(state, -0.05);
+                break;
+            default:
+                break;
+        }
+    });
 };
 
 function renderErrorConsole(state) {

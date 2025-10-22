@@ -22,12 +22,10 @@ export default {
 
         return state;
     },
-    generateControls: (gl, state, elements) => [{
-        type: "renderButton",
-        title: "Render",
-        onClick: () => {
+    generateControls: (gl, state, elements) => ({
+        onRender: () => {
             gl.useProgram(state.program);
             gl.drawArrays(gl.TRIANGLES, 0, 6);
         }
-    }]
+    })
 }

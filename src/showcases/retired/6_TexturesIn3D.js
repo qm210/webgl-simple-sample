@@ -1,11 +1,11 @@
-import standardSetup from "./retired/3_SimpleGeometry.js";
-import {createTextureFromImage} from "../webgl/helpers.js";
-import {startRenderLoop} from "../webgl/render.js";
+import standardSetup from "./3_SimpleGeometry.js";
+import {createTextureFromImage} from "../../webgl/helpers.js";
+import {startRenderLoop} from "../../webgl/render.js";
 
-import fragmentShaderSource from "../shaders/spring-2025/texturesAdvanced_K.glsl";
-import image0 from "../textures/frame.png";
-import image1 from "../textures/hubble_extreme_deep_field.jpg";
-import image2 from "../textures/Wood066_1K-JPG_Color.jpg";
+import fragmentShaderSource from "../../shaders/spring-2025/texturesAdvanced_K.glsl";
+import image0 from "../../textures/frame.png";
+import image1 from "../../textures/hubble_extreme_deep_field.jpg";
+import image2 from "../../textures/Wood066_1K-JPG_Color.jpg";
 
 export default {
     title: "Textures",
@@ -52,33 +52,32 @@ export default {
 
         return state;
     },
-    generateControls: (gl, state, elements) => [{
-        type: "renderButton",
-        title: "Render",
-        onClick: () => {
+    generateControls: (gl, state, elements) => ({
+        onRender: () => {
             startRenderLoop(
                 state => render(gl, state),
                 state,
                 elements
             );
-        }
-    }, {
-        type: "label",
-        name: "iTime",
-    }, {
-        type: "cursorInput",
-        name: "cursorWalk",
-        keys: ["w", "a", "s", "d", "r", "f", "q"],
-        hidden: true,
-    }, {
-        type: "floatInput",
-        name: "iFieldOfView",
-        defaultValue: 80,
-    }, {
-        type: "floatInput",
-        name: "iCameraTilt",
-        defaultValue: -23,
-    }]
+        },
+        uniforms: [{
+            type: "label",
+            name: "iTime",
+        }, {
+            type: "cursorInput",
+            name: "cursorWalk",
+            keys: ["w", "a", "s", "d", "r", "f", "q"],
+            hidden: true,
+        }, {
+            type: "floatInput",
+            name: "iFieldOfView",
+            defaultValue: 80,
+        }, {
+            type: "floatInput",
+            name: "iCameraTilt",
+            defaultValue: -23,
+        }]
+    })
 };
 
 function render(gl, state) {

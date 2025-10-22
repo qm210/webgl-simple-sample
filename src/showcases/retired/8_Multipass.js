@@ -1,16 +1,16 @@
-import standardSetup from "./retired/3_SimpleGeometry.js";
-import {startRenderLoop} from "../webgl/render.js";
-import {createTextureFromImage} from "../webgl/helpers.js";
+import standardSetup from "./3_SimpleGeometry.js";
+import {startRenderLoop} from "../../webgl/render.js";
+import {createTextureFromImage} from "../../webgl/helpers.js";
 
 // multiPassMain.glsl ist fast wie texturesAdvanced.glsl
 // aber was ist anders?
-import fragmentShaderSource from "../shaders/spring-2025/multiPassMain.glsl";
-import postFragmentShaderSource from "../shaders/spring-2025/multiPassPost.glsl";
+import fragmentShaderSource from "../../shaders/spring-2025/multiPassMain.glsl";
+import postFragmentShaderSource from "../../shaders/spring-2025/multiPassPost.glsl";
 
-import imageFrame from "../textures/frame.png";
-import imageSpace from "../textures/hubble_extreme_deep_field.jpg";
-import imageWood from "../textures/Wood066_1K-JPG_Color.jpg";
-import imageBumpMap from "../textures/funny_bumpmap.png";
+import imageFrame from "../../textures/frame.png";
+import imageSpace from "../../textures/hubble_extreme_deep_field.jpg";
+import imageWood from "../../textures/Wood066_1K-JPG_Color.jpg";
+import imageBumpMap from "../../textures/funny_bumpmap.png";
 
 const ACTIVATE_POST_PROCESSING = true;
 
@@ -51,7 +51,7 @@ export default {
         state.location.texture2 = gl.getUniformLocation(state.program, "iTexture2");
         state.location.texture3 = gl.getUniformLocation(state.program, "iBumpMap");
 
-        // <-- up to here, known from 6_Textures.js
+        // <-- up to here, known from 6_TexturesIn3D.js
 
         state.post = standardSetup.init(gl, postFragmentShaderSource);
 
@@ -95,44 +95,43 @@ export default {
 
         return state;
     },
-    generateControls: (gl, state, elements) => [{
-        type: "renderButton",
-        title: "Render",
-        onClick: () => {
+    generateControls: (gl, state, elements) => ({
+        onRender: () => {
             startRenderLoop(
                 state => render(gl, state),
                 state,
                 elements
             );
-        }
-    }, {
-        type: "label",
-        name: "iTime",
-    }, {
-        type: "floatInput",
-        name: "iFieldOfView",
-        defaultValue: 80,
-    }, {
-        type: "floatInput",
-        name: "iCameraTilt",
-        defaultValue: -23,
-    }, {
-        type: "cursorInput",
-        name: "cursorWalk",
-        keys: ["w", "a", "s", "d", "r", "f", "q"],
-    }, {
-        type: "floatInput",
-        name: "focusDistance",
-        defaultValue: 1,
-    }, {
-        type: "floatInput",
-        name: "focalLength",
-        defaultValue: 0.5,
-    }, {
-        type: "floatInput",
-        name: "aperture",
-        defaultValue: 0.25,
-    }]
+        },
+        uniforms: [{
+            type: "label",
+            name: "iTime",
+        }, {
+            type: "floatInput",
+            name: "iFieldOfView",
+            defaultValue: 80,
+        }, {
+            type: "floatInput",
+            name: "iCameraTilt",
+            defaultValue: -23,
+        }, {
+            type: "cursorInput",
+            name: "cursorWalk",
+            keys: ["w", "a", "s", "d", "r", "f", "q"],
+        }, {
+            type: "floatInput",
+            name: "focusDistance",
+            defaultValue: 1,
+        }, {
+            type: "floatInput",
+            name: "focalLength",
+            defaultValue: 0.5,
+        }, {
+            type: "floatInput",
+            name: "aperture",
+            defaultValue: 0.25,
+        }]
+    })
 };
 
 function render(gl, state) {

@@ -1,7 +1,8 @@
 import {compile, createStaticVertexBuffer, initVertices} from "../webgl/setup.js";
 
 import vertexShaderSource from "../shaders/playground.vertex.glsl";
-import fragmentShaderSource from "../shaders/colorPlayground.glsl";
+import fragmentShaderSource from "../shaders/investigation_sdBox.glsl";
+import {startRenderLoop} from "../webgl/render.js";
 
 
 export default {
@@ -24,47 +25,33 @@ export default {
 
         state.location.iTime = gl.getUniformLocation(state.program, "iTime");
         state.location.iResolution = gl.getUniformLocation(state.program, "iResolution");
-        state.location.iWhatever = gl.getUniformLocation(state.program, "iWhatever");
+        state.location.helloThere = gl.getUniformLocation(state.program, "helloThere");
         state.resolution = [gl.drawingBufferWidth, gl.drawingBufferHeight];
-
-        console.log(state);
 
         return state;
     },
-    generateControls: (gl, state, elements) => [{
-        type: "renderButton",
-        title: "Render",
-        onClick: () => {
-            cancelAnimationFrame(state.animationFrame);
-            state.startTime = performance.now();
-            state.animationFrame = requestAnimationFrame(
-                () => renderLoop(gl, state, elements)
-            )
-        }
-    }, {
-        type: "label",
-        name: "iTime",
-    }, {
-        type: "floatInput",
-        name: "iWhatever",
-        defaultValue: 1.00,
-        min: 0,
-        max: 10.,
-    }]
+    generateControls: (gl, state, elements) => ({
+        onRender: () =>
+            startRenderLoop(state => render(gl, state), state, elements),
+        uniforms: [{
+            type: "label",
+            name: "iTime",
+        }, {
+            type: "floatInput",
+            name: "helloThere",
+            defaultValue: 1.00,
+            min: 0,
+            max: 10.,
+        }]
+    })
 }
 
-function renderLoop(gl, state, elements) {
-    state.time = 0.001 * (performance.now() - state.startTime);
-
+function render(gl, state) {
     gl.useProgram(state.program);
 
     gl.uniform1f(state.location.iTime, state.time);
     gl.uniform2fv(state.location.iResolution, state.resolution);
-    gl.uniform1f(state.location.iWhatever, state.iWhatever)
+    gl.uniform1f(state.location.helloThere, state.helloThere);
 
     gl.drawArrays(gl.TRIANGLES, 0, 6);
-
-    elements.iTime.innerHTML = state.time.toFixed(2) + " sec";
-
-    requestAnimationFrame(() => renderLoop(gl, state, elements))
 }

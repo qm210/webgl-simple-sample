@@ -1,11 +1,6 @@
 #version 300 es
 precision highp float;
 
-// this is the Hello-World-Shader of shadertoy,
-// but translated for our WebGl2 use case.
-//
-// Note: the pipeline has to be adjusted for this!
-
 out vec4 fragColor;
 
 uniform vec2 iResolution;
@@ -32,6 +27,7 @@ float sdCircle( vec2 p, float r )
 float sdBox( in vec2 p, in vec2 b)
 {
     vec2 d = abs(p)-b;
+    // return max(d.x, d.y);
     return length(max(d,0.0)) + min(max(d.x,d.y),0.0);
 }
 
@@ -42,7 +38,7 @@ float sdSegment(vec2 p, vec2 a, vec2 b) {
     return length(pa - ba * h);
 }
 
-float sdSegment(vec3 p, vec3 a, vec3 b) { // ... überladen geht offenbar.
+float sdSegment(vec3 p, vec3 a, vec3 b) { // <-- überladen in GLSL möglich.
     vec3 pa = p - a;
     vec3 ba = b - a;
     float h = clamp(dot(pa, ba) / dot(ba, ba), 0.0, 1.0);
@@ -60,10 +56,11 @@ float sdEquilateralTriangle(vec2 p, float size) {
 }
 
 float hash(float n) {
-    // _eine_ Möglichkeit für pseudorandom.
+    // _eine_ Möglichkeit für Pseudo-Zufallszahlen.
+    // Pseudo = reicht dem menschlichen Auge meist als "zufällig genug"
     return fract(sin(n) * 43758.5453123);
     // return fract(n * 17.0 * fract(n * 0.3183099));
-    // könnte auch
+    // es gibt weitere Methoden -> das in späterer VL
 }
 
 float smootherstep(float x) {
@@ -73,6 +70,7 @@ float smootherstep(float x) {
 }
 
 float perlin1D(float x) {
+    // Perlin Noise = ein gängiges, "ausgewaschenes" Rauschen (hash => pseudorandom)
     float i = floor(x);
     float f = fract(x);
     float g0 = hash(i) * 2.0 - 1.0;
@@ -84,7 +82,8 @@ float perlin1D(float x) {
 }
 
 void whatAmI(inout vec3 col, in vec2 uv) {
-    float x = uv.x * 10.;
+    // einfacher "Funktionsplotter", kann aber Senkrechten nicht darstellen
+    float x = uv.x * 10. + 0.5 * iTime;
     float mysterious = -0.65 + 0.2 * perlin1D(x);
     float d = abs(uv.y - mysterious);
     col = mix(col, c.ywx, smoothstep(0.01, 0., d));
@@ -142,17 +141,17 @@ vec3 getNormal(vec3 p) {
 const vec2 samplePoints[3] = vec2[3](
     vec2(1.0, -0.2),
     vec2(1.0, -0.4),
-    vec2(1.4, 0.)
+    vec2(1.35, -0.1)
 );
 
 void demonstrateNormalVector(inout vec3 col, in vec2 uv) {
-    vec2 center = vec2(1.25, -0.3);
+    vec2 center = vec2(1.15, -0.3);
     uv -= center;
+    uv *= (1. + 0.03 * sin(0.4 * twoPi * iTime)); // <-- was only for fun during lesson
     vec3 uv3 = vec3(uv, 0.);
     float d = SDF(uv3);
     d = smoothstep(0.01, 0., d);
     col = mix(col, c.yyy, d);
-    /*
     vec3 point, vecNormal;
     for (int s=0; s < 3; s++) {
         point = vec3(samplePoints[s] - center, 0.);
@@ -160,24 +159,24 @@ void demonstrateNormalVector(inout vec3 col, in vec2 uv) {
         d = arrow(col, uv, point.xy, point.xy + 0.2 * vecNormal.xy);
         col = mix(col, vec3(0.8), d);
     }
-    vec3 vecDown = vec3(0, -1., 0);
+    vec3 vecDown = vec3(0, -.5, 0);
     d = arrow(col, uv, point.xy - vecDown.xy, point.xy);
     col = mix(col, c.xyy, d);
-    vec3 vecReflect = reflect(vecNormal, vecDown);
+    vec3 vecReflect = reflect(vecDown, vecNormal);
     d = arrow(col, uv, point.xy, point.xy + vecReflect.xy);
     col = mix(col, c.xyy, d);
-    */
 }
 
 void letsGoElsewhere(inout vec3 col, in vec2 uv) {
     vec2 p = (uv - vec2(-1.2, -0.1)) * rotate(iTime);
     // vec2 p = (uv * rotate(iTime) - vec2(-1.2, -0.1));
     float d = sdBox(p, vec2(0.4, .25));
+    col.g = max(step(abs(d), 0.004), col.g); // <-- Randa uch mit step(abs(d), dicke)
     col.b = 0.75 * sin(80. * d);
     col.b = exp(-30. * d);
-    // col.b = clamp(col.b, 0., 1.);
-    // <-- ...warum wohl? --> man achte mal auf die durchlässigkeit des blaus
-    col.b *= 0.5;
+    col.b = clamp(col.b, 0., 1.);
+    // <-- ...warum wohl? --> man achte mal auf die Deckkraft des Blaus, mit vs. ohne
+    col.b *= 0.7;
 }
 
 void vectorStuff(inout vec3  col, in vec2 uv) {
@@ -209,10 +208,12 @@ void vectorStuff(inout vec3  col, in vec2 uv) {
     vec3 vecC3 = vec3(vecC, 0.);
     vec3 vecZ = vec3(0, 0, 1);
     vec2 vecE = cross(vecZ, vecC3).xy;
+    // wir machen -vecE nur, damit es nicht direkt auf vecD liegt, d.h. unsichtbar wäre
+    // damit zeigt -vecE in die entgegengesetzte Richtung von vecD
     d = arrow(col, uv, c.yy, -vecE);
     col = mix(col, c.wyx, d);
 
-    vec2 someShift = vec2(0.7, 0.5);
+    vec2 someShift = vec2(0.5, 0.5);
     vec2 vecF = vec2(0.7, 0.4);
     vec2 vecG = vec2(0.3, -0.2);
     vec2 vecGF = vecG - vecF;
@@ -221,7 +222,7 @@ void vectorStuff(inout vec3  col, in vec2 uv) {
     d = arrow(col, uv, someShift, someShift + vecG);
     col = mix(col, c.xyx, d);
     float alpha = 0.;
-    // alpha = 0.5 - 0.5 * cos(twoPi * 0.25 * iTime);
+    alpha = 0.5 - 0.5 * cos(twoPi * 0.25 * iTime);
     d = arrow(col, uv, someShift + vecG, someShift + vecG + vecF);
     col = mix(col, c.yyx, d * alpha);
     d = arrow(col, uv, someShift + vecF, someShift + vecF + vecG);
@@ -230,12 +231,29 @@ void vectorStuff(inout vec3  col, in vec2 uv) {
     d = arrow(col, uv, someShift + vecF, someShift + vecF + vecGF);
     col = mix(col, c.wyx, d);
 
-    // demonstrateNormalVector(col, uv);
+    demonstrateNormalVector(col, uv);
+}
+
+void applyGrid(inout vec3 col, in vec2 uv) {
+    const float gridStep = 0.5;
+    float d = min(mod(uv.x, gridStep), mod(uv.y, gridStep));
+    // war in Vorlesung: fract(...) == mod(..., 1.)
+    // float d = min(mod(uv.x, gridStep), fract(uv.y));
+    col *= 1. - 0.3 * (step(d, 0.005)); // <- in lesson: step(d,0) - step(d,.01)
 }
 
 void main() {
     vec2 uv = (2. * gl_FragCoord.xy - iResolution.xy) / iResolution.y;
+/*
+    vec3 col = c.xxx;
 
+    vec2 p = vec2(uv.x, sin(twoPi * uv.x));
+    float d = sdCircle(uv - p, 0.);
+    d = smoothstep(0.01, 0.0, d);
+    col = vec3(d, 0, d);
+
+    fragColor = vec4(col, 1.);
+*/
     vec3 col = 0.5 + 0.25 * cos(uv.xyx + vec3(4, 0, 4));
 
     if (length(uv) < 0.04) {
@@ -301,8 +319,7 @@ void main() {
     d = smoothstep(0.01, 0., d);
     col = mix(col, red, d);
 
-    // what is that and why?
-    col.r += 0.5 * exp(-pow(max(fract(uv.x), fract(uv.y)), 2.));
+    applyGrid(col, uv);
 
     letsGoElsewhere(col, uv);
 
@@ -313,6 +330,13 @@ void main() {
     // Beispiel: Color Grading (Gammakorrektur) - nächste Woche mehr zu Farben
     float contrast = helloThere;
     col = (col - 0.5) * contrast + 0.5;
+
+    // check whether the y-normalization is [-0.5, +0.5] or [-1, 1] (it is the latter)
+    /*
+    if (abs(uv.y) > 0.5) {
+        col *= 0.95;
+    }
+    */
 
     // Output to screen
     fragColor = vec4(col, 1.0);

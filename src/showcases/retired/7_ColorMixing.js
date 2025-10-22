@@ -1,7 +1,7 @@
-import standardSetup from "./retired/3_SimpleGeometry.js";
-import {startRenderLoop} from "../webgl/render.js";
+import standardSetup from "./3_SimpleGeometry.js";
+import {startRenderLoop} from "../../webgl/render.js";
 
-import fragmentShaderSource from "../shaders/spring-2025/colorMixing.glsl";
+import fragmentShaderSource from "../../shaders/spring-2025/colorMixing.glsl";
 
 export default {
     title: "Color Mixing",
@@ -14,20 +14,19 @@ export default {
 
         return state;
     },
-    generateControls: (gl, state, elements) => [{
-        type: "renderButton",
-        title: "Render",
-        onClick: () => {
+    generateControls: (gl, state, elements) => ({
+        onRender: () => {
             startRenderLoop(
                 state => render(gl, state),
                 state,
                 elements
             );
-        }
-    }, {
-        type: "label",
-        name: "iTime",
-    }]
+        },
+        uniforms: [{
+            type: "label",
+            name: "iTime",
+        }],
+    })
 };
 
 function render(gl, state) {

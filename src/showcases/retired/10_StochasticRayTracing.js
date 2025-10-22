@@ -1,12 +1,12 @@
-import standardSetup from "./retired/3_SimpleGeometry.js";
-import {startRenderLoop} from "../webgl/render.js";
-import {createFramebufferWithTexture} from "../webgl/helpers.js";
+import standardSetup from "./3_SimpleGeometry.js";
+import {startRenderLoop} from "../../webgl/render.js";
+import {createFramebufferWithTexture} from "../../webgl/helpers.js";
 import {takePingPongFramebuffers} from "./9_FramebufferPingPong.js";
 
 // dieses Beispiel basiert auf dem bekannten "Ray Tracing In One Weekend" von Peter Shirley
 // https://raytracing.github.io/books/RayTracingInOneWeekend.html#wherenext?
 // bzw. seiner Shader-Toy-Implementierung, big credits an "reinder":
-import fragmentShaderSource from "../shaders/spring-2025/stochasticRayTracing_fromTheBook.glsl";
+import fragmentShaderSource from "../../shaders/spring-2025/stochasticRayTracing_fromTheBook.glsl";
 
 export default {
     title: "Stochastic Ray Tracing",
@@ -37,21 +37,19 @@ export default {
 
         return state;
     },
-    generateControls: (gl, state, elements) => [{
-        type: "renderButton",
-        title: "Render",
-        onClick: () => {
+    generateControls: (gl, state, elements) => ({
+        onRender: () => {
             startRenderLoop(
                 state => render(gl, state),
                 state,
                 elements
             );
-        }
-    }, {
-        type: "label",
-        name: "iTime",
-    }
-    ]
+        },
+        uniforms: [{
+            type: "label",
+            name: "iTime",
+        }]
+    })
 };
 
 function render(gl, state) {

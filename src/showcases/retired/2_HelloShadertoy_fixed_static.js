@@ -31,10 +31,8 @@ export default {
 
         return state;
     },
-    generateControls: (gl, state, elements) => [{
-        type: "renderButton",
-        title: "Render",
-        onClick: () => {
+    generateControls: (gl, state, elements) => ({
+        onRender: () => {
             gl.useProgram(state.program);
 
             gl.uniform1f(state.location.iTime, 0);
@@ -42,5 +40,5 @@ export default {
 
             gl.drawArrays(gl.TRIANGLES, 0, 6);
         }
-    }]
+    })
 }

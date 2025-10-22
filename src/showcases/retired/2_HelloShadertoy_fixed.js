@@ -31,20 +31,19 @@ export default {
 
         return state;
     },
-    generateControls: (gl, state, elements) => [{
-        type: "renderButton",
-        title: "Render",
-        onClick: () => {
+    generateControls: (gl, state, elements) => ({
+        onRender: () => {
             cancelAnimationFrame(state.animationFrame);
             state.startTime = performance.now();
             state.animationFrame = requestAnimationFrame(
                 () => renderLoop(gl, state, elements)
             )
-        }
-    }, {
-        type: "label",
-        name: "iTime",
-    }]
+        },
+        uniforms: [{
+            type: "label",
+            name: "iTime",
+        }]
+    })
 }
 
 function renderLoop(gl, state, elements) {

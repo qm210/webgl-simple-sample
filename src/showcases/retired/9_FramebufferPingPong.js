@@ -1,9 +1,9 @@
-import standardSetup from "./retired/3_SimpleGeometry.js";
-import {startRenderLoop} from "../webgl/render.js";
-import {createFramebufferWithTexture, createTextureFromImage} from "../webgl/helpers.js";
+import standardSetup from "./3_SimpleGeometry.js";
+import {startRenderLoop} from "../../webgl/render.js";
+import {createFramebufferWithTexture, createTextureFromImage} from "../../webgl/helpers.js";
 
-import fragmentShaderSource from "../shaders/spring-2025/framebufferPingPong.glsl";
-import someSampleImage from "../textures/mysterious_capybara.png";
+import fragmentShaderSource from "../../shaders/spring-2025/framebufferPingPong.glsl";
+import someSampleImage from "../../textures/mysterious_capybara.png";
 
 export default {
     title: "Stochastic Ray Tracing",
@@ -49,21 +49,19 @@ export default {
 
         return state;
     },
-    generateControls: (gl, state, elements) => [{
-        type: "renderButton",
-        title: "Render",
-        onClick: () => {
+    generateControls: (gl, state, elements) => ({
+        onRender: () => {
             startRenderLoop(
                 state => render(gl, state),
                 state,
                 elements
             );
-        }
-    }, {
-        type: "label",
-        name: "iTime",
-    }
-    ]
+        },
+        uniforms: [{
+            type: "label",
+            name: "iTime",
+        }]
+    })
 };
 
 export function takePingPongFramebuffers(state) {
