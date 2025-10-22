@@ -115,22 +115,6 @@ vec3 oklch2rgb(vec3 lch) {
     return xyz2rgb_srgb(oklab2xyz(oklch2oklab(lch)));
 }
 
-#define FROM_RGB(x) x
-#define TO_RGB(x) x
-
-//#define FROM_RGB rgb2hsv
-//#define TO_RGB hsv2rgb
-
-//#define FROM_RGB rgb2hsl
-//#define TO_RGB hsl2rgb
-
-//#define FROM_RGB rgb2oklab
-//#define TO_RGB oklab2rgb
-
-//#define FROM_RGB rgb2oklch
-//#define TO_RGB oklch2rgb
-
-
 float sdCircle( in vec2 p, in float r )
 {
     return length(p)-r;
@@ -184,24 +168,60 @@ void gammaCorrection(inout vec3 col) {
     col = pow(col, vec3(1./iGamma));
 }
 
-void drawPaletteRing(inout vec3 col, vec2 uv, float theta) {
-    vec3 colRing = vec3(theta);
-    colRing = uniformPalette(theta);
-
+void drawRing(inout vec3 col, in vec3 colRing, vec2 uv) {
     float d = sdCircle(uv, 0.5);
     d = abs(d) - 0.2;
     col = mix(col, colRing, smoothstep(0.01, 0., d));
 }
 
-void drawRing(inout vec3 col, vec2 uv, bool right) {
+void drawPaletteRing(inout vec3 col, vec2 uv, float theta) {
+    vec3 colRing = uniformPalette(theta);
+    drawRing(col, colRing, uv);
+}
+
+#define CASE_STUDY_HSV_HSL 0
+#define CASE_STUDY_HSV_OKLCH 0
+#define DEMONSTRATE_COSINE_PALETTE 0
+
+void drawColors(inout vec3 col, vec2 uv, bool right) {
     // (*) was ist das hier anschaulich, welche Werte nimmt es an?
     float theta = polar(uv) / twoPi;
+    float r = length(uv);
 
-    drawPaletteRing(col, uv, theta);
+    // just for seeing the "third dimension"
+    float wave = 0.5 - 0.5 * cos(twoPi * 0.1 * iTime);
+    vec3 colHSV = vec3(theta, r, wave);
+    col = hsv2rgb(colHSV);
 
-    if (right) {
-        gammaCorrection(col);
-    }
+    #if CASE_STUDY_HSV_HSL
+        if (right) {
+            vec3 colHSL = vec3(theta, r, wave);
+            col = hsl2rgb(colHSL);
+        }
+    #endif
+
+    #if CASE_STUDY_HSV_OKLCH
+        if (right) {
+            vec3 colOKLCH = vec3(wave, r, theta);
+            col = oklch2rgb(colHSL);
+        }
+    #endif
+
+    #if DEMONSTRATE_COSINE_PALETTE
+        drawPaletteRing(col, uv, theta);
+        if (right) {
+            gammaCorrection(col);
+        }
+        return;
+    #endif
+
+    // Fallback: "Rainbow Ring"
+    col = c.xxx;
+    applyGrid(col, uv);
+    vec3 colRing = right
+        ? oklch2rgb(vec3(wave, .3, twoPi * theta))
+        : hsv2rgb(vec3(theta, 1., wave));
+    drawRing(col, colRing, uv);
 }
 
 void main() {
@@ -213,12 +233,12 @@ void main() {
     if (uv.x < -0.005) {
         uv.x += 0.5 * aspRatio;
         background(col, uv);
-        drawRing(col, uv, false);
+        drawColors(col, uv, false);
     }
     else if (uv.x > 0.005) {
         uv.x -= 0.5 * aspRatio;
         background(col, uv);
-        drawRing(col, uv, true);
+        drawColors(col, uv, true);
     }
     else {
         discard;

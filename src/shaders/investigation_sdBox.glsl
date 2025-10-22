@@ -38,6 +38,7 @@ vec3 drawBox(vec2 uv, int mode) {
             break;
     }
 
+    d *= 2.;
     // rot wächst für immer negativere d,
     col.r = -min(0., d);
     // grün wächst für immer positivere d,
