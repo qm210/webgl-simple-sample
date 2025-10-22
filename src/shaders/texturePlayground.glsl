@@ -157,37 +157,16 @@ void main() {
     // einfache Farbtransformationen -- könnt ihr die nachvollziehen?
     fragColor.rgb = col;
     col = fragColor.rgb;
-    // Gammakorrektur:
+
+    // -> Gammakorrektur:
     col = pow(col, vec3(1./iGamma));
 
-    // Kontrast
+    // -> Kontrast:
     col = (col - 0.5) * iContrast + 0.5;
 
-    // Greyscale: Auf Grautöne reduzieren
+    // -> auf Graustufen reduzieren:
     float gray = dot(col, vec3(0.299, 0.587, 0.114));
     col = mix(col, vec3(gray), iGray);
 
     fragColor.rgb = col;
-
-    // Eine andere Exkursion:
-    // Ein Gauß'scher Weichzeichner (Gaussian Blur)
-    /*
-    col = c.yyy;
-    float weightSum = 0.;
-    const float delta = 0.005;
-    const float range = 0.01;
-    const float gaussWidth = 2. * delta;
-    for (float ds = -range; ds <= range; ds += delta) {
-        for (float dt = -range; dt <= range; dt += delta) {
-            vec2 shift = vec2(ds, dt);
-            float weight = exp(-length(shift) / gaussWidth);
-            col += weight * texture(iTexture2, st + shift).rgb;
-            weightSum += weight;
-        }
-    }
-    col /= weightSum;
-    */
-
-    fragColor = vec4(col, 1.0);
-    return;
 }
