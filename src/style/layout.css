@@ -23,7 +23,7 @@
     width: calc(100vw - 2 * var(--page-pad));
     height: calc(100vh - 2 * var(--page-pad));
     padding: var(--page-pad);
-    gap: var(--page-pad);
+    gap: calc(0.5 * var(--page-pad));
 
     @media (max-width: 1300px) {
         flex-direction: column-reverse;
@@ -35,11 +35,11 @@
 }
 
 #layout > #shaders {
-    flex: 2;
+    flex: 0 1 auto;
 }
 
 #layout > #working-program {
-    flex: 0;
+    flex: 0 1 0%;
 }
 
 #console {
@@ -75,6 +75,15 @@
     padding: 0.5rem;
     border: 2px solid black;
     box-shadow: 2px 2px 2px #0003;
+}
+
+#canvas-divider {
+    width: 3px;
+    background-color: lightgrey;
+    cursor: col-resize;
+    user-select: none;
+    flex-grow: 0;
+    flex-shrink: 0;
 }
 
 #working-program {
