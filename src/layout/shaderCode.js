@@ -39,6 +39,7 @@ function prepareElements(line, shaderKey) {
         code: createDiv(line.code.original, "code"),
         number: createDiv(line.number, "line-number"),
         annotation: createDiv("", "annotation"),
+        changedInfo: createDiv("", "changed-info"),
     };
     elements.line.appendChild(elements.number);
     elements.line.appendChild(elements.code);
@@ -53,11 +54,17 @@ function prepareElements(line, shaderKey) {
     if (line.changed) {
         elements.line.classList.add("changed");
         elements.line.title = "Line Changed"
-        annotation = "changed";
+        annotation = line.removedBefore.length === 0
+            ? "added"
+            : "changed";
     }
     if (line.removedBefore.length > 0) {
         elements.line.classList.add("removed-before");
         elements.line.title = "Was Removed: " + line.removedBefore.join("\n").trim();
+    }
+    if (line.changedBlock?.removed.length > 0) {
+        elements.line.appendChild(elements.changedInfo);
+        writeRemovedBlock(elements.changedInfo, line);
     }
 
     const errors = line.error
@@ -77,4 +84,22 @@ function prepareElements(line, shaderKey) {
     }
 
     return elements;
+}
+
+function writeRemovedBlock(parent, line) {
+    const closeButton = document.createElement("button");
+    closeButton.textContent = "\u2716";
+    closeButton.addEventListener("click", () => {
+        parent.style.display = "none";
+    });
+
+    parent.appendChild(createDiv("Removed:"));
+    parent.appendChild(closeButton);
+    let lineNumber = line.number;
+    for (const removed of line.changedBlock.removed) {
+        parent.appendChild(createDiv(lineNumber, "line-number"));
+        parent.appendChild(createDiv(removed.value));
+        parent.appendChild(createDiv());
+        lineNumber++;
+    }
 }

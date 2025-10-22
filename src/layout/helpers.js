@@ -3,7 +3,7 @@ export function createDiv(content, classes) {
     if (classes) {
         div.classList.add(...classes.split(" "));
     }
-    div.textContent = content.toString();
+    div.textContent = content?.toString() ?? "";
     return div;
 }
 

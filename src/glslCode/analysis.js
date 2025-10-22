@@ -34,7 +34,7 @@ export function analyzeShader(source, errorLog, shaderKey) {
         symbols: [],
         scopes: [],
         functions: [],
-        changedBlocks: [],
+        changedBlockAt: {},
     };
     const cursor = {
         index: 0,
@@ -54,7 +54,8 @@ export function analyzeShader(source, errorLog, shaderKey) {
             cursor.currentChangedBlock.diffs.push(diff);
         } else {
             if (cursor.currentChangedBlock.type !== null) {
-                analyzed.changedBlocks.push(cursor.currentChangedBlock);
+                const lineNumber = cursor.currentChangedBlock.startIndex + 1;
+                analyzed.changedBlockAt[lineNumber] = cursor.currentChangedBlock;
             }
             cursor.currentChangedBlock = {
                 type,
@@ -102,6 +103,7 @@ export function analyzeShader(source, errorLog, shaderKey) {
             changed,
             number: cursor.index + 1,
             removedBefore: cursor.removedBefore,
+            changedBlock: null,
             error: errors[cursor.index],
             belongsToUnusedDefinition: false,
             positionInSource: cursor.positionInSource,
@@ -118,6 +120,14 @@ export function analyzeShader(source, errorLog, shaderKey) {
     analyzed.lines = analyzed.lines.filter(
         l => l.consecutiveEmpty < 2
     );
+
+    for (const line of analyzed.lines) {
+        if (analyzed.changedBlockAt[line.number]) {
+            line.changedBlock = analyzed.changedBlockAt[line.number]
+            line.changedBlock.removed = line.changedBlock.diffs
+                .filter(d => d.removed);
+        }
+    }
 
     return analyzed;
 }

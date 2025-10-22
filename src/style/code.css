@@ -107,7 +107,7 @@
 }
 
 .line-number {
-    font-size: 0.5em;
+    font-size: 0.65rem;
     width: 1.2rem;
     font-weight: normal;
     text-align: right;
@@ -182,4 +182,34 @@
 .quicklink:hover {
     cursor: pointer;
     opacity: 0.6;
+}
+
+.changed-info {
+    position: absolute;
+    top: 0;
+    right: 0;
+    background: white;
+    padding: 2px;
+    z-index: 1;
+    border: 1px solid darkred;
+    box-shadow: 2px 2px 1px #0002;
+    font-size: smaller;
+    font-family: monospace;
+    color: darkred;
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+}
+
+.changed-info > button {
+    padding: 0 0.5rem;
+    border-radius: 0;
+    border-color: darkred;
+    color: darkred;
+    background: none;
+}
+
+.changed-info > div:first-of-type {
+    grid-column: span 2;
+    opacity: 0.7;
 }
