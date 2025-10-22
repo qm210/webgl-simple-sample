@@ -13,6 +13,17 @@ const regex = {
         new RegExp(`\buniform\s+${type}\s+${name};`),
 }
 
+export function maybeAdjustForCompatibility(shaderSource) {
+    let src = shaderSource;
+    // quick way to include Shader Toy shaders: add ?shadertoy-Flag to URL Query (value doesn't matter)
+    const shaderToyFlag = window.location.search.includes("shadertoy");
+    if (shaderToyFlag) {
+        src = translateShaderToyFormat(src);
+    }
+    // -- might add further variations / dialects here --
+    return src;
+}
+
 export function translateShaderToyFormat(source) {
     // OpenGL/WebGL versions like to differ in small-but-annoying details,
     // this holds e.g. when comparing shaders from Shader Toy to current WebGL2.

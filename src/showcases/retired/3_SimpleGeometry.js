@@ -3,7 +3,6 @@ import {compile, createStaticVertexBuffer, initVertices} from "../../webgl/setup
 import vertexShaderSource from "../../shaders/spring-2025/basic.vertex.glsl";
 import defaultFragmentShaderSource from "../../shaders/spring-2025/simpleGeometry.glsl";
 import {startRenderLoop} from "../../webgl/render.js";
-import {translateShaderToyFormat} from "../../webgl/compatibility.js";
 
 export default {
     title: "Simple Geometry",
@@ -13,7 +12,10 @@ export default {
             [-1, -1, +1, -1, -1, +1, -1, +1, +1, -1, +1, +1]
         );
 
-        const state = compile(gl, vertexShaderSource, fragmentShaderSource);
+        const state = compile(gl, {
+            vertex: vertexShaderSource,
+            fragment: fragmentShaderSource,
+        });
         if (!state.program) {
             // remember: need to exist because otherwise we cannot display any errors...
             return state;

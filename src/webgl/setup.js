@@ -1,5 +1,5 @@
 import {asResolution, createShader} from "./helpers.js";
-import {translateShaderToyFormat} from "./compatibility.js";
+import {maybeAdjustForCompatibility} from "./compatibility.js";
 
 /**
  *
@@ -61,11 +61,12 @@ export function createStaticIndexBuffer(gl, indexArray) {
     return buffer;
 }
 
-function createInitialState(vertexSrc, fragmentSrc) {
+function createInitialState(sources) {
+    sources.fragment = maybeAdjustForCompatibility(sources.fragment);
     return {
         source: {
-            vertex: vertexSrc,
-            fragment: fragmentSrc,
+            vertex: sources.vertex,
+            fragment: sources.fragment,
         },
         error: {
             vertex: "",
@@ -77,26 +78,19 @@ function createInitialState(vertexSrc, fragmentSrc) {
     };
 }
 
-// quick way to include Shader Toy shaders: add ?shadertoy-Flag to URL Query (value doesn't matter)
-const shaderToyFlag = window.location.search.includes("shadertoy");
-
 /**
  *
  * @param gl - the WebGl context (browser needs to support this)
- * @param vertexSrc - the Vertex Shader Source
- * @param fragmentSrc - the Fragment Shader Source
+ * @param {{vertex: string, fragment, string}} sources - the Fragment and Vertex Shader Source
  */
-export function compile(gl, vertexSrc, fragmentSrc) {
-    if (shaderToyFlag) {
-        fragmentSrc = translateShaderToyFormat(fragmentSrc);
-    }
+export function compile(gl, sources) {
 
-    const result = createInitialState(vertexSrc, fragmentSrc);
+    const result = createInitialState(sources);
 
-    const v = createShader(gl, gl.VERTEX_SHADER, vertexSrc);
+    const v = createShader(gl, gl.VERTEX_SHADER, sources.vertex);
     result.error.vertex = v.error;
 
-    const f = createShader(gl, gl.FRAGMENT_SHADER, fragmentSrc);
+    const f = createShader(gl, gl.FRAGMENT_SHADER, sources.fragment);
     result.error.fragment = f.error;
 
     const program = gl.createProgram();

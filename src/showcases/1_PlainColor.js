@@ -5,14 +5,16 @@ import fragmentShaderSource from "../shaders/spring-2025/singleColor.glsl";
 
 export default {
     title: "Very simple example",
-    init: (gl) => {
-        // QUESTION: what the... is this?
+    init: (gl, sources = {}) => {
         createStaticVertexBuffer(
             gl,
-            [-1, -1, +1, -1, -1, +1, -1, +1, +1, -1, +1, +1]
+            // what the... is this?
+            [-1, -1, +1, -1, -1, 1, -1, +1, +1, -1, +1, +1]
         );
 
-        const state = compile(gl, vertexShaderSource, fragmentShaderSource);
+        sources.vertex ??= vertexShaderSource;
+        sources.fragment ??= fragmentShaderSource;
+        const state = compile(gl, sources);
         if (!state.program) {
             return state;
         }

@@ -1,7 +1,5 @@
 import {createDiv} from "./helpers.js";
-import {analyzeShader, extendAnalysis} from "../glslCode/analysis.js";
-import {withGlslHighlighting, withSymbolsHighlighted} from "../glslCode/highlighting.js";
-import {addShaderCodeEventListeners, scrollToElementId} from "./events.js";
+import {analyzeShader} from "../glslCode/analysis.js";
 
 export function registerShaderCode(elements, shaderSource, errorLog, shaderKey, title = "") {
     if (!shaderSource) {

@@ -2,8 +2,15 @@
     margin: 0 auto;
     display: flex;
     color-scheme: light dark;
-    background-color: light-dark(#fff, #242424);
-    color: light-dark(#000, #fff);
+    background-color: #fff;
+    color: #000;
+}
+
+@media (prefers-color-scheme: dark) {
+    #app {
+        background-color: #242424;
+        color: #fff;
+    }
 }
 
 #layout {
@@ -89,7 +96,7 @@
 
     @media (min-width: 800px) {
         /* width: 50vw; */
-        height: 60vh;
+        height: 50vh;
         min-height: min(100%, 400px);
     }
 }

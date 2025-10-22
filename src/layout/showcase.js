@@ -26,6 +26,20 @@ export function prepareShowcase(showcase, glContext) {
     return state;
 }
 
+export function reconfigureShowcase(state, showcase, glContext, updates) {
+    // delete everything that exists (program etc.)
+    // or at least, that is about to be updated
+    if (updates.vertex) {
+        // ...
+    }
+    if (updates.fragment) {
+        // ...
+    }
+    console.log("reconfigure Showcase", state, updates);
+    throw Error("Not Implemented");
+    return prepareShowcase(showcase, glContext);
+}
+
 function readUniforms(...sources) {
     const result = [];
     for (const source of sources) {

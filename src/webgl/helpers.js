@@ -18,24 +18,6 @@ export function createShader(gl, type, source) {
     return {shader, error};
 }
 
-export function createProgram(gl, vertexShader, fragmentShader) {
-    let program = gl.createProgram();
-    let error = "";
-
-    gl.attachShader(program, vertexShader);
-    gl.attachShader(program, fragmentShader);
-    gl.linkProgram(program);
-
-    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-        error = gl.getProgramInfoLog(program);
-        gl.deleteProgram(program);
-        program = null;
-    }
-
-    return {program, error};
-}
-
-
 /**
  * Helper function for aspectRatio
  * @param geometry {width, height, aspectRatio} - canvas dimensions, specify either two

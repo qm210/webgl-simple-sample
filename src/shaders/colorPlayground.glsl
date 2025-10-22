@@ -181,7 +181,8 @@ void drawPaletteRing(inout vec3 col, vec2 uv, float theta) {
 
 #define CASE_STUDY_HSV_HSL 0
 #define CASE_STUDY_HSV_OKLCH 0
-#define DEMONSTRATE_COSINE_PALETTE 0
+#define DEMONSTRATE_COSINE_PALETTE 1
+#define RAINBOW_RING 1
 
 void drawColors(inout vec3 col, vec2 uv, bool right) {
     // (*) was ist das hier anschaulich, welche Werte nimmt es an?
@@ -191,20 +192,23 @@ void drawColors(inout vec3 col, vec2 uv, bool right) {
     // just for seeing the "third dimension"
     float wave = 0.5 - 0.5 * cos(twoPi * 0.1 * iTime);
     vec3 colHSV = vec3(theta, r, wave);
+    vec3 colHSL;
     col = hsv2rgb(colHSV);
 
     #if CASE_STUDY_HSV_HSL
+        colHSL = vec3(theta, r, wave);
         if (right) {
-            vec3 colHSL = vec3(theta, r, wave);
             col = hsl2rgb(colHSL);
         }
+        return;
     #endif
 
     #if CASE_STUDY_HSV_OKLCH
         if (right) {
             vec3 colOKLCH = vec3(wave, r, theta);
-            col = oklch2rgb(colHSL);
+            col = oklch2rgb(colOKLCH);
         }
+        return;
     #endif
 
     #if DEMONSTRATE_COSINE_PALETTE
@@ -216,12 +220,14 @@ void drawColors(inout vec3 col, vec2 uv, bool right) {
     #endif
 
     // Fallback: "Rainbow Ring"
-    col = c.xxx;
-    applyGrid(col, uv);
-    vec3 colRing = right
-        ? oklch2rgb(vec3(wave, .3, twoPi * theta))
-        : hsv2rgb(vec3(theta, 1., wave));
-    drawRing(col, colRing, uv);
+    #if RAINBOW_RING
+        col = c.xxx;
+        applyGrid(col, uv);
+        vec3 colRing = right
+            ? oklch2rgb(vec3(wave, .3, twoPi * theta))
+            : hsv2rgb(vec3(theta, 1., wave));
+        drawRing(col, colRing, uv);
+    #endif
 }
 
 void main() {

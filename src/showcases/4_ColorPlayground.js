@@ -7,13 +7,15 @@ import {startRenderLoop} from "../webgl/render.js";
 
 export default {
     title: "Playground: Color",
-    init: (gl) => {
+    init: (gl, sources = {}) => {
         createStaticVertexBuffer(
             gl,
             [-1, -1, +1, -1, -1, 1, -1, +1, +1, -1, +1, +1]
         );
 
-        const state = compile(gl, vertexShaderSource, fragmentShaderSource);
+        sources.vertex ??= vertexShaderSource;
+        sources.fragment ??= fragmentShaderSource;
+        const state = compile(gl, sources);
         if (!state.program) {
             return state;
         }

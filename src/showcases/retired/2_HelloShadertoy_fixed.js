@@ -12,7 +12,10 @@ export default {
             [-1, -1, +1, -1, -1, +1, -1, +1, +1, -1, +1, +1]
         );
 
-        const state = compile(gl, vertexShaderSource, fragmentShaderSource);
+        const state = compile(gl, {
+            vertex: vertexShaderSource,
+            fragment: fragmentShaderSource,
+        });
         if (!state.program) {
             return state;
         }

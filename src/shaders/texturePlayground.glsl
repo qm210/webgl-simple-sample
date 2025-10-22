@@ -29,6 +29,12 @@ float sdCircle( in vec2 p, in float r )
     return length(p)-r;
 }
 
+mat2 rotate(float angle) {
+    float c = cos(angle);
+    float s = sin(angle);
+    return mat2(c, -s, s,  c);
+}
+
 void applyGrid(inout vec3 col, in vec2 uv, float gridStep) {
     uv = mod(uv, gridStep);
     // <-- verallgemeinert fract(x) == mod(x, 1.)
@@ -45,10 +51,10 @@ vec3 grayscale(vec3 col) {
 // Absicht: Flags zum einfachen Vergleich ("rumspielen"),
 //          aber auch die if (false) {...} anschauen oder die uniforms mal ändern
 //          gerne auch "irgendwo anders dranhängen" :)
-#define SHOW_SAMPLE_TEXTURE 1
-#define SHOW_STARFIELD 1
-#define APPLY_ST_CORRECTION_FOR_TEXTURE2 0
-#define APPLY_BLENDING_METHODS 0
+#define SHOW_SAMPLE_TEXTURE 0
+#define SHOW_STARFIELD 0
+#define APPLY_ST_CORRECTION_FOR_TEXTURE2 1
+#define APPLY_BLENDING_METHODS 1
 #define APPLY_MANUAL_RGB_SHIFT 0
 
 void main() {
@@ -63,13 +69,10 @@ void main() {
     // a) was ist d, für sich genommen?
     bg = d * c.xxx;
     // b) Gewöhnliche Behandlung des Rands (d==0) der Geometrie:
-    // bg = mix(c.yyy, c.xxx, smoothstep(0., 0.001, d));
+    bg = mix(c.yyy, c.xxx, smoothstep(0., 0.001, d));
 
     applyGrid(bg, uv, 0.5);
     fragColor.rgb = bg;
-
-    if (false)
-        return;
 
     col0 = texture(iTexture0, uv).rgb; // .rgb == .xyz
     if (uv.x > 0. && uv.y > 0.) {
@@ -85,6 +88,7 @@ void main() {
     if (false) { // <-- VERGLEICHT DAS
         col1 = texture(iTexture1, uv).rgb;
     } else {
+        // st *= rotate(0.1 * iTime);
         col1 = texture(iTexture1, st).rgb;
     }
     #if SHOW_STARFIELD
@@ -179,6 +183,7 @@ void main() {
 
     // -> auf Graustufen reduzieren:
     float gray = dot(col, vec3(0.299, 0.587, 0.114));
+    // float gray = 0.33 * col.r + 0.33 * col.g + 0.33 * col.b;
     col = mix(col, vec3(gray), iGray);
 
     #if APPLY_MANUAL_RGB_SHIFT
