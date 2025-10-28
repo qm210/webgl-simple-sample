@@ -26,6 +26,6 @@ console.log("WebGL objects initialized:", state);
 
 const controls = showcase.generateControls(glContext, state, elements);
 
-generatePage(elements, state, controls, autoRenderOnLoad);
+generatePage(glContext, elements, state, controls, autoRenderOnLoad);
 
 console.log("Page took", elements.initialRenderMs.toFixed(1), "ms to render.");

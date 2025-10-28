@@ -31,6 +31,13 @@ export function createSpan({text, id, classes, title, data}) {
     return span;
 }
 
+export function appendButton(parent, text, onClickHandler) {
+    const button = document.createElement("button");
+    button.textContent = text;
+    button.addEventListener("click", onClickHandler);
+    parent.appendChild(button);
+}
+
 export function assignGloballyUniqueClass(element, className) {
     if (!element) {
         return;
@@ -50,4 +57,3 @@ export function findParentOfClass(element, className) {
     }
     return result;
 }
-

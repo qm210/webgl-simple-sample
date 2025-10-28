@@ -1,12 +1,13 @@
 import {addButton, createInputElements, addValueRow} from "./controls.js";
 import {registerShaderCode} from "./shaderCode.js";
-import {appendText} from "./helpers.js";
+import {appendButton, appendText} from "./helpers.js";
 import {createScrollStackOn, scrollToFirstInterestingLine} from "./events.js";
 import {deferExtendedAnalysis} from "../glslCode/deferredAnalysis.js";
 import {shiftTime} from "../webgl/render.js";
+import {setCanvasResolution} from "../webgl/setup.js";
 
 
-const generatePage = (elements, state, controls, autoRenderOnLoad) => {
+const generatePage = (glContext, elements, state, controls, autoRenderOnLoad) => {
 
     if (!state.program) {
         elements.workingShader.remove();
@@ -60,8 +61,9 @@ const generatePage = (elements, state, controls, autoRenderOnLoad) => {
         scrollToFirstInterestingLine();
     });
 
+    addCanvasMouseInteraction(elements, state);
     addControlsToPage(elements, state, controls, autoRenderOnLoad);
-    addCanvasControls(elements, state);
+    addCanvasControls(elements, state, glContext);
 
     elements.initialRenderMs = performance.now() - elements.startRendering;
 };
@@ -187,16 +189,10 @@ function renderCompileStepStatus(title, error, successMessage) {
     `;
 }
 
-function addCanvasControls(elements, state) {
-    const plusButton = document.createElement("button");
-    plusButton.textContent = "+";
-    plusButton.addEventListener("click", resizeHandler(1.05));
-    const minusButton = document.createElement("button");
-    minusButton.textContent = "\u2013";
-    minusButton.addEventListener("click", resizeHandler(0.95));
-
-    elements.canvasControls.appendChild(plusButton);
-    elements.canvasControls.appendChild(minusButton);
+function addCanvasControls(elements, state, glContext) {
+    appendButton(elements.canvasControls, "+", resizeHandler(1.05));
+    appendButton(elements.canvasControls, "–", resizeHandler(0.95));
+    // ...the EN DASH ("\u2013") is more pretty as minus than the hyphen :)
 
     function resizeHandler(factor) {
         return () => {
@@ -204,13 +200,43 @@ function addCanvasControls(elements, state) {
             let height = elements.canvas.height;
             width = Math.max(Math.round(width * factor), 1);
             height = Math.max(Math.round(height * factor), 1);
-            elements.canvas.style.width = `${width}px`;
-            elements.canvas.style.height = `${height}px`;
-            // TODO: should we respect window.devicePixelRatio here?
-            elements.canvas.width = width;
-            elements.canvas.height = height;
-            elements.canvas.getContext("webgl2").viewport(0, 0, width, height);
+            setCanvasResolution(elements.canvas, glContext, width, height);
             state.resolution = [width, height];
+        };
+    }
+}
+
+function addCanvasMouseInteraction(elements, state) {
+    let isPressed = false;
+    // Convention for iMouse is (e.g. shadertoy)
+    //   iMouse.xy = the current mouse position when some button is pressed (i.e. dragged to) -> [0, 0] if not pressed
+    //   iMouse.zw = the last mouse position where there button was pressed (i.e. dragged from)
+    state.iMouse = [0, 0, 0, 0];
+
+    elements.canvas.addEventListener("mousedown", event => {
+        isPressed = true;
+        const pressed = correctedCoordinates(event);
+        state.iMouse = [pressed.x, pressed.y, pressed.x, pressed.y];
+    });
+    elements.canvas.addEventListener("mousemove", event => {
+       if (!isPressed) {
+           return;
+       }
+       const dragged = correctedCoordinates(event);
+       state.iMouse[0] = dragged.x;
+       state.iMouse[1] = dragged.y;
+    });
+    elements.canvas.addEventListener("mouseup", event => {
+        isPressed = false;
+        state.iMouse[0] = 0;
+        state.iMouse[1] = 0;
+    });
+
+    function correctedCoordinates(event) {
+        // the y convention in GLSL is opposed to the HTML convention.
+        return {
+            x: event.offsetX,
+            y: elements.canvas.height - event.offsetY
         };
     }
 }

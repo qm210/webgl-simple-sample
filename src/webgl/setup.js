@@ -1,4 +1,4 @@
-import {asResolution, createShader} from "./helpers.js";
+import {createShader, initialOrStoredResolution, storeResolution} from "./helpers.js";
 import {maybeAdjustForCompatibility} from "./compatibility.js";
 
 /**
@@ -21,7 +21,6 @@ export function setupWebGl(canvas, geometry) {
 
     // WebGL2-spezifisch müsen manche Erweiterungen für manche Anwendungszwecke nachgeladen werden,
     // https://developer.mozilla.org/en-US/docs/Web/API/WebGL_API/Using_Extensions
-    // wir brauchen hier erstmal nur:
     const WEBGL_EXTENSIONS = ["EXT_color_buffer_float"];
     gl.ext = {};
     for (const extension of WEBGL_EXTENSIONS) {
@@ -31,18 +30,21 @@ export function setupWebGl(canvas, geometry) {
         }
         gl.ext[extension] = ext;
     }
-    // <-- kann man als Anfänger ignorieren, aber wir brauchen das später für Float-Texturen / Framebuffer
+    // <-- braucht man (später) für Float-Texturen / Framebuffer
 
-    const canvasRect = canvas.getBoundingClientRect();
-    if (!geometry.height) {
-        geometry.height = canvasRect.height;
-    }
-    const {width, height} = asResolution(geometry);
+    const {width, height} = initialOrStoredResolution(canvas, geometry);
+    setCanvasResolution(canvas, gl, width, height);
+    return gl;
+}
+
+export function setCanvasResolution(canvas, glContext, width, height) {
+    canvas.style.width = `${width}px`;
+    canvas.style.height = `${height}px`;
+    // TODO: need to think about window.devicePixelRatio here?
     canvas.width = width;
     canvas.height = height;
-    gl.viewport(0, 0, width, height);
-
-    return gl;
+    glContext.viewport(0, 0, width, height);
+    storeResolution(width, height);
 }
 
 export function createStaticVertexBuffer(gl, vertexArray) {
@@ -87,6 +89,8 @@ export function compile(gl, sources) {
 
     const result = createInitialState(sources);
 
+    result.resolution = [gl.drawingBufferWidth, gl.drawingBufferHeight];
+
     const v = createShader(gl, gl.VERTEX_SHADER, sources.vertex);
     result.error.vertex = v.error;
 
@@ -110,7 +114,6 @@ export function compile(gl, sources) {
     result.program = program;
     return result;
 }
-
 
 export function initVertices(gl, state, variableName) {
     // Note: state.program needs to exist here!

@@ -159,7 +159,7 @@ button.render-button {
 }
 
 #canvas-controls > button {
-    padding: 0.25rem 0.75rem;
-    font-size: large;
+    padding: 0.2rem 0.5rem;
+    font-size: x-large;
     font-family: monospace;
 }

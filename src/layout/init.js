@@ -1,6 +1,6 @@
 
 
-export default function init(rootId) {
+export default function initLayout(rootId) {
 
     const root = document.getElementById(rootId);
     root.innerHTML = `

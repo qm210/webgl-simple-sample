@@ -5,15 +5,15 @@ import showcase2c from "./showcases/2_GeometryPlayground_grid.js";
 import showcase3 from "./showcases/3_Textures.js";
 import showcase4 from "./showcases/4_ColorPlayground.js";
 import showcase5 from "./showcases/5_Noise.js";
-import showcase6a from "./showcases/retired/5a_RayTracingCubeBeginning.js";
-import showcase6b from "./showcases/retired/5b_RayTracingCubeExtended.js";
+import showcase6a from "./showcases/6a_RayMarchingPrimitivesSimplified.js";
+import showcase6b from "./showcases/6b_RayMarchingPrimitives.js";
 import showcase7 from "./showcases/retired/6_TexturesIn3D.js";
 import showcase8 from "./showcases/retired/8_Multipass.js";
 import showcase9 from "./showcases/retired/9_FramebufferPingPong.js";
 import showcase10 from "./showcases/retired/10_StochasticRayTracing.js";
 import showcase11 from "./showcases/retired/11_Volumetric.js";
 
-const defaultShowcase = showcase3;
+const defaultShowcase = showcase6a;
 
 export function selectShowcase() {
 
@@ -36,6 +36,7 @@ export function selectShowcase() {
         case "5":
             return showcase5;
         case "6":
+        case "6a":
             return showcase6a;
         case "6b":
             return showcase6b;

@@ -20,7 +20,7 @@ export function createShader(gl, type, source) {
 
 /**
  * Helper function for aspectRatio
- * @param geometry {width, height, aspectRatio} - canvas dimensions, specify either two
+ * @param geometry {width, height, aspectRatio} - canvas dimensions, specify any two
  * @return {{width, height}} - the resolution in integer pixels.
  */
 export function asResolution({width, height, aspectRatio}) {
@@ -34,6 +34,29 @@ export function asResolution({width, height, aspectRatio}) {
         width: Math.round(width || height * aspectRatio),
         height: Math.round(height ?? width / aspectRatio),
     };
+}
+
+/**
+ * @return {{width, height}}
+ */
+export function initialOrStoredResolution(canvas, geometry) {
+    const canvasRect = canvas.getBoundingClientRect();
+    geometry.height = loadStoredResolutionHeight()
+        ?? geometry.height
+        ?? canvasRect.height;
+    if (!geometry.aspectRatio && !geometry.width) {
+        geometry.width = canvasRect.width;
+    }
+    return asResolution(geometry);
+}
+
+function loadStoredResolutionHeight() {
+    const resolution = JSON.parse(localStorage.getItem("qm.resolution") ?? "null");
+    return resolution?.height ?? null;
+}
+
+export function storeResolution(width, height) {
+    localStorage.setItem("qm.resolution", JSON.stringify({width, height}));
 }
 
 export function loadImage(imageSource, onLoad) {
