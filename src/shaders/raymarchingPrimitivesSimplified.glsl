@@ -13,7 +13,7 @@ out vec4 fragColor;
 uniform vec2 iResolution;
 uniform float iTime;
 uniform vec4 iMouse;
-uniform float iFocalLength;
+// uniform float iFocalLength;
 // for you to play around with, put 'em wherever you want:
 uniform float iFree0;
 uniform float iFree1;
@@ -26,39 +26,41 @@ uniform float iFree7;
 uniform float iFree8;
 uniform float iFree9;
 
-const float twoPi = 6.2832;
+const float pi = 3.141593;
+const float twoPi = 2. * pi;
+const vec4 c = vec4(1., 0. , -1., .5);
 
 mat3 rotX(float angle) {
     float c = cos(angle);
     float s = sin(angle);
+    // Obacht: GLSL-Matrizen sind "column-major", d.h. die ersten drei Einträge sind die erste Spalte, etc.
+    // Auf die einzelnen Spalten zugreifen lässt sich per: vec3 zweiteSpalte = matrix[1];
     return mat3(
         1., 0., 0.,
         0.,  c,  s,
         0., -s,  c
     );
-    // Obacht: GLSL-Matrizen sind "column-major", d.h. die ersten drei Einträge sind die erste Spalte, etc.
-    // Auf die einzelnen Spalten zugreifen lässt sich per vec3 zweiteSpalte = matrix[1];
 }
 
-#define COS cos(angle)
-#define SIN sin(angle)
-
 mat3 rotY(float angle) {
+    float c = cos(angle);
+    float s = sin(angle);
     return mat3(
-        COS, 0.0, -SIN,
-        0.0, 0.0,  0.0,
-        SIN, 0.0,  COS
+          c, 0.0,  -s,
+        0.0, 0.0, 0.0,
+          s, 0.0,   c
     );
 }
 
 mat3 rotZ(float angle) {
+    float c = cos(angle);
+    float s = sin(angle);
     return mat3(
-        COS, SIN, 0.0,
-       -SIN, COS, 0.0,
+          c,   s, 0.0,
+         -s,   c, 0.0,
         0.0, 0.0, 1.0
     );
 }
-
 
 //------------------------------------------------------------------
 float dot2( in vec2 v ) { return dot(v,v); }
@@ -451,14 +453,14 @@ vec2 iBox( in vec3 ro, in vec3 rd, in vec3 rad )
 }
 
 // wie vec2, aber erklärt uns mehr über die Bedeutung :)
-struct RayCastResult {
+struct Marched {
     float t;
     float material;
 };
 
-RayCastResult raycast( in vec3 ro, in vec3 rd )
+Marched raycast( in vec3 ro, in vec3 rd )
 {
-    RayCastResult res = RayCastResult(-1.0,-1.0);
+    Marched res = Marched(-1.0,-1.0);
 
     float tmin = 1.0;
     float tmax = 20.0;
@@ -468,7 +470,7 @@ RayCastResult raycast( in vec3 ro, in vec3 rd )
     if( tp1>0.0 )
     {
         tmax = min( tmax, tp1 );
-        res = RayCastResult( tp1, 1.0 );
+        res = Marched( tp1, 1.0 );
     }
 
     // raymarch primitives
@@ -485,7 +487,7 @@ RayCastResult raycast( in vec3 ro, in vec3 rd )
             vec2 h = map( ro+rd*t );
             if( abs(h.x)<(0.0001*t) )
             {
-                res = RayCastResult(t, h.y);
+                res = Marched(t, h.y);
                 break;
             }
             t += h.x;
@@ -514,6 +516,22 @@ float calcSoftshadow( in vec3 ro, in vec3 rd, in float mint, in float tmax )
     return res*res*(3.0-2.0*res);
 }
 
+// https://iquilezles.org/articles/nvscene2008/rwwtt.pdf
+float calcAO( in vec3 pos, in vec3 nor )
+{
+    float occ = 0.0;
+    float sca = 1.0;
+    for( int i=0; i<5; i++ )
+    {
+        float h = 0.01 + 0.12*float(i)/4.0;
+        float d = map( pos + h*nor ).x;
+        occ += (h-d)*sca;
+        sca *= 0.95;
+        if( occ>0.35 ) break;
+    }
+    return clamp( 1.0 - 3.0*occ, 0.0, 1.0 ) * (0.5+0.5*nor.y);
+}
+
 // https://iquilezles.org/articles/normalsSDF
 vec3 calcNormal( in vec3 pos )
 {
@@ -530,45 +548,47 @@ vec3 render(in vec3 rayOrigin, in vec3 rayDir)
     vec3 col = vec3(0.7, 0.7, 0.9) - max(rayDir.y,0.0)*0.3;
 
     // raycast scene
-    RayCastResult res = raycast(rayOrigin,rayDir);
+    Marched res = raycast(rayOrigin,rayDir);
     if( res.material > -0.5 )
     {
         // material
         col = 0.2 + 0.2*sin( res.material*2.0 + vec3(0.0,1.0,2.0) );
-        float ks = 1.0;
+        float specularCoeff = 1.0;
         bool isFloor = res.material < 1.5;
 
         // ray evaluation
         vec3 rayPos = rayOrigin + res.t * rayDir;
         vec3 normal = isFloor ? vec3(0.0,1.0,0.0) : calcNormal(rayPos);
-        vec3 ref = reflect( rayDir, normal );
 
         if (isFloor)
         {
             float f = 1. - abs(step(0.5, fract(1.5*rayPos.x)) - step(0.5, fract(1.5*rayPos.z)));
             col = 0.15 + f*vec3(0.05);
-            ks = 0.4;
+            specularCoeff = 0.4;
         }
 
-        vec3 lin = vec3(0.0);
+        vec3 shade = vec3(0.0);
 
-        // point light source ("sun")
+        // Licht: reines Richtungslicht (passt zu einer Sonne, die weit weg ist, im Gegensatz zu Punktlicht)
         {
-            vec3  lightSource = normalize( vec3(-0.2, 0.4, -0.2) );
-            vec3  hal = normalize( lightSource - rayDir );
-            float diffuse = clamp( dot( normal, lightSource ), 0.0, 1.0 ); // dot( normal, lightSource ) <-- diffuse
-            diffuse *= calcSoftshadow( rayPos, lightSource, 0.02, 2.5 );
-            float specular = pow( clamp( dot( normal, hal ), 0.0, 1.0 ),16.0);
-            specular *= diffuse;
-            specular *= 0.04+0.96*pow(clamp(1.0-dot(hal,lightSource),0.0,1.0),5.0);
-            lin += col*2.20*diffuse*vec3(1.30,1.00,0.70);
-            lin +=     5.00*specular*vec3(1.30,1.00,0.70)*ks;
+            vec3  lightDirection = normalize( vec3(-0.2, 0.4, -0.2) ); // Vorsicht, Vorzeichenkonvention
+            vec3  halfway = normalize(lightDirection - rayDir); // was ist das, geometrisch?
+            float diffuse = clamp( dot(normal, lightDirection), 0.0, 1.0); // dot(normal, lightSource) <-- diffus (warum?)
+            diffuse *= calcSoftshadow(rayPos, lightDirection, 0.02, 2.5); // warum hier *= ...?
+            float specular = pow( clamp( dot( normal, halfway ), 0.0, 1.0), 90.0); // <-- glänzend (warum?)
+            // float fresnelAttenuation = 0.04 + 0.96*pow(clamp(1.0-dot(halfway,lightDirection), 0.0, 1.0), 5.0);
+            // specular *= fresnelAttenuation;
+            const vec3 sourceCol = vec3(1.30,1.00,0.70);
+            shade += col * 2.20 * sourceCol * diffuse;
+            shade +=       3.00 * sourceCol * specular * specularCoeff;
         }
 
-        col = lin;
+        col = shade;
 
-        // distance fog
-        col = mix( col, vec3(0.7,0.7,0.9), 1.0-exp( -0.0001*pow(res.t, 3.)) );
+        // "Distanznebel", inwiefern macht dieser Begriff Sinn?
+        const vec3 colFog = vec3(0.7, 0.7, 0.9);
+        float fogOpacity = 1.0 - exp( -0.0001 * pow(res.t, 3.0));
+        col = mix(col, colFog, fogOpacity);
     }
 
     return clamp(col, 0.0, 1.0);
@@ -590,18 +610,22 @@ void main()
     float rot = mo.x == 0. ? 0.02 * iTime : mo.x;
 
     // camera
-    vec3 cameraTarget = vec3( 0.25, -0.75, -0.75);
+    vec3 cameraTarget = vec3( 0.25 + iFree0, -0.75 + iFree1, -0.75 + iFree2);
     vec3 rayOrigin = cameraTarget + vec3( 4.5 * cos(twoPi * rot), 2.2, 4.5 * sin(-twoPi * rot));
     // camera-to-world transformation
     mat3 ca = setCamera( rayOrigin, cameraTarget, 0.0 );
     // ray direction
-    vec3 rayDirection = ca * normalize( vec3(uv, iFocalLength) );
+    const float focalLength = 2.5;
+    vec3 rayDirection = ca * normalize( vec3(uv, focalLength) );
 
     // render
     vec3 col = render( rayOrigin, rayDirection);
 
-    // gain
-    // col = col*3.0/(2.5+col);
+    // gain ("HDR compression", Konstanten so gewählt dass [0,1] erhalten bleibt)
+    // col = col * 2.5/(1.5 + col);
+    // col = col * 3.0/(2.5 + col)
+    // <-- quasi Alternativen zur pow()-Gammakorrektur, man wähle was einem gefällt. Siehe auch:
+    // https://graphtoy.com/?f1(x,t)=pow(x,1./2.2)&v1=true&f2(x,t)=x*3./(2.5+x)&v2=true&f3(x,t)=x*2.5/(1.5+x)&v3=true&f4(x,t)=&v4=false&f5(x,t)=&v5=false&f6(x,t)=&v6=false&grid=1&coords=0.744623141762885,0.5386673261892163,1.2183071759372475
 
     // gamma
     const float gamma = 2.2;

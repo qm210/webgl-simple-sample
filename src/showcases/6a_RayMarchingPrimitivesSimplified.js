@@ -12,7 +12,7 @@ export default {
             return state;
         }
 
-        state.location.iFocalLength = gl.getUniformLocation(state.program, "iFocalLength");
+        // state.location.iFocalLength = gl.getUniformLocation(state.program, "iFocalLength");
         state.location.iFree0 = gl.getUniformLocation(state.program, "iFree0");
         state.location.iFree1 = gl.getUniformLocation(state.program, "iFree1");
         state.location.iFree2 = gl.getUniformLocation(state.program, "iFree2");
@@ -38,12 +38,12 @@ export default {
             type: "label",
             name: "iTime",
         }, {
-            type: "floatInput",
-            name: "iFocalLength",
-            defaultValue: 2.5,
-            min: 0.001,
-            max: 20,
-        }, {
+        //     type: "floatInput",
+        //     name: "iFocalLength",
+        //     defaultValue: 2.5,
+        //     min: 0.001,
+        //     max: 20,
+        // }, {
             type: "floatInput",
             name: "iFree0",
             defaultValue: 0,
@@ -112,7 +112,7 @@ function render(gl, state) {
     gl.uniform2fv(state.location.iResolution, state.resolution);
     gl.uniform4fv(state.location.iMouse, state.iMouse);
 
-    gl.uniform1f(state.location.iFocalLength, state.iFocalLength);
+    // gl.uniform1f(state.location.iFocalLength, state.iFocalLength);
 
     gl.uniform1f(state.location.iFree0, state.iFree0);
     gl.uniform1f(state.location.iFree1, state.iFree1);
