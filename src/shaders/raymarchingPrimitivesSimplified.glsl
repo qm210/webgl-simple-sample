@@ -36,9 +36,9 @@ mat3 rotX(float angle) {
     // Obacht: GLSL-Matrizen sind "column-major", d.h. die ersten drei Einträge sind die erste Spalte, etc.
     // Auf die einzelnen Spalten zugreifen lässt sich per: vec3 zweiteSpalte = matrix[1];
     return mat3(
-        1., 0., 0.,
-        0.,  c,  s,
-        0., -s,  c
+        1.0, 0.0, 0.0,
+        0.0,   c,   s,
+        0.0,  -s,   c
     );
 }
 
@@ -47,7 +47,7 @@ mat3 rotY(float angle) {
     float s = sin(angle);
     return mat3(
           c, 0.0,  -s,
-        0.0, 0.0, 0.0,
+        0.0, 1.0, 0.0,
           s, 0.0,   c
     );
 }
@@ -371,9 +371,22 @@ float sdU( in vec3 p, in float r, in float le, vec2 w )
 
 //------------------------------------------------------------------
 
+// wie vec2, aber erklärt uns mehr über die Bedeutung :)
+struct Marched {
+    float t;
+    float material;
+};
+
 vec2 opUnion( vec2 d1, vec2 d2 )
 {
     return (d1.x<d2.x) ? d1 : d2;
+}
+
+Marched opUnion( Marched d1, Marched d2 )
+{
+    if (d1.t < d2.t)
+        return d1;
+    return d2;
 }
 
 vec2 map( in vec3 pos )
@@ -381,19 +394,17 @@ vec2 map( in vec3 pos )
     vec2 res = vec2( pos.y, 0.0 );
 
     // Anmerkung: Anstatt der bounding boxes KÖNNTE man hier alles berechnen und jeweils opUnion() nehmen
-    // das ist aber offensichtlich viel aufwändiger und, wenn man das Ergebnis kennt, klar verschwendet.
+    // das ist aber offensichtlich viel aufwändiger und, wenn man das Ergebnis kennt, evtl. verschwendet.
 
     // bounding box
-    /*
-    if( sdBox( pos-vec3(-2.0,0.3,0.25),vec3(0.3,0.3,1.0) )<res.x )
+    // if( sdBox( pos-vec3(-2.0,0.3,0.25),vec3(0.3,0.3,1.0) )<res.x )
     {
         res = opUnion( res, vec2( sdHexPrism(    pos-vec3(-2.0,0.25, 0.0), vec2(0.2,0.05) ), 18.4 ) );
         res = opUnion( res, vec2( sdRhombus(  (pos-vec3(-2.0,0.25, 1.0)).xzy, 0.15, 0.25, 0.04, 0.08 ),17.0 ) );
     }
-    */
+
     // bounding box
-    /*
-    if( sdBox( pos-vec3(0.0,0.3,-1.0),vec3(0.35,0.3,2.5) )<res.x )
+    // if( sdBox( pos-vec3(0.0,0.3,-1.0),vec3(0.35,0.3,2.5) )<res.x )
     {
         res = opUnion( res, vec2( sdCappedTorus((pos-vec3( 0.0,0.30, 1.0))*vec3(1,-1,1), vec2(0.866025,-0.5), 0.25, 0.05), 25.0) );
         res = opUnion( res, vec2( sdBoxFrame(    pos-vec3( 0.0,0.25, 0.0), vec3(0.3,0.25,0.2), 0.025 ), 16.9 ) );
@@ -401,33 +412,29 @@ vec2 map( in vec3 pos )
         res = opUnion( res, vec2( sdCappedCone(  pos-vec3( 0.0,0.25,-2.0), 0.25, 0.25, 0.1 ), 13.67 ) );
         res = opUnion( res, vec2( sdSolidAngle(  pos-vec3( 0.0,0.00,-3.0), vec2(3,4)/5.0, 0.4 ), 49.13 ) );
     }
-    */
 
     // bounding box
-    if( sdBox( pos-vec3(1.0,0.3,-1.0),vec3(0.35,0.3,2.5) )<res.x )
+    // if( sdBox( pos-vec3(1.0,0.3,-1.0),vec3(0.35,0.3,2.5) )<res.x )
     {
         res = opUnion( res, vec2( sdTorus(      (pos-vec3( 1.0,0.30, 1.0)).xzy, vec2(0.25,0.05) ), 7.1 ) );
         res = opUnion( res, vec2( sdBox(         pos-vec3( 1.0,0.25, 0.0), vec3(0.3,0.25,0.1) ), 3.0 ) );
         res = opUnion( res, vec2( sdSphere(      pos-vec3( 1.0,0.2,-1.0), 0.25 ), 26.9 ) );
-        res = opUnion( res, vec2( sdCylinder(    rotZ(0.*iTime)* (pos-vec3( 1.0,0.25,-2.0)), vec2(0.15,0.25) ), 8.0 ) );
-        // res = opUnion( res, vec2( sdCapsule(     pos-vec3( 1.0,0.00,-3.0),vec3(-0.1,0.1,-0.1), vec3(0.2,0.4,0.2), 0.1  ), 31.9 ) );
+        res = opUnion( res, vec2( sdCylinder(    rotZ(0.8*iTime)* (pos-vec3( 1.0,0.25,-2.0)), vec2(0.15,0.25) ), 8.0 ) );
+        res = opUnion( res, vec2( sdCapsule(     pos-vec3( 1.0,0.00,-3.0),vec3(-0.1,0.1,-0.1), vec3(0.2,0.4,0.2), 0.1  ), 31.9 ) );
     }
 
     // bounding box
-    /*
-    if( sdBox( pos-vec3(-1.0,0.35,-1.0),vec3(0.35,0.35,2.5))<res.x )
+    // if( sdBox( pos-vec3(-1.0,0.35,-1.0),vec3(0.35,0.35,2.5))<res.x )
     {
         res = opUnion( res, vec2( sdPyramid(    pos-vec3(-1.0,-0.6,-3.0), 1.0 ), 13.56 ) );
-        res = opUnion( res, vec2( sdOctahedron( pos-vec3(-1.0,0.15,-2.0), 0.35 ), 23.56 ) );
+        res = opUnion( res, vec2( sdOctahedron( pos-vec3(-1.0,0.15,-2.0) - rotY(iTime * 1.3)*vec3(-2.0,0.,0.), 0.35 ), 23.56 ) );
         res = opUnion( res, vec2( sdTriPrism(   pos-vec3(-1.0,0.15,-1.0), vec2(0.3,0.05) ),43.5 ) );
         res = opUnion( res, vec2( sdEllipsoid(  pos-vec3(-1.0,0.25, 0.0), vec3(0.2, 0.25, 0.05) ), 43.17 ) );
-        res = opUnion( res, vec2( sdHorseshoe(  pos-vec3(-1.0,0.25, 1.0), vec2(cos(1.3),sin(1.3)), 0.2, 0.3, vec2(0.03,0.08) ), 11.5 ) );
+        res = opUnion( res, vec2( sdHorseshoe(  pos-vec3(-1.0,0.25 + 0.25 * cos(twoPi * 2. * iTime), 1.0), vec2(cos(1.3),sin(1.3)), 0.2, 0.3, vec2(0.03,0.08) ), 11.5 ) );
     }
-    */
 
-    /*
     // bounding box
-    if( sdBox( pos-vec3(2.0,0.3,-1.0),vec3(0.35,0.3,2.5) )<res.x )
+    // if( sdBox( pos-vec3(2.0,0.3,-1.0),vec3(0.35,0.3,2.5) )<res.x )
     {
         res = opUnion( res, vec2( sdOctogonPrism(pos-vec3( 2.0,0.2,-3.0), 0.2, 0.05), 51.8 ) );
         res = opUnion( res, vec2( sdCylinder(    pos-vec3( 2.0,0.14,-2.0), vec3(0.1,-0.1,0.0), vec3(-0.2,0.35,0.1), 0.08), 31.2 ) );
@@ -435,7 +442,6 @@ vec2 map( in vec3 pos )
         res = opUnion( res, vec2( sdRoundCone(   pos-vec3( 2.0,0.15, 0.0), vec3(0.1,0.0,0.0), vec3(-0.1,0.35,0.1), 0.15, 0.05), 51.7 ) );
         res = opUnion( res, vec2( sdRoundCone(   pos-vec3( 2.0,0.20, 1.0), 0.2, 0.1, 0.3 ), 37.0 ) );
     }
-    */
 
     return res;
 }
@@ -451,12 +457,6 @@ vec2 iBox( in vec3 ro, in vec3 rd, in vec3 rad )
     return vec2( max( max( t1.x, t1.y ), t1.z ),
     min( min( t2.x, t2.y ), t2.z ) );
 }
-
-// wie vec2, aber erklärt uns mehr über die Bedeutung :)
-struct Marched {
-    float t;
-    float material;
-};
 
 Marched raycast( in vec3 ro, in vec3 rd )
 {
@@ -496,6 +496,53 @@ Marched raycast( in vec3 ro, in vec3 rd )
     return res;
 }
 
+Marched raycastJustTheSphere( in vec3 ro, in vec3 rd )
+{
+    Marched res = Marched(-1.0,-1.0);
+
+    float tmin = 1.0;
+    float tmax = 20.0;
+
+    // raytrace floor plane
+    float tp1 = (0.0-ro.y)/rd.y;
+    if( tp1>0.0 )
+    {
+        tmax = min( tmax, tp1 );
+        res = Marched( tp1, 1.0 );
+    }
+
+    // raymarch primitives
+    vec2 tb = iBox( ro-vec3(0.0,0.4,-0.5), rd, vec3(2.5,0.41,3.0) );
+    if( tb.x<tb.y && tb.y>0.0 && tb.x<tmax)
+    {
+        tmin = max(tb.x,tmin);
+        tmax = min(tb.y,tmax);
+
+        float t = tmin;
+        for( int i=0; i<70 && t<tmax; i++ )
+        {
+            vec3 pos = ro + rd * t;
+
+            /* best guess up to here: the floor is closest */
+            float minDistance = pos.y;
+            float material = 1.0;
+
+            float sphereDistance = sdSphere(pos-vec3( 1.0,0.2,-1.0), 0.25 );
+            if (sphereDistance < minDistance) {
+                minDistance = sphereDistance;
+                material = 1.5 + 0.1 * iTime; // rotes Sphere-Material
+            }
+            if( abs(minDistance) < (0.0001*t) )
+            {
+                res = Marched(t, material);
+                break;
+            }
+            t += minDistance;
+        }
+    }
+    return res;
+}
+
 // https://iquilezles.org/articles/rmshadows
 float calcSoftshadow( in vec3 ro, in vec3 rd, in float mint, in float tmax )
 {
@@ -504,7 +551,7 @@ float calcSoftshadow( in vec3 ro, in vec3 rd, in float mint, in float tmax )
 
     float res = 1.0;
     float t = mint;
-    for( int i=0; i<24; i++ )
+    for( int i=0; i<80; i++ )
     {
         float h = map( ro + rd*t ).x;
         float s = clamp(8.0*h/t,0.0,1.0);
@@ -545,10 +592,11 @@ vec3 calcNormal( in vec3 pos )
 vec3 render(in vec3 rayOrigin, in vec3 rayDir)
 {
     // background
-    vec3 col = vec3(0.7, 0.7, 0.9) - max(rayDir.y,0.0)*0.3;
+    vec3 col = vec3(0.0, 0., 0.0) - max(rayDir.y,0.0)*0.3;
 
     // raycast scene
     Marched res = raycast(rayOrigin,rayDir);
+    // Marched res = raycastJustTheSphere(rayOrigin, rayDir);
     if( res.material > -0.5 )
     {
         // material
@@ -571,12 +619,12 @@ vec3 render(in vec3 rayOrigin, in vec3 rayDir)
 
         // Licht: reines Richtungslicht (passt zu einer Sonne, die weit weg ist, im Gegensatz zu Punktlicht)
         {
-            vec3  lightDirection = normalize( vec3(-0.2, 0.4, -0.2) ); // Vorsicht, Vorzeichenkonvention
+            vec3  lightDirection = normalize( vec3(-0.2 + iFree3, 0.4 + iFree4, -0.2 + iFree5) ); // Vorsicht, Vorzeichenkonvention
             vec3  halfway = normalize(lightDirection - rayDir); // was ist das, geometrisch?
             float diffuse = clamp( dot(normal, lightDirection), 0.0, 1.0); // dot(normal, lightSource) <-- diffus (warum?)
             diffuse *= calcSoftshadow(rayPos, lightDirection, 0.02, 2.5); // warum hier *= ...?
-            float specular = pow( clamp( dot( normal, halfway ), 0.0, 1.0), 90.0); // <-- glänzend (warum?)
-            // float fresnelAttenuation = 0.04 + 0.96*pow(clamp(1.0-dot(halfway,lightDirection), 0.0, 1.0), 5.0);
+            float specular = pow( clamp( dot( normal, halfway ), 0.0, 1.0), 20.0); // <-- glänzend (warum?)
+            // float fresnelAttenuation = 0.04 + 0.36*pow(clamp(1.0-dot(halfway,lightDirection), 0.0, 1.0), 5.0);
             // specular *= fresnelAttenuation;
             const vec3 sourceCol = vec3(1.30,1.00,0.70);
             shade += col * 2.20 * sourceCol * diffuse;
@@ -586,7 +634,7 @@ vec3 render(in vec3 rayOrigin, in vec3 rayDir)
         col = shade;
 
         // "Distanznebel", inwiefern macht dieser Begriff Sinn?
-        const vec3 colFog = vec3(0.7, 0.7, 0.9);
+        const vec3 colFog = vec3(0.0, 0.0, 0.0);
         float fogOpacity = 1.0 - exp( -0.0001 * pow(res.t, 3.0));
         col = mix(col, colFog, fogOpacity);
     }
@@ -611,7 +659,7 @@ void main()
 
     // camera
     vec3 cameraTarget = vec3( 0.25 + iFree0, -0.75 + iFree1, -0.75 + iFree2);
-    vec3 rayOrigin = cameraTarget + vec3( 4.5 * cos(twoPi * rot), 2.2, 4.5 * sin(-twoPi * rot));
+    vec3 rayOrigin = cameraTarget + vec3( 4.5 * cos(twoPi * rot), 1.2, 4.5 * sin(-twoPi * rot));
     // camera-to-world transformation
     mat3 ca = setCamera( rayOrigin, cameraTarget, 0.0 );
     // ray direction
