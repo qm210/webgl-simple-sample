@@ -1,6 +1,6 @@
 import standardSetup from "./3_SimpleGeometry.js";
 import {startRenderLoop} from "../../webgl/render.js";
-import {createFramebufferWithTexture, createTextureFromImage} from "../../webgl/helpers.js";
+import {createFramebufferWithTexture, createTextureFromImage, takePingPongFramebuffers} from "../../webgl/helpers.js";
 
 import fragmentShaderSource from "../../shaders/spring-2025/framebufferPingPong.glsl";
 import someSampleImage from "../../textures/mysterious_capybara.png";
@@ -63,19 +63,6 @@ export default {
         }]
     })
 };
-
-export function takePingPongFramebuffers(state) {
-    // "Frame Buffer Ping Pong": wir beschreiben die Framebuffer immer abwechselnd:
-    // "ping": write fbo 0, read texture 1
-    // "pong": write fbo 1, read texture 0
-    // etc.
-    const pingIndex = state.frameIndex % 2;
-    const pongIndex = 1 - pingIndex;
-    return {
-        write: state.framebuffer[pingIndex],
-        read: state.framebuffer[pongIndex],
-    }
-}
 
 function render(gl, state) {
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);

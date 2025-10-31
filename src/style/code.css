@@ -120,6 +120,10 @@
     font-size: 0.7em;
 }
 
+.annotation.annotated:has(+ .info-collapsed) {
+    transform: translateX(-2.5rem);
+}
+
 .code .keyword {
     color: darkmagenta;
     text-shadow: var(--shadow);
@@ -212,4 +216,14 @@
 .changed-info > div:first-of-type {
     grid-column: span 2;
     opacity: 0.7;
+}
+
+.changed-info.info-collapsed,
+.changed-info.info-collapsed > button {
+    border-color: blue;
+    color: blue;
+}
+
+.changed-info.info-collapsed div {
+    display: none;
 }

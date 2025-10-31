@@ -12,6 +12,7 @@ import showcase8 from "./showcases/retired/8_Multipass.js";
 import showcase9 from "./showcases/retired/9_FramebufferPingPong.js";
 import showcase10 from "./showcases/retired/10_StochasticRayTracing.js";
 import showcase11 from "./showcases/retired/11_Volumetric.js";
+import showcaseX from "./showcases/X_SimulationPlayground.js";
 
 const defaultShowcase = showcase6a;
 
@@ -50,6 +51,8 @@ export function selectShowcase() {
             return showcase10;
         case "11":
             return showcase11;
+        case "x":
+            return showcaseX;
         default:
             return defaultShowcase;
     }

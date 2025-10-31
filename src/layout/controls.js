@@ -41,7 +41,10 @@ export function createInputElements(state, control) {
         .find(uniform => uniform.name === control.name);
 
     if (!expected) {
-        console.warn("Could not find expected uniform", control, state);
+        console.warn(
+            "Could not find expected uniform", control.type, control.name,
+            "(is it declared?), control:", control, "state:", state
+        );
         return;
     }
 

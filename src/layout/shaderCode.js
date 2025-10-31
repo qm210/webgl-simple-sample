@@ -86,15 +86,23 @@ function prepareElements(line, shaderKey) {
     return elements;
 }
 
+const CLOSE_X = "\u2716";
+const ELLIPSIS = "\u2026";
+
 function writeRemovedBlock(parent, line) {
-    const closeButton = document.createElement("button");
-    closeButton.textContent = "\u2716";
-    closeButton.addEventListener("click", () => {
-        parent.style.display = "none";
+    const hideButton = document.createElement("button");
+    hideButton.textContent = CLOSE_X;
+    hideButton.addEventListener("click", () => {
+        hideButton.textContent = (
+            hideButton.textContent === CLOSE_X
+                ? ELLIPSIS
+                : CLOSE_X
+        );
+        parent.classList.toggle("info-collapsed");
     });
 
     parent.appendChild(createDiv("Removed:"));
-    parent.appendChild(closeButton);
+    parent.appendChild(hideButton);
     let lineNumber = line.number;
     for (const removed of line.changedBlock.removed) {
         parent.appendChild(createDiv(lineNumber, "line-number"));

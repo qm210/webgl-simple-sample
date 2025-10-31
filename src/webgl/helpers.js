@@ -173,3 +173,16 @@ function warnAboutBadFramebufferStatus(gl, status) {
             console.error('Framebuffer error:', status);
     }
 }
+
+export function takePingPongFramebuffers(state) {
+    // "Frame Buffer Ping Pong": wir beschreiben die Framebuffer immer abwechselnd:
+    // "ping": write fbo 0, read texture 1
+    // "pong": write fbo 1, read texture 0
+    // etc.
+    const pingIndex = state.frameIndex % 2;
+    const pongIndex = 1 - pingIndex;
+    return {
+        write: state.framebuffer[pingIndex],
+        read: state.framebuffer[pongIndex],
+    }
+}
