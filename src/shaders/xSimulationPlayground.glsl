@@ -24,13 +24,22 @@ vec4 c = vec4(1., 0., -1., .5);
 
 const float twoPi = 6.28319;
 
+mat2 rot2D(float angle) {
+    float c = cos(angle);
+    float s = sin(angle);
+    return mat2(
+        c, -s,
+        s,  c
+    );
+}
+
 mat3 rotY(float angle) {
     float c = cos(angle);
     float s = sin(angle);
     return mat3(
-    c, 0.0,  -s,
-    0.0, 1.0, 0.0,
-    s, 0.0,   c
+        c, 0.0,  -s,
+        0.0, 1.0, 0.0,
+        s, 0.0,   c
     );
 }
 
@@ -321,51 +330,81 @@ void someRayMarching(out vec3 col, in vec2 uv) {
 //    col = ambient + diffuse + specular;
 }
 
-void main() {
-    float aspRatio = iResolution.x / iResolution.y;
-    vec2 uv = (2. * gl_FragCoord.xy) / iResolution.y - vec2(aspRatio, 1.);
+vec3 mod289(vec3 x) {
+    return x - floor(x * (1.0 / 289.0)) * 289.0;
+}
+vec2 mod289(vec2 x) {
+    return x - floor(x * (1.0 / 289.0)) * 289.0;
+}
+vec3 permute(vec3 x) {
+    return mod289(((x * 34.0) + 1.0) * x);
+}
 
-    vec3 col = c.xxx;
+float snoise(vec2 v) {
+    const vec4 C = vec4(0.211324865405187,  // (3.0 - sqrt(3.0)) / 6.0
+    0.366025403784439,  // 0.5 * (sqrt(3.0) - 1.0)
+    -0.577350269189626, // -1.0 + 2.0 * C.x
+    0.024390243902439); // 1.0 / 41.0
 
-    float d = sdCircle(uv, 0.02);
-    col = mix(c.yyy, c.xxx, smoothstep(0., 0.001, d));
+    // Skew the input space to determine which simplex cell we're in
+    vec2 i = floor(v + dot(v, C.yy));
+    vec2 x0 = v - i + dot(i, C.xx);
 
-    vec2 st = gl_FragCoord.xy / iResolution.xy;
-    vec4 image = texture(iPrevImage, st);
-    if (iPassIndex == 1) {
-        // this .a NEEDs float textures... many hours went into this.
-        fragColor = vec4(sqrt(image.rgb / image.a), 1.);
-
-        // some smear to know we are set up... |o|
-        vec3 imageClone = texture(iPrevImage, st - vec2(0., 0.002)).rgb;
-        fragColor.rgb = mix(fragColor.rgb, imageClone, 0.5);
-        return;
+    // For the 2D case, the simplex shape is an equilateral triangle.
+    vec2 i1;
+    if(x0.x > x0.y) {
+        i1 = vec2(1.0, 0.0);
+    } else {
+        i1 = vec2(0.0, 1.0);
     }
 
-    // applyGrid(col, uv, 0.5);
+    // Offsets for the other corners
+    vec4 x12 = x0.xyxy + C.xxzz;
+    x12.xy -= i1;
 
-    vec3 colX;
-    {
-        uv.y += 0.5;
-        vec2 somePos = vec2(perlin2D(iNoiseLevel * iTime * uv), 0.);
-        d = sdCircle(uv - somePos, 0.1);
-        colX = mix(c.xxx, colX, smoothstep(0.02, 0., d));
-        uv.y -= 0.5;
+    // Permutations
+    i = mod289(i);
+    vec3 p = permute(permute(i.y + vec3(0.0, i1.y, 1.0)) + i.x + vec3(0.0, i1.x, 1.0));
+
+    // Gradients: 41 points uniformly over a line mapped onto a diamond
+    vec3 x_ = fract(p * C.w) * 2.0 - 1.0;
+    vec3 h = abs(x_) - 0.5;
+    vec3 ox = floor(x_ + 0.5);
+    vec3 a0 = x_ - ox;
+
+    // Normalise gradients
+    vec3 g0 = vec3(a0.x, h.x, 0.0);
+    vec3 g1 = vec3(a0.y, h.y, 0.0);
+    vec3 g2 = vec3(a0.z, h.z, 0.0);
+
+    // Compute noise contributions from each corner
+    vec3 m = max(0.5 - vec3(dot(x0,x0), dot(x12.xy,x12.xy), dot(x12.zw,x12.zw)), 0.0);
+    m = m * m;
+    m = m * m;
+
+    // Dot product of gradients and offsets
+    float n0 = m.x * dot(g0, vec3(x0, 0.0));
+    float n1 = m.y * dot(g1, vec3(x12.xy, 0.0));
+    float n2 = m.z * dot(g2, vec3(x12.zw, 0.0));
+
+    // Sum and scale the result
+    return 70.0 * (n0 + n1 + n2);
+}
+
+float fbm(vec2 x) {
+    float v = 0.0;
+    float a = 0.5;
+    vec2 shift = vec2(100);
+    for (int i = 0; i < 5; i++) {
+        v += a * snoise(x);
+        x = x * 2.0 + shift;
+        a *= 0.5;
     }
+    return v;
+}
 
-    /*
-    colX = gradientNoise(uv);
-    float gamma = 1. + iFree.x - iFree.y;
-    colX = pow(colX, vec3(gamma));
-    colX = (colX - 0.5) * (1. + 2. * iFree.z) + 0.5;
-    */
-
-    colX = c.xxx - clamp(colX, 0., 1.);
-    col = mix(col, colX, iNoiseLevel);
-
-    someRayMarching(colX, uv);
-    col = max(col, colX);
-
+float aspRatio;
+void drawLogoParts(inout vec3 col, in vec2 st) {
     st.t = 1. - st.t;
     st.s /= aspRatio;
     st = vec2(clamp(0., 0.333, st.s), st.t);
@@ -375,5 +414,90 @@ void main() {
     float rotation = mod(iTime, 3.);
     vec4 tex = rotation < 1.0 ? tex2 : rotation < 2.0 ? tex1 : tex0;
     col = mix(col, vec3(1., 0., 0.), step(0.5, tex.a));
+}
+
+#define DO_RAYMARCHING 0
+#define DRAW_LOGO 0
+#define TEST_FEEDBACK 0
+#define CLOUD_ATTEMPT 1
+#define STUPID_SMEAR 0
+
+void main() {
+    aspRatio = iResolution.x / iResolution.y;
+    vec2 uv = (2. * gl_FragCoord.xy) / iResolution.y - vec2(aspRatio, 1.);
+    vec3 col = c.xxx;
+
+    float d = sdCircle(uv, 0.02);
+    col = mix(c.yyy, c.xxx, smoothstep(0., 0.001, d));
+
+    vec2 st = gl_FragCoord.xy / iResolution.xy;
+    vec4 image = texture(iPrevImage, st);
+    if (iPassIndex == 1) {
+        fragColor = image;
+        if (iFrame == 0) {
+            return;
+        }
+        #if STUPID_SMEAR
+            // some smear to know we are set up... |o|
+            vec3 imageClone = texture(iPrevImage, st - vec2(0., 0.002)).rgb;
+            fragColor.rgb = mix(fragColor.rgb, imageClone, 0.5);
+            return;
+        #endif
+
+        float dt = 0.016;
+        float perturb = snoise(st + iTime);
+        vec2 pos = st - dt * image.xy;
+        vec4 advected = texture(iPrevImage, pos);
+        vec2 newVel = advected.xy + vec2(perturb, 0.0);
+        fragColor.rgb = vec3(newVel, 0.);
+        return;
+    }
+
+    // applyGrid(col, uv, 0.5);
+
+    vec3 colX = c.xxx;
+    #if TEST_FEEDBACK
+    {
+        vec2 somePos = vec2(
+            perlin2D(iNoiseLevel * uv + iTime),
+            perlin2D(iNoiseLevel * uv * 7. + iTime + 0.312)
+        );
+        d = sdCircle(uv - somePos, 0.1);
+        vec3 color = vec3(0.5 + 0.3 * sin(10. * iTime), 1., 0.8 - 0.2 * cos(4. * iTime + .2));
+        colX = mix(color, colX, smoothstep(0.0, 0.02, d));
+    }
+    #endif
+
+    #if CLOUD_ATTEMPT
+    {
+        vec2 uvTime = uv + vec2(iTime * 0.05, iTime * 0.02);
+        float n = fbm(uvTime);
+        n *= 4.;
+        float alpha = smoothstep(0.3, 0.6, n);
+        col = vec3(alpha);
+    }
+    #endif
+
+    /*
+    colX = gradientNoise(uv);
+    float gamma = 1. + iFree.x - iFree.y;
+    colX = pow(colX, vec3(gamma));
+    colX = (colX - 0.5) * (1. + 2. * iFree.z) + 0.5;
+    */
+
+    /*
+    colX = c.xxx - clamp(colX, 0., 1.);
+    col = mix(col, colX, iNoiseLevel);
+    */
+
+    #if DO_RAYMARCHING
+        someRayMarching(colX, uv);
+        col = max(col, colX);
+    #endif
+
+    #if DRAW_LOGO
+        drawLogoParts(col, st);
+    #endif
+
     fragColor = vec4(col, 1.0);
 }
