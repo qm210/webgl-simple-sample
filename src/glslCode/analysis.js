@@ -40,6 +40,7 @@ export function analyzeShader(source, errorLog, shaderKey) {
         index: 0,
         positionInSource: 0,
         scopeLevel: 0,
+        commentLevel: 0,
         removedBefore: [],
         consecutiveEmpty: 0,
         currentChangedBlock: {type: null},
@@ -79,7 +80,7 @@ export function analyzeShader(source, errorLog, shaderKey) {
             length: diff.value.length,
         };
         code.empty = !code.trimmed;
-        code.braces = countBraces(code.trimmed);
+        code.blocks = countSeparators(code.trimmed);
 
         if (code.empty) {
             cursor.consecutiveEmpty++;
@@ -105,7 +106,7 @@ export function analyzeShader(source, errorLog, shaderKey) {
             removedBefore: cursor.removedBefore,
             changedBlock: null,
             error: errors[cursor.index],
-            belongsToUnusedDefinition: false,
+            belongsToUnusedBlock: cursor.commentLevel > 0 || code.blocks.comment.justOpening,
             positionInSource: cursor.positionInSource,
             scopeLevelAtStart: cursor.scopeLevel,
             consecutiveEmpty: cursor.consecutiveEmpty,
@@ -114,7 +115,8 @@ export function analyzeShader(source, errorLog, shaderKey) {
         cursor.index++;
         cursor.removedBefore = [];
         cursor.positionInSource += code.length;
-        cursor.scopeLevel += code.braces.open - code.braces.close;
+        cursor.scopeLevel += code.blocks.braces.open - code.blocks.braces.close;
+        cursor.commentLevel += code.blocks.comment.open - code.blocks.comment.close;
     }
 
     analyzed.lines = analyzed.lines.filter(
@@ -181,9 +183,9 @@ function parseSymbols(source) {
                 pattern:
                     new RegExp(`\\b${name}\\b`, "g"),
                 matched: {
-                    string: matched,
+                    trimmed: matched,
+                    full: match[0],
                     lines: matchedLines,
-                    start: matchedLines[0].trim(),
                 },
                 isMagic: name.match(REGEX.MAGIC_SYMBOL),
             };
@@ -203,14 +205,30 @@ function parseSymbols(source) {
     return results;
 }
 
-function countBraces(code) {
+const countRegex = {};
+
+function count(pattern, line) {
+    if (!countRegex[pattern]) {
+        countRegex[pattern] = new RegExp(pattern, 'g');
+    }
+    return line.match(countRegex[pattern])?.length ?? 0;
+}
+
+function countSeparators(code) {
     return {
-        open: code.match(/\{/g)?.length ?? 0,
-        close: code.match(/}/g)?.length ?? 0,
+        braces: {
+            open: count("\{", code),
+            close: count("}", code)
+        },
+        comment: {
+            open: count("\/\\*", code),
+            close: count("\\*/", code),
+            justOpening: code === "/*",
+        }
     };
 }
 
-function parseScopes(analyzedLines) {
+export function parseScopes(analyzedLines) {
     const scopes = {
         result: [],
         stack: [],
@@ -281,19 +299,15 @@ function enhancedFunctionsWithBody(analyzed) {
     );
 
     let nextIndex = 0;
-    for (const line of analyzed.lines) {
-
+    for (let i = 0; i < analyzed.lines.length; i++) {
+        const line = analyzed.lines[i];
         const nextFunction = functions[nextIndex];
         if (!nextFunction) {
             break;
         }
 
-        const match = nextFunction.matched.string;
-        const possibleSourceMatch = analyzed.source.slice(
-            line.positionInSource,
-            line.positionInSource + match.length
-        );
-        const startsHere = possibleSourceMatch === match;
+        const nextLinePosition = analyzed.lines[i + 1]?.positionInSource;
+        const startsHere = nextLinePosition > nextFunction.sourcePosition;
         if (startsHere) {
             nextFunction.startsAtLine = line.number;
             nextFunction.endsAtLine = line.number + nextFunction.matched.lines.length - 1;
@@ -302,11 +316,14 @@ function enhancedFunctionsWithBody(analyzed) {
             nextFunction.scope = analyzed.scopes
                 .find(scope => scope.openedIn >= nextFunction.endsAtLine);
 
+            nextFunction.actuallyInvalid =
+                line.belongsToUnusedBlock || line.scopeLevelAtStart > 0;
+
             nextIndex++;
         }
     }
 
-    return functions;
+    return functions.filter(f => !f.actuallyInvalid);
 }
 
 function parseErrors(errorLog) {
@@ -375,13 +392,13 @@ function enhanceSymbols(analyzed) {
 
     for (const symbol of analyzed.unusedSymbols) {
         for (let l = 0; l < symbol.definitionSpansLines; l++ ) {
-            const lineIndex = symbol.definedInLine + l - 1;
-            // console.log("CHECK?", symbol.name, analyzed.lines, lineIndex, symbol.definedInLine);
-            const analyzedLine = analyzed.lines[lineIndex];
+            const analyzedLine = analyzed.lines.find(
+                line => line.number === symbol.definedInLine + l
+            );
             if (!analyzedLine) {
                 break;
             }
-            analyzedLine.belongsToUnusedDefinition = true;
+            analyzedLine.belongsToUnusedBlock = true;
         }
     }
 }

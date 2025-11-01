@@ -87,18 +87,18 @@ function prepareElements(line, shaderKey) {
 }
 
 const CLOSE_X = "\u2716";
-const ELLIPSIS = "\u2026";
+const TRIANGLE_UP = "\u25b2";
 
 function writeRemovedBlock(parent, line) {
     const hideButton = document.createElement("button");
     hideButton.textContent = CLOSE_X;
     hideButton.addEventListener("click", () => {
+        parent.classList.toggle("info-collapsed");
         hideButton.textContent = (
-            hideButton.textContent === CLOSE_X
-                ? ELLIPSIS
+            parent.classList.contains("info-collapsed")
+                ? TRIANGLE_UP
                 : CLOSE_X
         );
-        parent.classList.toggle("info-collapsed");
     });
 
     parent.appendChild(createDiv("Removed:"));

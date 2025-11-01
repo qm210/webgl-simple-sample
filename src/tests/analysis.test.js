@@ -1,8 +1,8 @@
 import {describe, it, expect} from "vitest";
-import {analyzeShader, parseScopes, SymbolType} from "../glslCode/analysis.js";
+import {analyzeShader, extendAnalysis, parseScopes, SymbolType} from "../glslCode/analysis.js";
 import REGEX from "../glslCode/regex.js";
 
-const sample = `
+export const sample = `
 #version 300 es
 precision highp float;
 out vec4 fragColor;
@@ -106,24 +106,28 @@ const getDefines = analyzed =>
 
 describe("Regex matching", () => {
 
-    it ("standalone: finds define directives", () => {
-        const analyzed = analyzeShader(`
+    it ("standalone: finds define directives", async () => {
+        const code = `
             #define TEST_DIRECTIVE 1
             #define TEST_DIRECTIVE_WITH_ARGS(x) x
-        `);
+        `;
+        const defineMatches = [...code.matchAll(REGEX.DEFINE_DIRECTIVE)];
+        expect(defineMatches.length).toBe(2);
+
+        const analyzed = await extendAnalysis(analyzeShader(code));
+        const defines = getDefines(analyzed);
+        expect(defines.length).toBe(2);
+
+    });
+
+    it ("sample: finds define directives", async () => {
+        const analyzed = await extendAnalysis(analyzeShader(sample));
         const defines = getDefines(analyzed);
 
         expect(defines.length).toBe(2);
     });
 
-    it ("sample: finds define directives", () => {
-        const analyzed = analyzeShader(sample);
-        const defines = getDefines(analyzed);
-
-        expect(defines.length).toBe(2);
-    });
-
-    it ("standalone: the matcher.pattern regex works", () => {
+    it ("standalone: the matcher.pattern regex works", async () => {
         const code = `
         ...
         #define FROM_RGB(x) x
@@ -132,17 +136,22 @@ describe("Regex matching", () => {
         </div><div class="line" id="fragment.source.line.204"><div class="line-number">204</div><div class="code">    col01 = FROM_RGB(col01);
         ...
         `;
-        const analyzed = analyzeShader(code);
+        const analyzed = await extendAnalysis(analyzeShader(code));
         const defines = getDefines(analyzed);
 
         expect(defines.length).toBe(1);
     });
 
     it ("sample: matches whole function", () => {
-        const code = sampleUnusedFunction;
-        const matches =  [...code.matchAll(REGEX.FUNCTION)];
-        expect(matches).toBeDefined();
+        const target = sampleUnusedFunction.matchAll(REGEX.FUNCTION);
+        expect(target).toBeDefined();
     });
+
+    it ("CONSTANT RegExp works", () => {
+        const code = "const vec3 c = vec3(1,0,-1);"
+        const target = code.matchAll(REGEX.CONSTANT);
+        expect(target).toBeDefined();
+    })
 });
 
 describe("Scope parsing", () => {
@@ -163,16 +172,16 @@ describe("Scope parsing", () => {
         }
     `;
 
-    it ("works", () => {
-        const analyzed = analyzeShader(example);
-        const scopes = parseScopes(analyzed);
+    it ("works", async () => {
+        const analyzed = await extendAnalysis(analyzeShader(example));
+        const scopes = parseScopes(analyzed.lines);
 
         expect(scopes).toBeDefined();
 
         // TODO
     });
 
-    it ("works for functions with multi-line signatures", () => {
+    it ("works for functions with multi-line signatures", async () => {
         const ugly = `
             const float irrelevant = 3.;
         
@@ -195,21 +204,21 @@ theUglyFunction
                    
                    float blablablaluberluber = 0.;
         `;
-        const analyzed = analyzeShader(ugly);
-        expect(analyzed.matches.signatures.length).toBe(1);
+        const analyzed = await extendAnalysis(analyzeShader(ugly));
+        expect(analyzed.functions.length).toBe(2);
     });
 
 });
 
 describe("Function Matching", () => {
 
+    it ("does the extended function matching", async () => {
+        const analyzed = await extendAnalysis(analyzeShader(sample));
 
-    it ("does the extended function matching", () => {
-        const analyzed = analyzeShader(sample);
+        const target = analyzed.unusedSymbols
+            .find(s => s.name === "hsl2rgb");
 
-        const rgb2hslInUnusedSymbols = analyzed.unusedSymbols.find(s => s.name === "rgb2hsl");
-
-        expect(rgb2hslInUnusedSymbols).toBeDefined();
-        expect(rgb2hslInUnusedSymbols.definitionSpanLines).toBe(31);
+        expect(target).toBeDefined();
+        expect(target.definitionSpansLines).toBe(5);
     });
 });

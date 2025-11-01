@@ -1,7 +1,7 @@
 {
   "name": "webgl-simple-sample",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite --open",
@@ -9,10 +9,10 @@
     "test": "vitest"
   },
   "devDependencies": {
-    "happy-dom": "17.4.4",
-    "vite": "6.2.3",
-    "vite-plugin-glsl": "1.3.1",
-    "vitest": "3.0.9"
+    "happy-dom": "20.0.10",
+    "vite": "7.1.12",
+    "vite-plugin-glsl": "1.5.4",
+    "vitest": "3.2.4"
   },
   "dependencies": {
     "diff": "7.0.0"

@@ -24,6 +24,7 @@
     height: calc(100vh - 2 * var(--page-pad));
     padding: var(--page-pad);
     gap: calc(0.5 * var(--page-pad));
+    overflow-x: hidden;
 
     @media (max-width: 1300px) {
         flex-direction: column-reverse;

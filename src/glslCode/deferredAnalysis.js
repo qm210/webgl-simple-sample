@@ -31,7 +31,7 @@ function applyExtendedAnalysis(analyzed, references, scrollStack) {
         code = withSymbolsHighlighted(code, analyzed.symbols, line.number);
         element.code.innerHTML = code;
 
-        if (line.belongsToUnusedDefinition) {
+        if (line.belongsToUnusedBlock) {
             element.line.classList.add("unused-definition");
             element.annotation.textContent = "unused";
         }
@@ -45,7 +45,7 @@ function applyExtendedAnalysis(analyzed, references, scrollStack) {
         if (!symbol) {
             continue;
         }
-        const code = symbol.code ?? symbol.matched.string;
+        const code = symbol.code ?? symbol.matched.trimmed;
         const lineInfo = `line ${symbol.definedInLine}`;
         element.title = `${lineInfo}: ${code}`;
     }

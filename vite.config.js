@@ -1,13 +1,12 @@
 import { defineConfig } from 'vite';
 import glslImport from './plugin/glslImport.js';
 
-// https://vite.dev/config/
 export default defineConfig({
-    plugins: [
-        glslImport()
-    ],
+    plugins: process.env.VITEST
+        ? []
+        : [glslImport()],
     test: {
         globals: true,
         environment: "happy-dom"
     }
-})
+});

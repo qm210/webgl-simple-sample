@@ -79,7 +79,8 @@
 }
 
 .line.unused-definition {
-    opacity: 0.35;
+    opacity: 0.55;
+    color: dimgray;
 }
 
 .empty {

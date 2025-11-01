@@ -1,10 +1,10 @@
 const REGEX = {
     DEFINE_DIRECTIVE:
-        /^#define\s*(?<name>\w*)(?<args>\(.*?\))?\s*(?<value>.*)\s*$/mg,
+        /^\s*#define\s*(?<name>\w*)(?<args>\(.*?\))?\s*(?<value>.*)\s*$/mg,
     SHADER_VARIABLE:
         /^\b(layout\s*\(location\s*=\s*(?<location>\d+)\)\s*)?(?<keyword>out|uniform|varying|attribute)\s*(?<type>\w+)\s*(?<name>\w*);$/mg,
     CONSTANT:
-        /\bconst\s*(?<type>float|u?int|bool|[iu]vec[2-4]|mat[2-4])\s*(?<name>\w*)\s*=\s*(?<value>\S*);/g,
+        /\bconst\s*(?<type>float|u?int|bool|[iu]?vec[2-4]|mat[2-4])\s*(?<name>\w*)\s*=\s*(?<value>\S*);/g,
     FUNCTION:
         /\b(?<returnType>\w+)\s+(?<name>\w+)\s*\((?<args>[^()]*)\)(?:\s*\{\s*(?<body>[^}]*)(?<=\n)})?\s*;?\n?/mg,
     FUNCTION_SIGNATURE:
@@ -17,7 +17,7 @@ const REGEX = {
     KEYWORD:
         /\b(uniform|varying|attribute|layout|const|in|out|[iu]?vec[234]|mat[234]|void|float|u?int|bool|sampler[123]D|return|discard|continue|break|if|else|texture|texelFetch|precision|highp|mediump|lowp)\b/g,
     BUILTIN_FUNCTION:
-        /\b(mix|min|max|clamp|smoothstep|step|length|dot|normalize|cross|reflect|refract|sinh?|cosh?|tanh?|atan|exp|log|sqrt|pow|mod|modf|fract|abs|sign|floor|ceil)\b/g,
+        /\b(mix|min|max|clamp|smoothstep|step|length|dot|normalize|cross|reflect|refract|sinh?|cosh?|tanh?|atan|exp|log|sqrt|pow|mod|modf|fract|abs|sign|floor|ceil|all|greaterThan|greaterThanEqual|lessThan|lessThanEqual)\b/g,
     NUMBER:
         /\b(-?\d+\.?\d*(e-?\d+)?[Uf]?)/g,
     DIRECTIVE:
