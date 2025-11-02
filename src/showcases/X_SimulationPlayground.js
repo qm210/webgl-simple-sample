@@ -26,13 +26,36 @@ export default {
                 // dataType: gl.UNSIGNED_BYTE,
             })
         );
+
+        state.resolution = [gl.drawingBufferWidth, gl.drawingBufferHeight];
+        state.frameIndex = 0;
+
+        for (const fb of state.framebuffer) {
+            // for the second, i.e. layout(location=1) out ...
+            fb.extraOutTexture = gl.createTexture();
+            gl.bindTexture(gl.TEXTURE_2D, fb.extraOutTexture);
+            // NOTE: does gl.RGBA32F even work? maybe gl.RGBA16F
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, ...state.resolution, 0, gl.RGBA, gl.FLOAT, null);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+
+            gl.bindFramebuffer(gl.FRAMEBUFFER, fb.fbo);
+            gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT1, gl.TEXTURE_2D, fb.extraOutTexture, 0);
+            fb.attachments.push(gl.COLOR_ATTACHMENT1);
+            gl.drawBuffers(fb.attachments);
+
+            gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+            gl.bindTexture(gl.TEXTURE_2D, null);
+        }
+
+        // random reminder: there is textureSize(). should be written somewhere useful.
+
         state.location.iTime = gl.getUniformLocation(state.program, "iTime");
         state.location.iResolution = gl.getUniformLocation(state.program, "iResolution");
-        state.resolution = [gl.drawingBufferWidth, gl.drawingBufferHeight];
         state.location.prevImage = gl.getUniformLocation(state.program, "iPrevImage");
+        state.location.prevVelocity = gl.getUniformLocation(state.program, "iPrevVelocity");
         state.location.passIndex = gl.getUniformLocation(state.program, "iPassIndex");
         state.location.iFrame = gl.getUniformLocation(state.program, "iFrame");
-        state.frameIndex = 0;
 
         state.location.iNoiseLevel = gl.getUniformLocation(state.program, "iNoiseLevel");
         state.location.iNoiseFreq = gl.getUniformLocation(state.program, "iNoiseFreq");
@@ -40,6 +63,8 @@ export default {
         state.location.iFractionSteps = gl.getUniformLocation(state.program, "iFractionSteps");
         state.location.iFractionScale = gl.getUniformLocation(state.program, "iFractionScale");
         state.location.iFractionAmplitude = gl.getUniformLocation(state.program, "iFractionAmplitude");
+        state.location.iCloudMorph = gl.getUniformLocation(state.program, "iCloudMorph");
+        state.location.iCloudVelX = gl.getUniformLocation(state.program, "iCloudVelX");
         state.location.iFree0 = gl.getUniformLocation(state.program, "iFree0");
         state.location.iFree1 = gl.getUniformLocation(state.program, "iFree1");
         state.location.iFree2 = gl.getUniformLocation(state.program, "iFree2");
@@ -105,6 +130,18 @@ export default {
             min: 0.01,
             max: 2.,
         }, {
+            type: "floatInput",
+            name: "iCloudMorph",
+            defaultValue: 0,
+            min: 0,
+            max: 2,
+        }, {
+            type: "floatInput",
+            name: "iCloudVelX",
+            defaultValue: 0,
+            min: -2.,
+            max: 2,
+        }, {
             type: "vec3Input",
             name: "iFree0",
             defaultValue: [0, 0, 0],
@@ -137,24 +174,33 @@ function render(gl, state) {
     gl.uniform1i(state.location.iFractionSteps, Math.floor(state.iFractionSteps));
     gl.uniform1f(state.location.iFractionScale, state.iFractionScale);
     gl.uniform1f(state.location.iFractionAmplitude, state.iFractionAmplitude);
+    gl.uniform1f(state.location.iCloudMorph, state.iCloudMorph);
+    gl.uniform1f(state.location.iCloudVelX, state.iCloudVelX);
     gl.uniform3fv(state.location.iFree0, state.iFree0);
     gl.uniform3fv(state.location.iFree1, state.iFree1);
     gl.uniform3fv(state.location.iFree2, state.iFree2);
 
-    gl.activeTexture(gl.TEXTURE1);
+    gl.activeTexture(gl.TEXTURE2);
     gl.bindTexture(gl.TEXTURE_2D, state.dream210logo);
-    gl.uniform1i(state.location.iDream210, 1);
+    gl.uniform1i(state.location.iDream210, 2);
 
-    const {write, read} = takePingPongFramebuffers(state);
+    let {write, read} = takePingPongFramebuffers(state);
 
-    gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo);
-    gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, read.texture);
-    gl.uniform1i(state.location.prevImage, 0);
-    gl.uniform1i(state.location.passIndex, 0);
-    gl.drawArrays(gl.TRIANGLES, 0, 6);
+    for (let pass = 0; pass < 3; pass++) {
+        gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo);
+        gl.uniform1i(state.location.passIndex, pass);
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, read.texture);
+        gl.uniform1i(state.location.prevImage, 0);
+        gl.activeTexture(gl.TEXTURE1);
+        gl.bindTexture(gl.TEXTURE_2D, read.extraOutTexture);
+        gl.uniform1i(state.location.prevVelocity, 1);
+        gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+        [write, read] = [read, write];
+    }
 
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-    gl.uniform1i(state.location.passIndex, 1);
+    gl.uniform1i(state.location.passIndex, 3);
     gl.drawArrays(gl.TRIANGLES, 0, 6);
 }

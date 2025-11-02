@@ -69,8 +69,7 @@ const SymbolClass = {
 
 function highlightedDefinition(symbol) {
     const classes = [];
-    console.log(symbol.name, symbol);
-    if (!symbol.isMagic && !symbol.isDirectiveKeyword) {
+    if (!symbol.isMagic) {
         classes.push(SymbolClass[symbol.symbolType]);
     }
     const element = createSpan({

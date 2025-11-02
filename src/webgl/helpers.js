@@ -134,7 +134,6 @@ export function createFramebufferWithTexture(gl, options) {
     // gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, width, height, 0, gl.RGBA, gl.FLOAT, null);
     // gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
 
-
     const fbo = gl.createFramebuffer();
     gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
 
@@ -149,8 +148,22 @@ export function createFramebufferWithTexture(gl, options) {
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
 
     return {
-        texture,
         fbo,
+        texture,
+        attachments: [colorAttachment],
+        extraOutTexture: null,
+        options: {
+            width,
+            height,
+            internalFormat,
+            dataFormat,
+            dataType,
+            colorAttachment,
+            wrapS,
+            wrapT,
+            minFilter,
+            magFilter,
+        },
         status
     };
 }

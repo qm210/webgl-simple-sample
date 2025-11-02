@@ -26,7 +26,7 @@ const REGEX = {
     KEYWORD:
         /\b(?<!#)(uniform|varying|attribute|layout|const|in|out|[iu]?vec[234]|mat[234]|void|float|u?int|bool|sampler[123]D|return|discard|continue|break|if|else|texture|texelFetch|precision|highp|mediump|lowp)\b/g,
     BUILTIN_FUNCTION:
-        /\b(mix|min|max|clamp|smoothstep|step|length|dot|normalize|cross|reflect|refract|sinh?|cosh?|tanh?|atan|exp|log|sqrt|pow|mod|modf|fract|abs|sign|floor|ceil|all|greaterThan|greaterThanEqual|lessThan|lessThanEqual)\b/g,
+        /\b(mix|min|max|clamp|smoothstep|step|length|dot|normalize|cross|reflect|refract|sinh?|cosh?|tanh?|atan|exp|log|sqrt|pow|mod|modf|fract|abs|sign|floor|ceil|all|any|greaterThan|greaterThanEqual|lessThan|lessThanEqual)\b/g,
     NUMBER:
         /\b(-?\d+\.?\d*(e-?\d+)?[Uf]?)/g,
     DIRECTIVE:

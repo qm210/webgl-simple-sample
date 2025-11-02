@@ -1,13 +1,15 @@
 #version 300 es
 precision highp float;
 
-out vec4 fragColor;
+layout(location = 0) out vec4 fragColor;
+layout(location = 1) out vec2 outVelocity;
 
 uniform vec2 iResolution;
 uniform float iTime;
 uniform int iFrame;
 uniform int iPassIndex;
 uniform sampler2D iPrevImage;
+uniform sampler2D iPrevVelocity;
 uniform sampler2D iDream210;
 
 uniform float iNoiseFreq;
@@ -16,13 +18,18 @@ uniform float iNoiseOffset;
 uniform int iFractionSteps;
 uniform float iFractionScale;
 uniform float iFractionAmplitude;
+uniform float iCloudMorph;
+uniform float iCloudVelX;
+uniform float iCloudVelY;
 uniform vec3 iFree0;
 uniform vec3 iFree1;
 uniform vec3 iFree2;
 
-vec4 c = vec4(1., 0., -1., .5);
-
 const float twoPi = 6.28319;
+
+const vec4 c = vec4(1., 0., -1., .5);
+
+float aspRatio;
 
 mat2 rot2D(float angle) {
     float c = cos(angle);
@@ -95,7 +102,7 @@ float perlin2D(vec2 p)
     return ym;
 }
 
-float fractionalNoiseSum(vec2 p){
+float fractionalNoiseSum(vec2 p) {
     p *= 4.;
     float a = 1., r = 0., s = 0., noise;
     for (int i=0; i < iFractionSteps; i++) {
@@ -339,125 +346,176 @@ vec2 mod289(vec2 x) {
 vec3 permute(vec3 x) {
     return mod289(((x * 34.0) + 1.0) * x);
 }
+vec4 permute(vec4 x) {
+    return mod(((x * 34.0) + 1.0) * x, 289.0);
+}
+vec4 taylorInvSqrt(vec4 r) {
+    return 1.79284291400159 - 0.85373472095314 * r;
+}
 
-float snoise(vec2 v) {
-    const vec4 C = vec4(0.211324865405187,  // (3.0 - sqrt(3.0)) / 6.0
-    0.366025403784439,  // 0.5 * (sqrt(3.0) - 1.0)
-    -0.577350269189626, // -1.0 + 2.0 * C.x
-    0.024390243902439); // 1.0 / 41.0
+float snoise(vec3 v) {
+    const vec2 C = vec2(1.0 / 6.0, 1.0 / 3.0);
+    const vec4 D = vec4(0.0, 0.5, 1.0, 2.0);
 
-    // Skew the input space to determine which simplex cell we're in
-    vec2 i = floor(v + dot(v, C.yy));
-    vec2 x0 = v - i + dot(i, C.xx);
+    // First corner
+    vec3 i = floor(v + dot(v, C.yyy));
+    vec3 x0 = v - i + dot(i, C.xxx);
 
-    // For the 2D case, the simplex shape is an equilateral triangle.
-    vec2 i1;
-    if(x0.x > x0.y) {
-        i1 = vec2(1.0, 0.0);
-    } else {
-        i1 = vec2(0.0, 1.0);
-    }
+    // Other corners
+    vec3 g = step(x0.yzx, x0.xyz);
+    vec3 l = 1.0 - g;
+    vec3 i1 = min(g.xyz, l.zxy);
+    vec3 i2 = max(g.xyz, l.zxy);
 
-    // Offsets for the other corners
-    vec4 x12 = x0.xyxy + C.xxzz;
-    x12.xy -= i1;
+    vec3 x1 = x0 - i1 + C.xxx;
+    vec3 x2 = x0 - i2 + C.yyy;
+    vec3 x3 = x0 - 1.0 + 3.0 * C.xxx;
 
     // Permutations
-    i = mod289(i);
-    vec3 p = permute(permute(i.y + vec3(0.0, i1.y, 1.0)) + i.x + vec3(0.0, i1.x, 1.0));
+    i = mod(i, 289.0);
+    vec4 p = permute(
+    permute(
+    permute(i.z + vec4(0.0, i1.z, i2.z, 1.0))
+    + i.y + vec4(0.0, i1.y, i2.y, 1.0))
+    + i.x + vec4(0.0, i1.x, i2.x, 1.0));
 
-    // Gradients: 41 points uniformly over a line mapped onto a diamond
-    vec3 x_ = fract(p * C.w) * 2.0 - 1.0;
-    vec3 h = abs(x_) - 0.5;
-    vec3 ox = floor(x_ + 0.5);
-    vec3 a0 = x_ - ox;
+    // Gradients
+    float n_ = 1.0 / 7.0;
+    vec3 ns = n_ * D.wyz - D.xzx;
 
-    // Normalise gradients
-    vec3 g0 = vec3(a0.x, h.x, 0.0);
-    vec3 g1 = vec3(a0.y, h.y, 0.0);
-    vec3 g2 = vec3(a0.z, h.z, 0.0);
+    vec4 j = p - 49.0 * floor(p * ns.z * ns.z);
 
-    // Compute noise contributions from each corner
-    vec3 m = max(0.5 - vec3(dot(x0,x0), dot(x12.xy,x12.xy), dot(x12.zw,x12.zw)), 0.0);
+    vec4 x_ = floor(j * ns.z);
+    vec4 y_ = floor(j - 7.0 * x_);
+
+    vec4 x = x_ * ns.x + ns.yyyy;
+    vec4 y = y_ * ns.x + ns.yyyy;
+    vec4 h = 1.0 - abs(x) - abs(y);
+
+    vec4 b0 = vec4(x.xy, y.xy);
+    vec4 b1 = vec4(x.zw, y.zw);
+
+    vec4 s0 = floor(b0) * 2.0 + 1.0;
+    vec4 s1 = floor(b1) * 2.0 + 1.0;
+    vec4 sh = -step(h, vec4(0.0));
+
+    vec4 a0 = b0.xzyw + s0.xzyw * sh.xxyy;
+    vec4 a1 = b1.xzyw + s1.xzyw * sh.zzww;
+
+    vec3 p0 = vec3(a0.xy, h.x);
+    vec3 p1 = vec3(a0.zw, h.y);
+    vec3 p2 = vec3(a1.xy, h.z);
+    vec3 p3 = vec3(a1.zw, h.w);
+
+    // Normalize gradients
+    vec4 norm = taylorInvSqrt(vec4(dot(p0, p0), dot(p1, p1), dot(p2, p2), dot(p3, p3)));
+    p0 *= norm.x;
+    p1 *= norm.y;
+    p2 *= norm.z;
+    p3 *= norm.w;
+
+    // Mix final noise value
+    vec4 m = max(0.6 - vec4(dot(x0, x0), dot(x1, x1), dot(x2, x2), dot(x3, x3)), 0.0);
     m = m * m;
-    m = m * m;
 
-    // Dot product of gradients and offsets
-    float n0 = m.x * dot(g0, vec3(x0, 0.0));
-    float n1 = m.y * dot(g1, vec3(x12.xy, 0.0));
-    float n2 = m.z * dot(g2, vec3(x12.zw, 0.0));
-
-    // Sum and scale the result
-    return 70.0 * (n0 + n1 + n2);
+    return 42.0 * dot(m * m, vec4(dot(p0, x0), dot(p1, x1), dot(p2, x2), dot(p3, x3)));
 }
 
-float fbm(vec2 x) {
-    float v = 0.0;
-    float a = 0.5;
-    vec2 shift = vec2(100);
-    for (int i = 0; i < 5; i++) {
-        v += a * snoise(x);
-        x = x * 2.0 + shift;
-        a *= 0.5;
+float snoise(vec2 uv, float seedShift) {
+    return snoise(vec3(uv, seedShift));
+}
+
+float fbm(vec2 p, float seedShift) {
+    float v = 0.;
+    float a = 1.;
+    float s = 0.;
+    for (int i = 0; i < iFractionSteps; i++) {
+        v += a * snoise(p, seedShift);
+        s += a;
+        p = p * iFractionScale;
+        a *= iFractionAmplitude;
     }
-    return v;
+    return v / s;
 }
 
-float aspRatio;
-void drawLogoParts(inout vec3 col, in vec2 st) {
+/*
+void loadLogoTextures(in vec2 st) {
     st.t = 1. - st.t;
     st.s /= aspRatio;
-    st = vec2(clamp(0., 0.333, st.s), st.t);
-    vec4 tex2 = texture(iDream210, st);
-    vec4 tex1 = texture(iDream210, st + vec2(0.333, 0.));
-    vec4 tex0 = texture(iDream210, st + vec2(0.667, 0.));
-    float rotation = mod(iTime, 3.);
-    vec4 tex = rotation < 1.0 ? tex2 : rotation < 2.0 ? tex1 : tex0;
-    col = mix(col, vec3(1., 0., 0.), step(0.5, tex.a));
+    const float ratio = .333;
+    st = vec2(clamp(0., ratio, st.s), st.t);
+    for (int i = 0; i < 3; i++) {
+        texLogoDream[2 - i] = texture(
+            iDream210,
+            st + float(i) * ratio * c.yx
+        );
+    }
+}
+*/
+
+vec4 logoPart(vec2 uv, vec2 uvBottomLeft, float uvSize, int logoIndex) {
+    vec2 st = (uv - uvBottomLeft) / uvSize;
+    if (any(lessThan(st, c.yy)) || any(greaterThan(st, c.xx))) {
+        return c.yyyy;
+    }
+    st.t = 1. - st.t;
+    st.s += float(logoIndex);
+    st.s /= 3.;
+    return texture(iDream210, st);
 }
 
-#define DO_RAYMARCHING 0
-#define DRAW_LOGO 0
-#define TEST_FEEDBACK 0
-#define CLOUD_ATTEMPT 1
-#define STUPID_SMEAR 0
+#define DRAW_LOGO 1
+const bool TEST_FEEDBACK = false;
+const bool STUPID_SMEAR = false;
 
-void main() {
-    aspRatio = iResolution.x / iResolution.y;
-    vec2 uv = (2. * gl_FragCoord.xy) / iResolution.y - vec2(aspRatio, 1.);
-    vec3 col = c.xxx;
+void renderNoiseClouds(in vec2 uv) {
+    vec2 uvTime = uv - vec2(iCloudVelX, iCloudVelY) * iTime;
+    float n = fbm(uvTime, iCloudMorph * iTime);
+    n *= 4.;
+    const float lowerLimit = 0.0; // 0.2
+    n = smoothstep(lowerLimit, 1.0, n);
+    fragColor = vec4(vec3(n), 1.);
+}
 
-    float d = sdCircle(uv, 0.02);
-    col = mix(c.yyy, c.xxx, smoothstep(0., 0.001, d));
+void morphNoiseClouds(in vec2 uv, in vec2 st) {
+    fragColor = texture(iPrevImage, st);
 
-    vec2 st = gl_FragCoord.xy / iResolution.xy;
-    vec4 image = texture(iPrevImage, st);
-    if (iPassIndex == 1) {
-        fragColor = image;
-        if (iFrame == 0) {
-            return;
-        }
-        #if STUPID_SMEAR
-            // some smear to know we are set up... |o|
-            vec3 imageClone = texture(iPrevImage, st - vec2(0., 0.002)).rgb;
-            fragColor.rgb = mix(fragColor.rgb, imageClone, 0.5);
-            return;
-        #endif
-
-        float dt = 0.016;
-        float perturb = snoise(st + iTime);
-        vec2 pos = st - dt * image.xy;
-        vec4 advected = texture(iPrevImage, pos);
-        vec2 newVel = advected.xy + vec2(perturb, 0.0);
-        fragColor.rgb = vec3(newVel, 0.);
+    if (STUPID_SMEAR) { // just as to know we are set up... |o|
+        vec3 imageClone = texture(iPrevImage, st - vec2(0., 0.002)).rgb;
+        fragColor.rgb = mix(fragColor.rgb, imageClone, 0.5);
         return;
     }
+
+    fragColor = pow(fragColor, vec4(9.));
+    float time = 0.5 * iTime;
+    vec2 perturb = vec2(
+        snoise(st + time, 0.),
+        snoise(1.5 * st + time - 0.43, 0.4)
+    );
+    vec2 pos = st;
+    vec2 scaleCenter = c.wy;
+    pos = 0.99 * (pos - scaleCenter) + scaleCenter;
+    // pos -= 0.016 * perturb;
+    vec4 prev = texture(iPrevImage, pos);
+    float mixing = max(max(prev.r, prev.g), prev.b);
+    // fragColor = mix(fragColor, advected, 0.5 + 0.5 * mixing);
+    // fragColor.rgb += prev.rgb * prev.a;
+    fragColor.rgb = mix(fragColor.rgb, prev.rgb, 0.5 + 0.5 * mixing);
+
+    outVelocity += 1.e-1 * c.yz;
+}
+
+void renderScene(in vec2 uv, in vec2 st) {
+    vec3 col = c.xxx;
+    float d;
+
+    d = sdCircle(uv, 0.02);
+    col = mix(c.yyy, c.xxx, smoothstep(0., 0.001, d));
 
     // applyGrid(col, uv, 0.5);
 
     vec3 colX = c.xxx;
-    #if TEST_FEEDBACK
-    {
+    if (TEST_FEEDBACK) {
         vec2 somePos = vec2(
             perlin2D(iNoiseLevel * uv + iTime),
             perlin2D(iNoiseLevel * uv * 7. + iTime + 0.312)
@@ -466,17 +524,6 @@ void main() {
         vec3 color = vec3(0.5 + 0.3 * sin(10. * iTime), 1., 0.8 - 0.2 * cos(4. * iTime + .2));
         colX = mix(color, colX, smoothstep(0.0, 0.02, d));
     }
-    #endif
-
-    #if CLOUD_ATTEMPT
-    {
-        vec2 uvTime = uv + vec2(iTime * 0.05, iTime * 0.02);
-        float n = fbm(uvTime);
-        n *= 4.;
-        float alpha = smoothstep(0.3, 0.6, n);
-        col = vec3(alpha);
-    }
-    #endif
 
     /*
     colX = gradientNoise(uv);
@@ -490,14 +537,47 @@ void main() {
     col = mix(col, colX, iNoiseLevel);
     */
 
-    #if DO_RAYMARCHING
-        someRayMarching(colX, uv);
-        col = max(col, colX);
-    #endif
-
-    #if DRAW_LOGO
-        drawLogoParts(col, st);
-    #endif
+    someRayMarching(colX, uv);
+    col = max(col, colX);
 
     fragColor = vec4(col, 1.0);
+    fragColor.br += outVelocity;
+
+    // vec4 clouds = texture(iPrevImage, st);
+    fragColor.r = iNoiseLevel;
+
+}
+
+void postprocess(in vec2 uv, in vec2 st) {
+    fragColor = texture(iPrevImage, st);
+    #if DRAW_LOGO
+    {
+        int logoIndex = int(iTime) % 3;
+        vec4 tex = logoPart(uv, c.yy, 0.95, logoIndex);
+        fragColor.rgb = mix(fragColor.rgb, tex.rgb, 0.7 * tex.a);
+    }
+    #endif
+}
+
+void main() {
+    aspRatio = iResolution.x / iResolution.y;
+    vec2 uv = (2. * gl_FragCoord.xy) / iResolution.y - vec2(aspRatio, 1.);
+
+    vec2 st = gl_FragCoord.xy / iResolution.xy;
+    outVelocity = texture(iPrevVelocity, st).xy;
+
+    switch (iPassIndex) {
+        case 0:
+            renderNoiseClouds(uv);
+            break;
+        case 1:
+            morphNoiseClouds(uv, st);
+            break;
+        case 2:
+            renderScene(uv, st);
+            break;
+        case 3:
+            postprocess(uv, st);
+            break;
+    }
 }
