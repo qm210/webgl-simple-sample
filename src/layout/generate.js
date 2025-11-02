@@ -1,6 +1,6 @@
-import {addButton, createInputElements, addValueRow} from "./controls.js";
+import {addButton, createInputElements, addFreeRow} from "./controls.js";
 import {registerShaderCode} from "./shaderCode.js";
-import {appendButton, appendText} from "./helpers.js";
+import {appendButton, appendText, createDiv, createElement} from "./helpers.js";
 import {createScrollStackOn, scrollToFirstInterestingLine} from "./events.js";
 import {deferExtendedAnalysis} from "../glslCode/deferredAnalysis.js";
 import {shiftTime} from "../webgl/render.js";
@@ -84,7 +84,8 @@ export const addControlsToPage = (elements, state, controls, autoRenderOnLoad) =
     if (autoRenderOnLoad) {
         controls.onRender();
     } else {
-        addButton(elements.controls, {
+        addButton({
+            parent: elements.controls,
             title: "Render!",
             onClick: controls.onRender,
         });
@@ -94,12 +95,27 @@ export const addControlsToPage = (elements, state, controls, autoRenderOnLoad) =
 
         if (control.type === "label") {
             elements[control.name] =
-                addValueRow(elements.controls, {
-                    label: control.name + " = ",
-                    id: control.name
-                });
+                addFreeRow({
+                    parent: elements.controls,
+                    label: control.name,
+                    id: control.name,
+                    content: createDiv("=", "value-label"),
+                }).value;
             continue;
         }
+        else if (control.type === "button") {
+            elements[control.name] =
+                addFreeRow({
+                    parent: elements.controls,
+                    label: "outVelocity",
+                    content: addButton({
+                        title: control.label,
+                        onClick: control.onClick
+                    })
+                })
+            continue;
+        }
+
 
         const input = createInputElements(state, control);
         if (!input) {

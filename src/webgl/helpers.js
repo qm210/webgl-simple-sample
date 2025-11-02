@@ -85,7 +85,7 @@ export function createTextureFromImage(gl, imageSource, options) {
     // wir lassen hier das Konzept "Mipmaps" aus, das ist aber prinzipiell nicht uninteressant.
 
     // Laden im Browser notwendigerweise asynchron.
-    // -> wird kurz flackern, aber das akzeptieren wir mal (WebGL-Limitierung).
+    // -> wird kurz flackern, aber das akzeptieren wir halt (geht im Browser nicht anders).
 
     loadImage(imageSource, (img) => {
         // -> daher auch: Textur lieber neu binden, weil inzwischen alles mögliche passiert sein kann.
@@ -103,7 +103,7 @@ export function createTextureFromImage(gl, imageSource, options) {
     return texture;
 }
 
-export function createFramebufferWithTexture(gl, options) {
+export function createFramebufferWithTexture(gl, options, fbIndex = undefined) {
     const width = options?.width ?? gl.drawingBufferWidth;
     const height = options?.height ?? gl.drawingBufferHeight;
 
@@ -152,6 +152,10 @@ export function createFramebufferWithTexture(gl, options) {
         texture,
         attachments: [colorAttachment],
         extraOutTexture: null,
+        // for debugging:
+        index: fbIndex,
+        status,
+        // stored in here because we might care about resizing the canvas one day (we don't, for now.) // TODO
         options: {
             width,
             height,
@@ -164,7 +168,6 @@ export function createFramebufferWithTexture(gl, options) {
             minFilter,
             magFilter,
         },
-        status
     };
 }
 

@@ -130,9 +130,13 @@ button.render-button {
     gap: 0.5rem;
 }
 
-#controls > div.value-row {
-    grid-column: 1 / -1;
+#controls > div.free-row {
+    grid-column: 2 / -1;
     font-size: var(--font-size-large);
+    display: flex;
+    flex-direction: row;
+    padding-left: 0.25rem;
+    width: 100%;
 }
 
 #controls > div.value-label {
@@ -144,6 +148,11 @@ button.render-button {
 
 #controls > div > label {
     white-space: nowrap;
+}
+
+.free-row button {
+    padding: 0.25rem 0.5rem;
+    flex: 1;
 }
 
 .small-button {

@@ -1,7 +1,6 @@
-import {REGEX} from "../glslCode/symbols.js";
-import {createDiv, createSpan} from "./helpers.js";
+import {createDiv, createElement} from "./helpers.js";
 
-export function addButton(parent, {onClick, onRightClick, title = "", className = ""}) {
+export function addButton({parent, onClick, onRightClick, title = "", className = ""}) {
     const button = document.createElement("button");
     button.textContent = title;
     if (className) {
@@ -13,17 +12,24 @@ export function addButton(parent, {onClick, onRightClick, title = "", className 
     if (onRightClick) {
       button.addEventListener("contextmenu", onRightClick);
     }
-    parent.appendChild(button);
+    if (parent) {
+        parent.appendChild(button);
+    }
     return button;
 }
 
-export const addValueRow = (parent, {label, name}) => {
-    const container = createDiv(`${label} `, "value-row");
-    const span = document.createElement("span");
-    span.id = name;
-    container.appendChild(span);
+export const addFreeRow = ({parent, label, id, content}) => {
+    const name = createElement("label", label);
+    const container = createDiv("", "free-row");
+    container.id = id;
+    const value = createDiv("", "value-label");
+    if (content) {
+        container.appendChild(content);
+    }
+    container.appendChild(value);
+    parent.appendChild(name);
     parent.appendChild(container);
-    return span;
+    return {container, name, value, content};
 };
 
 export function createInputElements(state, control) {

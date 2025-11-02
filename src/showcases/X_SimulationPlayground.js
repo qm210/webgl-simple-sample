@@ -15,7 +15,7 @@ export default {
             return state;
         }
 
-        state.framebuffer = [0, 1].map(() =>
+        state.framebuffer = [0, 1].map((index) =>
             createFramebufferWithTexture(gl, {
                 width: gl.drawingBufferWidth,
                 height: gl.drawingBufferHeight,
@@ -24,44 +24,78 @@ export default {
                 // internalFormat: gl.RGBA,
                 // dataFormat: gl.RGBA,
                 // dataType: gl.UNSIGNED_BYTE,
-            })
+            }, index)
         );
 
+        // TODO: Resizing the canvas DOES NOT scale the framebuffers / textures yet!! MUST DO
         state.resolution = [gl.drawingBufferWidth, gl.drawingBufferHeight];
         state.frameIndex = 0;
+        state.wantToReadPixels = false;
+
+        // for the second, i.e. layout(location=1) out ... we need another texture PER FRAMEBUFFER.
+        const extraOut = {
+            // The specific linking between one framebuffer object (FBO) and one texture is called "attachment",
+            // as this FBO already has its primary texture on COLOR_ATTACHMENT0, we need a second one.
+            attachment: gl.COLOR_ATTACHMENT1,
+            // We need to choose fitting format (number of channels) / type (bytes per channel) parameters,
+            // this CAN BE TRICKY, so best not to leave the vec4 alignment, and I needed to
+            // use gl.RGBA16F because the "more natural sounding" gl.RGBA32F just wouldn't work ¯\_(ツ)_/¯
+            dataFormat: gl.RGBA,
+            dataType: gl.FLOAT,
+            internalFormat: gl.RGBA16F,
+            // Also, to initialize these values, we need these typed WebGL Arrays (e.g. Float32Array),
+            // they should be sized as (resolution * 4), even if only used for one vec2
+            // ignoring z and w is easier than caring for the different alignment ;)
+            // Also: 4 bytes / 32 bit for floats is the WebGL standard, (even with gl.RGBA16F).
+            initialData: new Float32Array(gl.drawingBufferWidth * gl.drawingBufferHeight * 4),
+            // and we might want to read the pixels at a later time
+            readData: new Float32Array(gl.drawingBufferWidth * gl.drawingBufferHeight * 4),
+            readAtTime: null,
+        };
+        initializeExtraValues(extraOut.initialData, ...state.resolution);
 
         for (const fb of state.framebuffer) {
-            // for the second, i.e. layout(location=1) out ...
             fb.extraOutTexture = gl.createTexture();
             gl.bindTexture(gl.TEXTURE_2D, fb.extraOutTexture);
-            // NOTE: does gl.RGBA32F even work? maybe gl.RGBA16F
-            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, ...state.resolution, 0, gl.RGBA, gl.FLOAT, null);
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.MIRRORED_REPEAT);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.MIRRORED_REPEAT);
 
+            gl.texImage2D(
+                gl.TEXTURE_2D,
+                0,
+                extraOut.internalFormat,
+                ...state.resolution,
+                0,
+                extraOut.dataFormat,
+                extraOut.dataType,
+                extraOut.initialData,
+                // <-- NOTE: would suffice to supply the data to the first READ fbo, but which is it?
+                //           let's just init both, the first WRITE will overwrite it anyway.
+            );
+
+            fb.attachments.push(extraOut.attachment);
             gl.bindFramebuffer(gl.FRAMEBUFFER, fb.fbo);
-            gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT1, gl.TEXTURE_2D, fb.extraOutTexture, 0);
-            fb.attachments.push(gl.COLOR_ATTACHMENT1);
+            gl.framebufferTexture2D(gl.FRAMEBUFFER, extraOut.attachment, gl.TEXTURE_2D, fb.extraOutTexture, 0);
             gl.drawBuffers(fb.attachments);
 
             const status = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
             if (status !== gl.FRAMEBUFFER_COMPLETE) {
                 console.error(fb, status);
             }
-
             gl.bindFramebuffer(gl.FRAMEBUFFER, null);
             gl.bindTexture(gl.TEXTURE_2D, null);
         }
-
-        // random reminder: there is textureSize(). should be written somewhere useful.
+        state.extraOut = extraOut;
 
         state.location.iTime = gl.getUniformLocation(state.program, "iTime");
         state.location.iResolution = gl.getUniformLocation(state.program, "iResolution");
         state.location.prevImage = gl.getUniformLocation(state.program, "iPrevImage");
         state.location.prevVelocity = gl.getUniformLocation(state.program, "iPrevVelocity");
         state.location.passIndex = gl.getUniformLocation(state.program, "iPassIndex");
-        state.location.iFrame = gl.getUniformLocation(state.program, "iFrame");
 
+        state.location.iFrame = gl.getUniformLocation(state.program, "iFrame");
         state.location.iNoiseLevel = gl.getUniformLocation(state.program, "iNoiseLevel");
         state.location.iNoiseFreq = gl.getUniformLocation(state.program, "iNoiseFreq");
         state.location.iNoiseOffset = gl.getUniformLocation(state.program, "iNoiseOffset");
@@ -164,6 +198,13 @@ export default {
             defaultValue: [0, 0, 0],
             min: -9.99,
             max: +9.99,
+        }, {
+            type: "button",
+            name: "readButton",
+            label: "read second \"out\" texture",
+            onClick: () => {
+                state.wantToReadPixels = true;
+            }
         }]
     })
 };
@@ -191,21 +232,76 @@ function render(gl, state) {
 
     let {write, read} = takePingPongFramebuffers(state);
 
-    for (let pass = 0; pass < 3; pass++) {
+    let pass;
+    for (pass = 0; pass < 3; pass++) {
+        if (pass > 0) {
+            [write, read] = [read, write];
+        }
+
         gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo);
         gl.uniform1i(state.location.passIndex, pass);
+
         gl.activeTexture(gl.TEXTURE0);
         gl.bindTexture(gl.TEXTURE_2D, read.texture);
         gl.uniform1i(state.location.prevImage, 0);
+
         gl.activeTexture(gl.TEXTURE1);
         gl.bindTexture(gl.TEXTURE_2D, read.extraOutTexture);
         gl.uniform1i(state.location.prevVelocity, 1);
-        gl.drawArrays(gl.TRIANGLES, 0, 6);
 
-        [write, read] = [read, write];
+        if (state.frameIndex === 0) {
+            console.info("Check Ping Pong", write, read, "Pass", pass);
+        }
+        gl.drawBuffers(write.attachments);
+        gl.drawArrays(gl.TRIANGLES, 0, 6);
     }
 
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-    gl.uniform1i(state.location.passIndex, 3);
+    // gl.drawBuffers([gl.BACK]);
+    gl.uniform1i(state.location.passIndex, pass);
+    if (state.frameIndex === 0) {
+        console.info("Check Ping Pong", write, read, "Pass", pass);
+    }
     gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+    // Demonstration, how gl.readPixels() could work (this transfers GPU -> CPU, but that takes time)
+
+    if (state.wantToReadPixels) {
+        state.wantToReadPixels = false;
+        console.time("readPixels()");
+        gl.bindFramebuffer(gl.READ_FRAMEBUFFER, write.fbo);
+        gl.readBuffer(state.extraOut.attachment);
+        gl.readPixels(0, 0, ...state.resolution, state.extraOut.dataFormat, state.extraOut.dataType, state.extraOut.readData);
+        state.extraOut.readAtTime = state.time;
+        console.timeEnd("readPixels()");
+        console.info(
+            "Read extraValues:", state.extraOut.readData,
+            "info:", state.extraOut,
+            "resolution:", state.resolution
+        );
+    }
+}
+
+function initializeExtraValues(data, width, height) {
+    function put(x, y, r = 0, g = 0, b = 0, a = 0) {
+        let index = 4 * (y * width + x);
+        data[index++] = r;
+        data[index++] = g;
+        data[index++] = b;
+        data[index++] = a;
+    }
+    // Notes:
+    // - initialization is only necessary when already changed, fresh Float32Array() are 0-initialized.
+    // - one might suggest, "why don't we use the shader itself here?" -- because yes. we could and maybe should.
+    console.time("initializeExtraValues");
+    for (let y = 0; y < height; y++)
+    for (let x = 0; x < width; x++)
+    {
+        if (y / height < x / width) {
+            put(x, y, 0.5, 0.5)
+        } else {
+            put(x, y, -0.5, 0.5);
+        }
+    }
+    console.timeEnd("initializeExtraValues");
 }

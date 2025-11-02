@@ -438,21 +438,6 @@ float fbm(vec2 p, float seedShift) {
     return v / s;
 }
 
-/*
-void loadLogoTextures(in vec2 st) {
-    st.t = 1. - st.t;
-    st.s /= aspRatio;
-    const float ratio = .333;
-    st = vec2(clamp(0., ratio, st.s), st.t);
-    for (int i = 0; i < 3; i++) {
-        texLogoDream[2 - i] = texture(
-            iDream210,
-            st + float(i) * ratio * c.yx
-        );
-    }
-}
-*/
-
 vec4 logoPart(vec2 uv, vec2 uvBottomLeft, float uvSize, int logoIndex) {
     vec2 st = (uv - uvBottomLeft) / uvSize;
     if (any(lessThan(st, c.yy)) || any(greaterThan(st, c.xx))) {
@@ -504,7 +489,7 @@ void morphNoiseClouds(in vec2 uv, in vec2 st) {
     // fragColor.rgb += prev.rgb * prev.a;
     fragColor.rgb = mix(fragColor.rgb, prev.rgb, 0.5 + 0.5 * mixing);
 
-    outVelocity += 1.e-1 * c.yz;
+    // outVelocity += 1.e-1 * c.yz;
 }
 
 void renderScene(in vec2 uv, in vec2 st) {
@@ -543,11 +528,9 @@ void renderScene(in vec2 uv, in vec2 st) {
     col = max(col, colX);
 
     fragColor = vec4(col, 1.0);
-    fragColor.br += outVelocity;
 
     // vec4 clouds = texture(iPrevImage, st);
-    fragColor.r = iNoiseLevel;
-
+    // fragColor.r = iNoiseLevel;
 }
 
 void postprocess(in vec2 uv, in vec2 st) {
@@ -568,21 +551,35 @@ void main() {
     vec2 st = gl_FragCoord.xy / iResolution.xy;
     outVelocity = texture(iPrevVelocity, st).xy;
 
+    if (iPassIndex > 0) {
+        fragColor = texture(iPrevImage, st);
+    } else {
+        fragColor = c.yyyy;
+    }
+
     switch (iPassIndex) {
         case 0:
             renderNoiseClouds(uv);
+            // fragColor.rb = outVelocity;
+            fragColor.r = max(fragColor.r, max(fragColor.g, fragColor.b));
+            fragColor.g = fragColor.b = 0.;
+            fragColor.a = 0.1;
             break;
         case 1:
-        outVelocity = vec2(step(0., uv.x), 0.);
-            morphNoiseClouds(uv, st);
+            fragColor.g = fragColor.r;
+            // morphNoiseClouds(uv, st);
             break;
         case 2:
-            renderScene(uv, st);
+            // THIS STEP SEEMS TO BE SKIPPED??
+            fragColor.b = fragColor.r;
+            // renderScene(uv, st);
+            outVelocity.x += (0.015 * perlin2D(uv) - 0.01);
             break;
         case 3:
-            postprocess(uv, st);
-            fragColor.rg += outVelocity;
-            // outVelocity += 1.e-1 * c.yz;
+            // postprocess(uv, st);
+            fragColor.a = 1.;
+            // fragColor.rb += outVelocity;
+            outVelocity.y = 0.;
         break;
     }
 }

@@ -1,11 +1,14 @@
-export function createDiv(content, classes) {
-    const div = document.createElement("div");
+export function createElement(tag, content, classes) {
+    const element = document.createElement(tag);
     if (classes) {
-        div.classList.add(...classes.split(" "));
+        element.classList.add(...classes.split(" "));
     }
-    div.textContent = content?.toString() ?? "";
-    return div;
+    element.textContent = content?.toString() ?? "";
+    return element;
 }
+
+export const createDiv = (...args) =>
+    createElement("div", ...args);
 
 export function appendText(parent, tagName, textContent) {
     const element = document.createElement(tagName);
