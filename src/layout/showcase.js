@@ -1,4 +1,4 @@
-import REGEX from "../glslCode/regex.js";
+import {REGEX} from "../glslCode/symbols.js";
 
 
 const storageKey = "qm.showcase.key";

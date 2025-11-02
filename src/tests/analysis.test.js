@@ -1,6 +1,7 @@
 import {describe, it, expect} from "vitest";
-import {analyzeShader, extendAnalysis, parseScopes, SymbolType} from "../glslCode/analysis.js";
-import REGEX from "../glslCode/regex.js";
+import {analyzeShader, extendAnalysis} from "../glslCode/analysis.js";
+import {REGEX, SymbolType} from "../glslCode/symbols.js";
+import {parseScopes} from "../glslCode/scopes.js";
 
 const sample = `
 #version 300 es

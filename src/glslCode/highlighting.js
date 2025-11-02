@@ -1,6 +1,5 @@
-import REGEX, {MAGIC_SYMBOLS} from "./regex.js";
+import {REGEX, SymbolType} from "./symbols.js";
 import {createSpan} from "../layout/helpers.js";
-import {SymbolType} from "./analysis.js";
 
 export function withGlslHighlighting(code) {
     return code

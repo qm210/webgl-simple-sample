@@ -103,15 +103,14 @@ export const addControlsToPage = (elements, state, controls, autoRenderOnLoad) =
 
         const input = createInputElements(state, control);
         if (!input) {
-            console.warn("Undefined Control", control);
             continue;
         }
-        elements.controls.appendChild(input.nameLabel);
-        elements.controls.appendChild(input.valueLabel);
-        elements.controls.appendChild(input.minLabel);
-        elements.controls.appendChild(input.input ?? input.container);
-        elements.controls.appendChild(input.maxLabel);
-        elements.controls.appendChild(input.resetButton);
+        elements.controls.appendChild(input.name);
+        elements.controls.appendChild(input.value);
+        elements.controls.appendChild(input.min);
+        elements.controls.appendChild(input.control);
+        elements.controls.appendChild(input.max);
+        elements.controls.appendChild(input.reset);
     }
 
     document.addEventListener("keydown", event => {

@@ -1,4 +1,4 @@
-export const MAGIC_SYMBOLS = [
+const MAGIC_SYMBOLS = [
     "gl_Position",
     "gl_PointSize",
     "gl_FragCoord",
@@ -7,7 +7,7 @@ export const MAGIC_SYMBOLS = [
     "main",
 ];
 
-const REGEX = {
+export const REGEX = {
     DEFINE_DIRECTIVE:
         /^\s*#define\s*(?<name>\w*)(?<args>\(.*?\))?\s*(?<value>.*)\s*$/mg,
     SHADER_VARIABLE:
@@ -30,25 +30,31 @@ const REGEX = {
     NUMBER:
         /\b(-?\d+\.?\d*(e-?\d+)?[Uf]?)/g,
     DIRECTIVE:
-        /^\s*#(?<keyword>\w+)\s*(?<expression>.*?)\s*$/g,
+        /^\s*#(?<keyword>\w+)\s*(?<expression>.*?)\s*$/mg,
     DIRECTIVE_KEYWORD:
         /\b(defined|optimize|debug)\b/g,
+    BLOCK_DELIMITER:
+        /(?<braceOpen>\{)|(?<braceClose>})|(?<commentOpen>\/\*)|(?<commentClose>\*\/)/g,
 
     ERROR_LOG:
         /:\s*([0-9]*):([0-9]*):\s*(.*)/g,
     // <--this holds for WebGl2, as of March 2025 - e.g. error logs look like:
     // ERROR: 0:12: '=' : dimension mismatch
     // -> parse accordingly: /<ignore>: <number>:<number>: <rest>/
-
-    cached: {}
 };
 
-export default REGEX;
+export const SymbolType = {
+    DefineDirective: "DefineDirective",
+    ShaderVariable: "ShaderVariable",
+    Constant: "CustomConstant",
+    CustomFunction: "CustomFunction",
+    Struct: "CustomStruct",
+};
 
-
-export function matchCached(pattern, code) {
-    if (!REGEX.cached[pattern]) {
-        REGEX.cached[pattern] = new RegExp(pattern, 'g');
-    }
-    return code.match(REGEX.cached[pattern]);
-}
+export const SymbolRegex = {
+    [SymbolType.DefineDirective]: REGEX.DEFINE_DIRECTIVE,
+    [SymbolType.ShaderVariable]: REGEX.SHADER_VARIABLE,
+    [SymbolType.Constant]: REGEX.CONSTANT,
+    [SymbolType.CustomFunction]: REGEX.FUNCTION_SIGNATURE,
+    [SymbolType.Struct]: REGEX.STRUCT,
+};
