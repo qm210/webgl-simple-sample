@@ -438,7 +438,8 @@ float fbm(vec2 p, float seedShift) {
     return v / s;
 }
 
-vec4 logoPart(vec2 uv, vec2 uvBottomLeft, float uvSize, int logoIndex) {
+vec4 logoPart(vec2 uv, vec2 uvCenter, float uvSize, int logoIndex) {
+    vec2 uvBottomLeft = uvCenter - 0.5 * uvSize * c.xx;
     vec2 st = (uv - uvBottomLeft) / uvSize;
     if (any(lessThan(st, c.yy)) || any(greaterThan(st, c.xx))) {
         return c.yyyy;
@@ -465,13 +466,11 @@ void renderNoiseClouds(in vec2 uv) {
 void morphNoiseClouds(in vec2 uv, in vec2 st) {
     fragColor = texture(iPrevImage, st);
 
-    #if defined(DRAW_LOGO)
     if (STUPID_SMEAR) { /* just as to know we are set up... |o| */
         vec3 imageClone = texture(iPrevImage, st - vec2(0., 0.002)).rgb;
         fragColor.rgb = mix(fragColor.rgb, imageClone, 0.5);
         return;
     }
-    #endif
 
     fragColor = pow(fragColor, vec4(9.));
     float time = 0.5 * iTime;
@@ -537,9 +536,17 @@ void postprocess(in vec2 uv, in vec2 st) {
     fragColor = texture(iPrevImage, st);
     #if DRAW_LOGO
     {
-        int logoIndex = int(iTime) % 3;
-        vec4 tex = logoPart(uv, c.yy, 0.95, logoIndex);
-        fragColor.rgb = mix(fragColor.rgb, tex.rgb, 0.7 * tex.a);
+        int logoIndex = int(iTime * 1.33) % 3;
+        vec2 pos = c.yy + float(logoIndex - 1) * 0.8 * c.xy;
+        vec4 tex = logoPart(uv, pos, 1.5, logoIndex);
+        fragColor.rgb = mix(fragColor.rgb, tex.rgb, 0.4 * tex.a);
+
+        tex = logoPart(uv, pos - 0.01, 1.5, logoIndex);
+        float val = max(tex.r, max(tex.g, tex.b)) * tex.a;
+        val = smoothstep(0., 0.37, val);
+        vec3 col = fragColor.rgb;
+        vec3 colInvert = mix(col, vec3(col.r, 1. - col.g, 1. - col.b), val);
+        fragColor.rgb = mix(fragColor.rgb, colInvert, val);
     }
     #endif
 }
@@ -550,6 +557,8 @@ void main() {
 
     vec2 st = gl_FragCoord.xy / iResolution.xy;
     outVelocity = texture(iPrevVelocity, st).xy;
+    // Note: our current setup outVelocity read-only in the last pass
+    //       we might change that, but that is a post-processing step, so... no.
 
     if (iPassIndex > 0) {
         fragColor = texture(iPrevImage, st);
@@ -567,19 +576,16 @@ void main() {
             break;
         case 1:
             fragColor.g = fragColor.r;
+            fragColor.b = fragColor.r;
             // morphNoiseClouds(uv, st);
             break;
         case 2:
-            // THIS STEP SEEMS TO BE SKIPPED??
-            fragColor.b = fragColor.r;
-            // renderScene(uv, st);
-            outVelocity.x += (0.015 * perlin2D(uv) - 0.01);
+            renderScene(uv, st);
             break;
         case 3:
-            // postprocess(uv, st);
+            postprocess(uv, st);
             fragColor.a = 1.;
-            // fragColor.rb += outVelocity;
-            outVelocity.y = 0.;
+            fragColor.rb = outVelocity;
         break;
     }
 }

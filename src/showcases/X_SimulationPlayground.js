@@ -15,6 +15,11 @@ export default {
             return state;
         }
 
+        // TODO: Resizing the canvas DOES NOT scale the framebuffers / textures yet!! MUST DO
+        state.resolution = [gl.drawingBufferWidth, gl.drawingBufferHeight];
+        state.frameIndex = 0;
+        state.nPasses = 4;
+
         state.framebuffer = [0, 1].map((index) =>
             createFramebufferWithTexture(gl, {
                 width: gl.drawingBufferWidth,
@@ -26,11 +31,8 @@ export default {
                 // dataType: gl.UNSIGNED_BYTE,
             }, index)
         );
-
-        // TODO: Resizing the canvas DOES NOT scale the framebuffers / textures yet!! MUST DO
-        state.resolution = [gl.drawingBufferWidth, gl.drawingBufferHeight];
-        state.frameIndex = 0;
-        state.wantToReadPixels = false;
+        state.fbPingIndex = 0;
+        state.fbPongIndex = 1;
 
         // for the second, i.e. layout(location=1) out ... we need another texture PER FRAMEBUFFER.
         const extraOut = {
@@ -53,6 +55,8 @@ export default {
             readAtTime: null,
         };
         initializeExtraValues(extraOut.initialData, ...state.resolution);
+        state.extraOut = extraOut;
+        state.wantToReadExtraOut = false;
 
         for (const fb of state.framebuffer) {
             fb.extraOutTexture = gl.createTexture();
@@ -87,7 +91,6 @@ export default {
             gl.bindFramebuffer(gl.FRAMEBUFFER, null);
             gl.bindTexture(gl.TEXTURE_2D, null);
         }
-        state.extraOut = extraOut;
 
         state.location.iTime = gl.getUniformLocation(state.program, "iTime");
         state.location.iResolution = gl.getUniformLocation(state.program, "iResolution");
@@ -111,7 +114,7 @@ export default {
         state.dream210logo = createTextureFromImage(gl, schnoergl210, {
             wrapS: gl.CLAMP_TO_EDGE,
             wrapT: gl.CLAMP_TO_EDGE,
-            minFilter: gl.NEAREST,
+            minFilter: gl.LINEAR,
             magFilter: gl.NEAREST,
         });
         state.location.iDream210 = gl.getUniformLocation(state.program, "iDream210");
@@ -201,9 +204,9 @@ export default {
         }, {
             type: "button",
             name: "readButton",
-            label: "read second \"out\" texture",
+            label: "read second \"out\" texture (check F12 console)",
             onClick: () => {
-                state.wantToReadPixels = true;
+                state.wantToReadExtraOut = true;
             }
         }]
     })
@@ -230,53 +233,52 @@ function render(gl, state) {
     gl.bindTexture(gl.TEXTURE_2D, state.dream210logo);
     gl.uniform1i(state.location.iDream210, 2);
 
-    let {write, read} = takePingPongFramebuffers(state);
+    let pass, write, read;
+    for (pass = 0; pass < state.nPasses; pass++) {
 
-    let pass;
-    for (pass = 0; pass < 3; pass++) {
-        if (pass > 0) {
-            [write, read] = [read, write];
+        // we always do the frame-buffer ping pong...
+        write = state.framebuffer[state.fbPingIndex];
+        read = state.framebuffer[state.fbPongIndex];
+        [state.fbPingIndex, state.fbPongIndex] = [state.fbPongIndex, state.fbPingIndex];
+
+        // ... but the last pass needs to go to the screen
+        if (pass < state.nPasses - 1) {
+            gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo);
+            gl.drawBuffers(write.attachments);
+        } else {
+            // null == Screen ("Back Buffer")
+            gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+            // Note: this amounts to gl.drawBuffers([gl.BACK]);
+            //       i.e. this will not render the extra output anymore, only fragColor!
         }
 
-        gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo);
-        gl.uniform1i(state.location.passIndex, pass);
-
+        // get the previously rendered image from the other buffer on its attachment
         gl.activeTexture(gl.TEXTURE0);
         gl.bindTexture(gl.TEXTURE_2D, read.texture);
         gl.uniform1i(state.location.prevImage, 0);
 
+        // that is the previously calculated extraOut from the other buffer on its different attachment
         gl.activeTexture(gl.TEXTURE1);
         gl.bindTexture(gl.TEXTURE_2D, read.extraOutTexture);
         gl.uniform1i(state.location.prevVelocity, 1);
 
-        if (state.frameIndex === 0) {
-            console.info("Check Ping Pong", write, read, "Pass", pass);
-        }
-        gl.drawBuffers(write.attachments);
+        gl.uniform1i(state.location.passIndex, pass);
         gl.drawArrays(gl.TRIANGLES, 0, 6);
     }
 
-    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-    // gl.drawBuffers([gl.BACK]);
-    gl.uniform1i(state.location.passIndex, pass);
-    if (state.frameIndex === 0) {
-        console.info("Check Ping Pong", write, read, "Pass", pass);
-    }
-    gl.drawArrays(gl.TRIANGLES, 0, 6);
+    // Demonstration: how gl.readPixels() could work (this transfers GPU -> CPU, but that takes time)
 
-    // Demonstration, how gl.readPixels() could work (this transfers GPU -> CPU, but that takes time)
-
-    if (state.wantToReadPixels) {
-        state.wantToReadPixels = false;
+    if (state.wantToReadExtraOut) {
+        state.wantToReadExtraOut = false;
         console.time("readPixels()");
-        gl.bindFramebuffer(gl.READ_FRAMEBUFFER, write.fbo);
+        gl.bindFramebuffer(gl.READ_FRAMEBUFFER, read.fbo);
         gl.readBuffer(state.extraOut.attachment);
         gl.readPixels(0, 0, ...state.resolution, state.extraOut.dataFormat, state.extraOut.dataType, state.extraOut.readData);
         state.extraOut.readAtTime = state.time;
         console.timeEnd("readPixels()");
         console.info(
-            "Read extraValues:", state.extraOut.readData,
-            "info:", state.extraOut,
+            "Read:", state.extraOut.readData,
+            "extraOut:", state.extraOut,
             "resolution:", state.resolution
         );
     }

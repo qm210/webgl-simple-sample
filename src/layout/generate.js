@@ -252,7 +252,6 @@ function addDisplayControls(elements, state, glContext) {
             const oldValue = document.documentElement.style.getPropertyValue(PAGE_FONT.storageKey);
             const newFactor = Math.max(0.1, currentFactor * relativeFactor).toFixed(3);
             document.documentElement.style.setProperty(PAGE_FONT.cssProperty, newFactor);
-            console.log("this was fun", PAGE_FONT.cssProperty, currentFactor, newFactor, oldValue);
             localStorage.setItem(PAGE_FONT.storageKey, newFactor);
         };
     }
@@ -260,7 +259,6 @@ function addDisplayControls(elements, state, glContext) {
     function pageFontInitialize() {
         const currentFactor = JSON.parse(localStorage.getItem(PAGE_FONT.storageKey) ?? "1");
         document.documentElement.style.setProperty(PAGE_FONT.cssProperty, currentFactor);
-        console.log("und schon sind wir schlauüer:", currentFactor);
     }
 }
 
