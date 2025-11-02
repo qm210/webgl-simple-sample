@@ -91,16 +91,30 @@ export const addControlsToPage = (elements, state, controls, autoRenderOnLoad) =
         });
     }
 
+    // We nowadays want to always have the time, not specify it in every showcase anymore
+    elements.iTime = addFreeRow({
+        parent: elements.controls,
+        label: "iTime",
+        id: "iTime",
+        content: createDiv("=", "value-label"),
+    });
+    elements.fps = createDiv("", "value-label right-align fps");
+    elements.iTime.container.appendChild(elements.fps);
+
     for (const control of controls.uniforms ?? []) {
 
         if (control.type === "label") {
+            if (elements[control.name] !== undefined) {
+                continue;
+            }
+            // <-- skip overwriting one defined per default (i.e. iTime)
             elements[control.name] =
                 addFreeRow({
                     parent: elements.controls,
                     label: control.name,
                     id: control.name,
                     content: createDiv("=", "value-label"),
-                }).value;
+                });
             continue;
         }
         else if (control.type === "button") {

@@ -16,32 +16,62 @@
 
 export function startRenderLoop (renderFunction, state, elements) {
     cancelAnimationFrame(state.animationFrame);
-    state.startTime = performance.now();
+    state.startTime = null;
     state.timeRunning = true;
     state.frameIndex = -1;
     state.stopSignal = false;
-    state.animationFrame = requestAnimationFrame(() =>
-        runLoop(renderFunction, state, elements)
-    );
+    state.fps = null;
+    state.animation = (timestamp) =>
+        runLoop(renderFunction, state, elements, timestamp);
+    state.animationFrame = requestAnimationFrame(state.animation);
 }
 
-function runLoop(renderFunction, state, elements) {
+function runLoop(renderFunction, state, elements, timestamp) {
+    if (state.startTime === null) {
+        state.startTime = timestamp;
+    }
     if (state.timeRunning) {
-        state.time = 0.001 * (performance.now() - state.startTime);
+        state.time = 0.001 * (timestamp - state.startTime);
         state.frameIndex = state.frameIndex + 1;
+        doFpsMeasurement(state);
     }
 
     renderFunction(state);
 
-    elements.iTime.innerHTML = state.time.toFixed(2) + " sec";
+    elements.iTime.value.textContent = state.time.toFixed(2) + " sec";
+    elements.fps.textContent = "FPS: " + state.fps;
 
     if (state.stopSignal) {
+        resetFpsMeasurement(state);
         return;
     }
 
-    requestAnimationFrame(() =>
-        runLoop(renderFunction, state, elements)
-    );
+    requestAnimationFrame(state.animation);
+}
+
+const measureFps = {
+    frames: null,
+    measureAtTime: null,
+    durationSeconds: 1,
+}
+
+function resetFpsMeasurement(state) {
+    state.fps = null;
+    measureFps.frames = null;
+    measureFps.measureAtTime = null;
+}
+
+function doFpsMeasurement(state) {
+    if (measureFps.measureAtTime === null) {
+        measureFps.measureAtTime = state.time + measureFps.durationSeconds;
+        measureFps.frames = 0;
+    } else {
+        measureFps.frames++;
+        if (state.time > measureFps.measureAtTime) {
+            state.fps = measureFps.frames / measureFps.durationSeconds;
+            measureFps.measureAtTime = null;
+        }
+    }
 }
 
 export function shiftTime(state, seconds) {

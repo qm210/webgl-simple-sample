@@ -59,7 +59,7 @@ function renderLoop(gl, state, elements) {
 
     gl.drawArrays(gl.TRIANGLES, 0, 6);
 
-    elements.iTime.innerHTML = state.time.toFixed(2) + " sec";
+    elements.iTime.value.textContent = state.time.toFixed(2) + " sec";
 
     requestAnimationFrame(() => renderLoop(gl, state, elements))
 }
