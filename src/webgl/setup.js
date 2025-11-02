@@ -6,7 +6,7 @@ import {maybeAdjustForCompatibility} from "./compatibility.js";
  * @param canvas - You need a <canvas> element to initialize WebGl context
  *                 Also, your browser needs to support this.
  *                 See: https://caniuse.com/webgl2
- * @param geometry {width, height, aspectRatio} - canvas dimensions, specify either two
+ * @param geometry {{width, height, aspectRatio}} - canvas dimensions, specify either two
  */
 
 export function setupWebGl(canvas, geometry) {

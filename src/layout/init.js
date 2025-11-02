@@ -10,10 +10,10 @@ export default function initLayout(rootId) {
         <div id="working-program">
           <div id="canvas-frame">
             <canvas id="canvas"></canvas>
+            <div id="display-controls"></div>            
           </div>
-          <div id="controls"></div>
+          <div id="shader-controls"></div>
         </div>
-        <div id="canvas-controls"></div>
       </div>
     `;
 
@@ -26,8 +26,8 @@ export default function initLayout(rootId) {
         workingShader: document.getElementById("working-program"),
         canvasFrame: document.getElementById("canvas-frame"),
         canvas: document.getElementById("canvas"),
-        controls: document.getElementById("controls"),
-        canvasControls: document.getElementById("canvas-controls"),
+        controls: document.getElementById("shader-controls"),
+        displayControls: document.getElementById("display-controls"),
         startRendering: performance.now(),
     };
 }

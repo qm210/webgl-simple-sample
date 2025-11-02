@@ -13,13 +13,14 @@
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 
-  --font-size-large: 1.25em;
+  --font-size-base: 1.25em;
+  --font-size-factor: 1;
+  --font-size-large: calc(var(--font-size-base) * var(--font-size-factor));
 
   @media (max-width: 400px) {
     font-size: 8pt;
-    --font-size-large: 9pt;
+    --font-size-base: 9pt;
   }
-
 }
 
 a {
@@ -94,7 +95,7 @@ pre {
 
 label {
   font-family: monospace;
-  margin: 0.3rem 0;
+  margin: 4px 0;
   font-size: var(--font-size-large);
 }
 

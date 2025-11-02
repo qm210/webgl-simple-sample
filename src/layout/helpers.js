@@ -10,9 +10,8 @@ export function createElement(tag, content, classes) {
 export const createDiv = (...args) =>
     createElement("div", ...args);
 
-export function appendText(parent, tagName, textContent) {
-    const element = document.createElement(tagName);
-    element.textContent = textContent;
+export function appendElement(parent, content, tagName = "div", classes = "") {
+    const element = createElement(tagName, content, classes);
     parent.appendChild(element);
 }
 

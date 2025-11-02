@@ -1,13 +1,13 @@
 import {addButton, createInputElements, addFreeRow} from "./controls.js";
 import {registerShaderCode} from "./shaderCode.js";
-import {appendButton, appendText, createDiv, createElement} from "./helpers.js";
+import {appendButton, appendElement, createDiv} from "./helpers.js";
 import {createScrollStackOn, scrollToFirstInterestingLine} from "./events.js";
 import {deferExtendedAnalysis} from "../glslCode/deferredAnalysis.js";
 import {shiftTime} from "../webgl/render.js";
 import {setCanvasResolution} from "../webgl/setup.js";
 
 
-const generatePage = (glContext, elements, state, controls, autoRenderOnLoad) => {
+const generatePage = (glContext, elements, state, controls, autoRenderOnLoad = true) => {
 
     if (!state.program) {
         elements.workingShader.remove();
@@ -36,10 +36,10 @@ const generatePage = (glContext, elements, state, controls, autoRenderOnLoad) =>
     );
 
     if (state.post) {
-        appendText(
+        appendElement(
             elements.shaders,
+            "Second Program (Post Processing):",
             "h4",
-            "Second Program (Post Processing):"
         );
         registerShaderCode(
             elements,
@@ -57,13 +57,12 @@ const generatePage = (glContext, elements, state, controls, autoRenderOnLoad) =>
         );
     }
 
-    deferExtendedAnalysis(elements).then(() => {
-        scrollToFirstInterestingLine();
-    });
+    deferExtendedAnalysis(elements)
+        .then(scrollToFirstInterestingLine);
 
     addCanvasMouseInteraction(elements, state);
     addControlsToPage(elements, state, controls, autoRenderOnLoad);
-    addCanvasControls(elements, state, glContext);
+    addDisplayControls(elements, state, glContext);
 
     elements.initialRenderMs = performance.now() - elements.startRendering;
 };
@@ -162,7 +161,7 @@ export const addControlsToPage = (elements, state, controls, autoRenderOnLoad) =
                     state.timeRunning = false;
                 } else {
                     state.timeRunning = true;
-                    state.startTime = performance.now() - 1000. * state.time;
+                    state.startTime = null;
                 }
                 break;
             case "ArrowLeft":
@@ -218,12 +217,24 @@ function renderCompileStepStatus(title, error, successMessage) {
     `;
 }
 
-function addCanvasControls(elements, state, glContext) {
-    appendButton(elements.canvasControls, "+", resizeHandler(1.05));
-    appendButton(elements.canvasControls, "–", resizeHandler(0.95));
-    // ...the EN DASH ("\u2013") is more pretty as minus than the hyphen :)
+const PAGE_FONT = {
+    cssProperty: "--font-size-factor",
+    storageKey: "qm.fontsize.factor"
+};
 
-    function resizeHandler(factor) {
+function addDisplayControls(elements, state, glContext) {
+    appendButton(elements.displayControls, "+", canvasResize(1.05));
+    appendButton(elements.displayControls, "–", canvasResize(0.95));
+    appendElement(elements.displayControls, "canvas", "label", "space-below");
+    // Note: the EN DASH ("\u2013") is more pretty as minus than the hyphen :)
+
+    appendButton(elements.displayControls, "↑", pageFontResize(1.05));
+    appendButton(elements.displayControls, "￬", pageFontResize(0.95));
+    appendElement(elements.displayControls, "font", "label");
+
+    pageFontInitialize();
+
+    function canvasResize(factor) {
         return () => {
             let width = elements.canvas.width;
             let height = elements.canvas.height;
@@ -231,7 +242,25 @@ function addCanvasControls(elements, state, glContext) {
             height = Math.max(Math.round(height * factor), 1);
             setCanvasResolution(elements.canvas, glContext, width, height);
             state.resolution = [width, height];
+            // TODO: if we have framebuffers etc. we have to rescale them NOW
         };
+    }
+
+    function pageFontResize(relativeFactor) {
+        return () => {
+            const currentFactor = JSON.parse(localStorage.getItem(PAGE_FONT.storageKey) ?? "1");
+            const oldValue = document.documentElement.style.getPropertyValue(PAGE_FONT.storageKey);
+            const newFactor = Math.max(0.1, currentFactor * relativeFactor).toFixed(3);
+            document.documentElement.style.setProperty(PAGE_FONT.cssProperty, newFactor);
+            console.log("this was fun", PAGE_FONT.cssProperty, currentFactor, newFactor, oldValue);
+            localStorage.setItem(PAGE_FONT.storageKey, newFactor);
+        };
+    }
+
+    function pageFontInitialize() {
+        const currentFactor = JSON.parse(localStorage.getItem(PAGE_FONT.storageKey) ?? "1");
+        document.documentElement.style.setProperty(PAGE_FONT.cssProperty, currentFactor);
+        console.log("und schon sind wir schlauüer:", currentFactor);
     }
 }
 
