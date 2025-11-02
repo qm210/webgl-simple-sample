@@ -113,6 +113,7 @@ export function analyzeShader(source, errorLog, shaderKey) {
 export async function extendAnalysis(analyzed) {
     analyzed.scopes = parseScopes(analyzed.lines);
     analyzed.symbols = parseSymbols(analyzed.source);
+    console.log(analyzed.symbols);
     analyzed.functions = enhancedFunctionsWithBody(analyzed);
     enhanceSymbols(analyzed);
     console.log("Analyzed Shader", analyzed);

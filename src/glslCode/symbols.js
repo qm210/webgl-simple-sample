@@ -20,9 +20,8 @@ export const REGEX = {
         /\b(?<returnType>\w+)\s+(?<name>\w+)\s*\((?<args>[^()]*)\)\s*\{/g,
     STRUCT:
         /\bstruct\s+(?<name>\w+)\s*\{(?<body>[^}]*)}/mg,
-
     MAGIC_SYMBOL:
-        new RegExp(`\b(${MAGIC_SYMBOLS.join('|')})\b`, 'g'),
+        new RegExp(`\\b(${MAGIC_SYMBOLS.join('|')})\\b`, 'g'),
     KEYWORD:
         /\b(?<!#)(uniform|varying|attribute|layout|const|in|out|[iu]?vec[234]|mat[234]|void|float|u?int|bool|sampler[123]D|return|discard|continue|break|if|else|texture|texelFetch|precision|highp|mediump|lowp)\b/g,
     BUILTIN_FUNCTION:
