@@ -15,6 +15,10 @@ export function deferExtendedAnalysis(elements) {
                         elements.scrollStack,
                     );
                 })
+                .catch(error => {
+                    console.error("Analysis failed, guess your shader's broken anyway.");
+                    console.info(error);
+                })
         )
     );
 }

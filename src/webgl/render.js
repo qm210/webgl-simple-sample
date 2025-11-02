@@ -49,29 +49,60 @@ function runLoop(renderFunction, state, elements, timestamp) {
     requestAnimationFrame(state.animation);
 }
 
-const measureFps = {
+const fpsMeter = {
     frames: null,
     measureAtTime: null,
     durationSeconds: 1,
+    measuredFps: null,
+    direct: {
+        lastTime: null,
+        lastFrame: null,
+        fps: null,
+    }
 }
 
 function resetFpsMeasurement(state) {
     state.fps = null;
-    measureFps.frames = null;
-    measureFps.measureAtTime = null;
+    fpsMeter.frames = null;
+    fpsMeter.measureAtTime = null;
+    fpsMeter.measuredFps = null;
+    fpsMeter.direct.lastTime = null;
+    fpsMeter.direct.lastFrame = null;
+    // fpsMeter.direct.fps = null;
 }
 
 function doFpsMeasurement(state) {
-    if (measureFps.measureAtTime === null) {
-        measureFps.measureAtTime = state.time + measureFps.durationSeconds;
-        measureFps.frames = 0;
+    // counting method
+    if (fpsMeter.measureAtTime === null) {
+        fpsMeter.measureAtTime = state.time + fpsMeter.durationSeconds;
+        fpsMeter.frames = 0;
     } else {
-        measureFps.frames++;
-        if (state.time > measureFps.measureAtTime) {
-            state.fps = measureFps.frames / measureFps.durationSeconds;
-            measureFps.measureAtTime = null;
+        fpsMeter.frames++;
+        if (state.time > fpsMeter.measureAtTime) {
+            fpsMeter.measuredFps = fpsMeter.frames / fpsMeter.durationSeconds;
+            fpsMeter.measureAtTime = null;
         }
     }
+    // direct rate
+    if (fpsMeter.direct.lastTime !== null) {
+        fpsMeter.direct.fps =
+            (state.frameIndex - fpsMeter.direct.lastFrame)
+            / (state.time - fpsMeter.direct.lastTime);
+    }
+    fpsMeter.direct.lastTime = state.time;
+    fpsMeter.direct.lastFrame = state.frameIndex;
+
+    state.fps = 0;
+    let weight = 0;
+    if (fpsMeter.direct.fps !== null) {
+        state.fps += 0.33 * fpsMeter.direct.fps;
+        weight += 0.5;
+    }
+    if (fpsMeter.measuredFps !== null) {
+        state.fps += fpsMeter.measuredFps;
+        weight += 1;
+    }
+    state.fps = weight > 0 ? (state.fps / weight).toFixed(0) : "?";
 }
 
 export function shiftTime(state, seconds) {

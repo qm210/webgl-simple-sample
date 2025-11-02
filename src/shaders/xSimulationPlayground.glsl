@@ -25,7 +25,8 @@ uniform vec3 iFree0;
 uniform vec3 iFree1;
 uniform vec3 iFree2;
 
-const float twoPi = 6.28319;
+const float pi = 3.1415923;
+const float twoPi = 2. * pi;
 
 const vec4 c = vec4(1., 0., -1., .5);
 
@@ -534,7 +535,7 @@ void renderScene(in vec2 uv, in vec2 st) {
 
 const vec3 grayScale = vec3(0.299, 0.587, 0.114);
 
-const bool JUST_MIX = false;
+const bool JUST_MIX = true;
 
 vec3 blendColors(vec3 colA, vec3 colB, float alpha, float gamma) {
     // trying less-ugly-but-still-simple ways for RGB mixing
@@ -549,29 +550,76 @@ vec3 blendColors(vec3 colA, vec3 colB, float alpha, float gamma) {
     return pow(blend, vec3(1./gamma));
 }
 
+const mat3 rgb2yiq = mat3(
+    0.299,  0.5959,  0.2215,
+    0.587, -0.2746, -0.5227,
+    0.114, -0.3213,  0.3112
+);
+vec3 rgbToYCh(vec3 rgb) {
+    vec3 yiq = rgb2yiq * rgb;
+    float C = length(yiq.yz);
+    float h = atan(yiq.z, yiq.y);
+    return vec3(yiq.x, C, h);
+}
+vec3 ychToRgb(float Y, float C, float h) {
+    float I = C * cos(h);
+    float Q = C * sin(h);
+    float R = Y + 0.9469 * I + 0.6236 * Q;
+    float G = Y - 0.2748 * I - 0.6357 * Q;
+    float B = Y - 1.1000 * I + 1.7000 * Q;
+    return clamp(vec3(R, G, B), 0.0, 1.0);
+}
+
 void postprocess(in vec2 uv, in vec2 st) {
     fragColor = texture(iPrevImage, st);
-    fragColor.rgb = pow(fragColor.rgb, vec3(1./3.2));
+
+    // some ych-playing-arounds
+    float val = dot(grayScale, fragColor.rgb);
+    fragColor.rgb = ychToRgb(0.5 + 0.05 * iFree0.x, 0.5 + 0.05 * iFree0.y, 0.2 * iFree1.z + (0.5 + 0.1 * iFree0.z) * pi * val);
+
+    // some gamma
+    fragColor.rgb = pow(fragColor.rgb, vec3(1./2.2 + iFree1.x));
+
+    vec4 tex, tex1, texS = c.yyyy;
+    vec3 col0 = fragColor.rgb;
+    vec3 col = col0;
+
     #if DRAW_LOGO
     {
         // int logoIndex = int(iTime * 1.33) % 3;
         for (int logoIndex = 0; logoIndex < 3; logoIndex++) {
-            float scaling = 1.0 + 0.25 * sin(twoPi * 1. * 1.33 * iTime);
-            vec2 pos = c.yy + float(logoIndex - 1) * 0.8 * c.xy;
-            pos *= rot2D(0.12 * sin(0.4 * iTime));
-            vec4 tex = logoPart(uv, pos, scaling, logoIndex);
-            vec4 tex1 = logoPart(uv, pos - 0.01, scaling, logoIndex);
+            float indexShift = float(logoIndex - 1);
+            float scaling = 0.7 + 0.2 * sin(twoPi * 1. * 1.33 * iTime - 1.4 * indexShift);
+            vec2 pos = c.yy + indexShift * 0.84 * c.xy;
+            uv *= rot2D(0.042 * sin(0.66 * iTime));
+            tex = logoPart(uv, pos, scaling, logoIndex);
+            tex1 = logoPart(uv, pos - 0.01, scaling, logoIndex);
+            texS.rgb += mix(tex.rgb * tex.a, tex1.rgb * tex1.a, 0.5);
+            texS.a += 0.333 * tex.a * tex1.a;
 
-            fragColor.rgb = mix(fragColor.rgb, tex.rgb, 0.4 * tex.a);
-            vec3 col = fragColor.rgb;
+            // col0 = mix(col0, tex.rgb, 0.4 * tex.a);
 
+            /*
             float val = max(tex1.r, max(tex1.g, tex1.b)) * tex1.a;
             val = smoothstep(0., 0.4, val);
-            vec3 colInvert = blendColors(col, vec3(col.r, 1. - col.g, 1. - col.b), val, 10.);
-            col = blendColors(col, colInvert, val, -0.3);
-            col = min(col, 1. - 0.5 * fragColor.rgb);
-            fragColor.rgb = mix(col, tex.rgb * c.yxx, tex.a);
+            vec3 colInvert = blendColors(col, vec3(col.r, 1. - col.g, 1. - col.b), val, -0.4);
+            */
+            // col = blendColors(col, colInvert, val, -0.3);
+            // col = min(col, 1. - 0.5 * col0);
+            // tex.rgb = smoothstep(0.0, 0.5, tex.rgb);
         }
+        texS.a = smoothstep(0., 0.62, texS.a);
+        fragColor.rgb = mix(col, 4. * texS.rgb, 0.5 + 0.5 * texS.a);
+
+            /*
+            vec3 ych = rgbToYCh(fragColor.rgb);
+            float mainHue = 210.;
+            float varyHue = 40.;
+            // hue += ((mainHue - hue) / varyHue) * varyHue;
+            fragColor.rgb = ychToRgb(ych.x, ych.y, ych.z);
+            // fragColor.rgb = ychToRgb(0.5 + iFree0.x, 0.5 + iFree0.y, hue + iFree0.z);
+            */
+
     }
     #endif
 }
