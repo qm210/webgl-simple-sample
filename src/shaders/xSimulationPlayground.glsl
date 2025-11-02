@@ -532,21 +532,46 @@ void renderScene(in vec2 uv, in vec2 st) {
     // fragColor.r = iNoiseLevel;
 }
 
+const vec3 grayScale = vec3(0.299, 0.587, 0.114);
+
+const bool JUST_MIX = false;
+
+vec3 blendColors(vec3 colA, vec3 colB, float alpha, float gamma) {
+    // trying less-ugly-but-still-simple ways for RGB mixing
+    vec3 blend = mix(colA, colB, alpha);
+    if (JUST_MIX) {
+        return blend;
+    }
+
+    vec3 colAcorr = pow(colA, vec3(gamma));
+    vec3 colBcorr = pow(colB, vec3(gamma));
+    blend = mix(colAcorr, colBcorr, alpha);
+    return pow(blend, vec3(1./gamma));
+}
+
 void postprocess(in vec2 uv, in vec2 st) {
     fragColor = texture(iPrevImage, st);
+    fragColor.rgb = pow(fragColor.rgb, vec3(1./3.2));
     #if DRAW_LOGO
     {
-        int logoIndex = int(iTime * 1.33) % 3;
-        vec2 pos = c.yy + float(logoIndex - 1) * 0.8 * c.xy;
-        vec4 tex = logoPart(uv, pos, 1.5, logoIndex);
-        fragColor.rgb = mix(fragColor.rgb, tex.rgb, 0.4 * tex.a);
+        // int logoIndex = int(iTime * 1.33) % 3;
+        for (int logoIndex = 0; logoIndex < 3; logoIndex++) {
+            float scaling = 1.0 + 0.25 * sin(twoPi * 1. * 1.33 * iTime);
+            vec2 pos = c.yy + float(logoIndex - 1) * 0.8 * c.xy;
+            pos *= rot2D(0.12 * sin(0.4 * iTime));
+            vec4 tex = logoPart(uv, pos, scaling, logoIndex);
+            vec4 tex1 = logoPart(uv, pos - 0.01, scaling, logoIndex);
 
-        tex = logoPart(uv, pos - 0.01, 1.5, logoIndex);
-        float val = max(tex.r, max(tex.g, tex.b)) * tex.a;
-        val = smoothstep(0., 0.37, val);
-        vec3 col = fragColor.rgb;
-        vec3 colInvert = mix(col, vec3(col.r, 1. - col.g, 1. - col.b), val);
-        fragColor.rgb = mix(fragColor.rgb, colInvert, val);
+            fragColor.rgb = mix(fragColor.rgb, tex.rgb, 0.4 * tex.a);
+            vec3 col = fragColor.rgb;
+
+            float val = max(tex1.r, max(tex1.g, tex1.b)) * tex1.a;
+            val = smoothstep(0., 0.4, val);
+            vec3 colInvert = blendColors(col, vec3(col.r, 1. - col.g, 1. - col.b), val, 10.);
+            col = blendColors(col, colInvert, val, -0.3);
+            col = min(col, 1. - 0.5 * fragColor.rgb);
+            fragColor.rgb = mix(col, tex.rgb * c.yxx, tex.a);
+        }
     }
     #endif
 }
@@ -571,21 +596,16 @@ void main() {
             renderNoiseClouds(uv);
             // fragColor.rb = outVelocity;
             fragColor.r = max(fragColor.r, max(fragColor.g, fragColor.b));
-            fragColor.g = fragColor.b = 0.;
-            fragColor.a = 0.1;
             break;
         case 1:
-            fragColor.g = fragColor.r;
-            fragColor.b = fragColor.r;
-            // morphNoiseClouds(uv, st);
+            morphNoiseClouds(uv, st);
             break;
         case 2:
-            renderScene(uv, st);
+            // renderScene(uv, st);
             break;
         case 3:
             postprocess(uv, st);
-            fragColor.a = 1.;
-            fragColor.rb = outVelocity;
+            // fragColor.rb = outVelocity;
         break;
     }
 }
