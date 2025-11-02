@@ -1,5 +1,5 @@
 import {diffLines} from "diff";
-import REGEX, {MAGIC_SYMBOLS} from "./regex.js";
+import REGEX, {matchCached} from "./regex.js";
 
 export const SymbolType = {
     DefineDirective: "DefineDirective",
@@ -43,34 +43,14 @@ export function analyzeShader(source, errorLog, shaderKey) {
         commentLevel: 0,
         removedBefore: [],
         consecutiveEmpty: 0,
-        currentChangedBlock: {type: null},
+        consecutiveChanged: {type: null},
+        directiveConditions: []
     };
-
-    function handleChangedBlock(diff, type) {
-        if (type !== null && cursor.currentChangedBlock.type !== null) {
-            if (cursor.currentChangedBlock.type !== type) {
-                cursor.currentChangedBlock.type = ChangeType.Changed;
-            }
-            cursor.currentChangedBlock.endIndex = cursor.index;
-            cursor.currentChangedBlock.diffs.push(diff);
-        } else {
-            if (cursor.currentChangedBlock.type !== null) {
-                const lineNumber = cursor.currentChangedBlock.startIndex + 1;
-                analyzed.changedBlockAt[lineNumber] = cursor.currentChangedBlock;
-            }
-            cursor.currentChangedBlock = {
-                type,
-                startIndex: cursor.index,
-                endIndex: cursor.index,
-                diffs: type === null ? [] : [diff]
-            };
-        }
-    }
 
     for (const diff of differences) {
         if (diff.removed) {
             cursor.removedBefore.push(diff.value);
-            handleChangedBlock(diff, ChangeType.Removed);
+            handleConsecutiveChanges(analyzed, cursor, diff);
             continue;
         }
 
@@ -80,13 +60,9 @@ export function analyzeShader(source, errorLog, shaderKey) {
             length: diff.value.length,
         };
         code.empty = !code.trimmed;
-        code.blocks = countSeparators(code.trimmed);
-
-        if (code.empty) {
-            cursor.consecutiveEmpty++;
-        } else {
-            cursor.consecutiveEmpty = 0;
-        }
+        cursor.consecutiveEmpty = code.empty
+            ? cursor.consecutiveEmpty + 1
+            : 0;
 
         let changed = diff.added && stored !== "";
         const onlyWhiteSpaceChanged =
@@ -94,10 +70,14 @@ export function analyzeShader(source, errorLog, shaderKey) {
             code.trimmed === storedLines[cursor.index]?.trim();
         if (onlyWhiteSpaceChanged) {
             changed = false;
+            diff.added = false;
             cursor.removedBefore = [];
         }
+        handleConsecutiveChanges(analyzed, cursor, diff);
 
-        handleChangedBlock(diff, changed ? ChangeType.Added : null);
+        const boundary = matchBlockBoundaries(code.trimmed);
+        const directive = [...code.trimmed.matchAll(REGEX.DIRECTIVE)][0]?.groups;
+        handleDirectiveConditions(cursor, directive);
 
         analyzed.lines.push({
             code,
@@ -106,17 +86,19 @@ export function analyzeShader(source, errorLog, shaderKey) {
             removedBefore: cursor.removedBefore,
             changedBlock: null,
             error: errors[cursor.index],
-            belongsToUnusedBlock: cursor.commentLevel > 0 || code.blocks.comment.justOpening,
+            belongsToUnusedBlock: cursor.commentLevel > 0 || boundary.commentJustOpening,
             positionInSource: cursor.positionInSource,
             scopeLevelAtStart: cursor.scopeLevel,
             consecutiveEmpty: cursor.consecutiveEmpty,
+            directive,
+            directiveConditions: [...cursor.directiveConditions],
         });
 
         cursor.index++;
         cursor.removedBefore = [];
         cursor.positionInSource += code.length;
-        cursor.scopeLevel += code.blocks.braces.open - code.blocks.braces.close;
-        cursor.commentLevel += code.blocks.comment.open - code.blocks.comment.close;
+        cursor.scopeLevel += boundary.deltaBraces;
+        cursor.commentLevel += boundary.deltaComments;
     }
 
     analyzed.lines = analyzed.lines.filter(
@@ -132,6 +114,63 @@ export function analyzeShader(source, errorLog, shaderKey) {
     }
 
     return analyzed;
+}
+
+function handleConsecutiveChanges(analyzed, cursor, diff) {
+    const type = (
+        diff.removed ? ChangeType.Removed :
+        diff.added ? ChangeType.Added :
+        null
+    );
+    if (type !== null && cursor.consecutiveChanged.type !== null) {
+        if (cursor.consecutiveChanged.type !== type) {
+            cursor.consecutiveChanged.type = ChangeType.Changed;
+        }
+        cursor.consecutiveChanged.endIndex = cursor.index;
+        cursor.consecutiveChanged.diffs.push(diff);
+    } else {
+        if (cursor.consecutiveChanged.type !== null) {
+            const lineNumber = cursor.consecutiveChanged.startIndex + 1;
+            analyzed.changedBlockAt[lineNumber] = cursor.consecutiveChanged;
+        }
+        cursor.consecutiveChanged = {
+            type,
+            startIndex: cursor.index,
+            endIndex: cursor.index,
+            diffs: type === null ? [] : [diff]
+        };
+    }
+}
+
+const CONDITIONAL_DIRECTIVES = ["if", "elif", "else", "ifdef", "ifndef", "endif"];
+
+function handleDirectiveConditions(cursor, directive) {
+    // TODO: this in -> extendAnalysis?
+    if (!CONDITIONAL_DIRECTIVES.includes(directive?.keyword)) {
+        return;
+    }
+    const lastCondition = cursor.directiveConditions.pop();
+    if (directive.keyword === "endif") {
+        return;
+    }
+    else if (directive.keyword === "else" || directive.keyword === "elif") {
+        cursor.directiveConditions.push({
+            ...lastCondition,
+            inverted: !lastCondition?.inverted
+        });
+    }
+    if (directive.keyword === "if" || directive.keyword === "elif") {
+        cursor.directiveConditions.push({
+            expression: directive.expression,
+            inverted: false,
+        });
+    } else if (directive.keyword === "ifdef" || directive.keyword === "ifndef") {
+        cursor.directiveConditions.push({
+            expression: `defined(${directive.expression})`,
+            inverted: directive.keyword === "ifndef"
+        });
+    }
+    console.log("DIRECTIVE CONDITIONS", directive, cursor.directiveConditions, lastCondition);
 }
 
 export async function extendAnalysis(analyzed) {
@@ -151,11 +190,11 @@ const SymbolRegex = {
     [SymbolType.Constant]: REGEX.CONSTANT,
     [SymbolType.CustomFunction]: REGEX.FUNCTION_SIGNATURE,
     [SymbolType.Struct]: REGEX.STRUCT,
-}
+};
 
 function parseSymbols(source) {
     const results = [];
-    for (const symbolType in SymbolType) {
+    for (const symbolType of Object.values(SymbolType)) {
 
         const matches = source.matchAll(SymbolRegex[symbolType]);
 
@@ -164,7 +203,7 @@ function parseSymbols(source) {
             if (!name) {
                 continue;
             }
-            if (name.match(REGEX.KEYWORD)) {
+            if (name.match(REGEX.KEYWORD) || name.match(REGEX.DIRECTIVE_KEYWORD)) {
                 continue;
             }
             if (typeof name !== "string") {
@@ -189,7 +228,6 @@ function parseSymbols(source) {
                 },
                 isMagic: name.match(REGEX.MAGIC_SYMBOL),
             };
-
             if (result.args) {
                 result.argString = result.args
                     .trim()
@@ -198,33 +236,26 @@ function parseSymbols(source) {
                 result.argArray = result.argString
                     .split(', ');
             }
-
             results.push(result);
         }
     }
     return results;
 }
 
-const countRegex = {};
-
-function count(pattern, line) {
-    if (!countRegex[pattern]) {
-        countRegex[pattern] = new RegExp(pattern, 'g');
-    }
-    return line.match(countRegex[pattern])?.length ?? 0;
+function countBoundaries(line, openPattern, closePattern) {
+    return {
+        open: matchCached(openPattern, line)?.length ?? 0,
+        close: matchCached(closePattern, line)?.length ?? 0
+    };
 }
 
-function countSeparators(code) {
+function matchBlockBoundaries(code) {
+    const braces = countBoundaries(code, "\{", "}");
+    const comments = countBoundaries(code, "\/\\*", "\\*/");
     return {
-        braces: {
-            open: count("\{", code),
-            close: count("}", code)
-        },
-        comment: {
-            open: count("\/\\*", code),
-            close: count("\\*/", code),
-            justOpening: code === "/*",
-        }
+        deltaBraces: braces.open - braces.close,
+        deltaComments: comments.open - comments.close,
+        commentJustOpening: code.startsWith("/*"),
     };
 }
 

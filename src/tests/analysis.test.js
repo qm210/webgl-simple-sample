@@ -2,7 +2,7 @@ import {describe, it, expect} from "vitest";
 import {analyzeShader, extendAnalysis, parseScopes, SymbolType} from "../glslCode/analysis.js";
 import REGEX from "../glslCode/regex.js";
 
-export const sample = `
+const sample = `
 #version 300 es
 precision highp float;
 out vec4 fragColor;
@@ -11,7 +11,7 @@ uniform float iTime;
 
 const float pi = 3.141593;
 
-vec3 c = vec3(1,0,-1);
+const vec3 c = vec3(1,0,-1);
 
 vec3 hsl2rgb( in vec3 c )
 {
@@ -106,28 +106,28 @@ const getDefines = analyzed =>
 
 describe("Regex matching", () => {
 
-    it ("standalone: finds define directives", async () => {
+    it ("finds define directives (standalone)", async () => {
         const code = `
             #define TEST_DIRECTIVE 1
             #define TEST_DIRECTIVE_WITH_ARGS(x) x
         `;
         const defineMatches = [...code.matchAll(REGEX.DEFINE_DIRECTIVE)];
-        expect(defineMatches.length).toBe(2);
+        expect(defineMatches).toHaveLength(2);
 
         const analyzed = await extendAnalysis(analyzeShader(code));
         const defines = getDefines(analyzed);
-        expect(defines.length).toBe(2);
+        expect(defines).toHaveLength(2);
 
     });
 
-    it ("sample: finds define directives", async () => {
+    it ("finds define directives (sample)", async () => {
         const analyzed = await extendAnalysis(analyzeShader(sample));
         const defines = getDefines(analyzed);
 
-        expect(defines.length).toBe(2);
+        expect(defines).toHaveLength(2);
     });
 
-    it ("standalone: the matcher.pattern regex works", async () => {
+    it ("the matcher.pattern regex works (standalone)", async () => {
         const code = `
         ...
         #define FROM_RGB(x) x
@@ -139,19 +139,25 @@ describe("Regex matching", () => {
         const analyzed = await extendAnalysis(analyzeShader(code));
         const defines = getDefines(analyzed);
 
-        expect(defines.length).toBe(1);
+        expect(defines).toHaveLength(1);
     });
 
-    it ("sample: matches whole function", () => {
+    it ("matches whole function (sample)", () => {
         const target = sampleUnusedFunction.matchAll(REGEX.FUNCTION);
         expect(target).toBeDefined();
     });
 
-    it ("CONSTANT RegExp works", () => {
+    it ("RegExp for constants works (standalone)", () => {
         const code = "const vec3 c = vec3(1,0,-1);"
         const target = code.matchAll(REGEX.CONSTANT);
         expect(target).toBeDefined();
-    })
+    });
+
+    it ("RegExp for constants works (sample)", async () => {
+        const analyzed = await extendAnalysis(analyzeShader(sample));
+        const target = analyzed.symbols.filter(s => s.symbolType === SymbolType.Constant);
+        expect(target).toHaveLength(2);
+    });
 });
 
 describe("Scope parsing", () => {

@@ -1,3 +1,12 @@
+export const MAGIC_SYMBOLS = [
+    "gl_Position",
+    "gl_PointSize",
+    "gl_FragCoord",
+    "gl_FrontFacing",
+    "gl_PointCoord",
+    "main",
+];
+
 const REGEX = {
     DEFINE_DIRECTIVE:
         /^\s*#define\s*(?<name>\w*)(?<args>\(.*?\))?\s*(?<value>.*)\s*$/mg,
@@ -13,35 +22,33 @@ const REGEX = {
         /\bstruct\s+(?<name>\w+)\s*\{(?<body>[^}]*)}/mg,
 
     MAGIC_SYMBOL:
-        /\b(gl_Position|gl_PointSize|gl_FragCoord|gl_FrontFacing|gl_PointCoord|main)\b/g,
+        new RegExp(`\b(${MAGIC_SYMBOLS.join('|')})\b`, 'g'),
     KEYWORD:
-        /\b(uniform|varying|attribute|layout|const|in|out|[iu]?vec[234]|mat[234]|void|float|u?int|bool|sampler[123]D|return|discard|continue|break|if|else|texture|texelFetch|precision|highp|mediump|lowp)\b/g,
+        /\b(?<!#)(uniform|varying|attribute|layout|const|in|out|[iu]?vec[234]|mat[234]|void|float|u?int|bool|sampler[123]D|return|discard|continue|break|if|else|texture|texelFetch|precision|highp|mediump|lowp)\b/g,
     BUILTIN_FUNCTION:
         /\b(mix|min|max|clamp|smoothstep|step|length|dot|normalize|cross|reflect|refract|sinh?|cosh?|tanh?|atan|exp|log|sqrt|pow|mod|modf|fract|abs|sign|floor|ceil|all|greaterThan|greaterThanEqual|lessThan|lessThanEqual)\b/g,
     NUMBER:
         /\b(-?\d+\.?\d*(e-?\d+)?[Uf]?)/g,
     DIRECTIVE:
-        /^\s*(#.*)/g,
+        /^\s*#(?<keyword>\w+)\s*(?<expression>.*?)\s*$/g,
+    DIRECTIVE_KEYWORD:
+        /\b(defined|optimize|debug)\b/g,
 
     ERROR_LOG:
         /:\s*([0-9]*):([0-9]*):\s*(.*)/g,
     // <--this holds for WebGl2, as of March 2025 - e.g. error logs look like:
     // ERROR: 0:12: '=' : dimension mismatch
     // -> parse accordingly: /<ignore>: <number>:<number>: <rest>/
+
+    cached: {}
 };
 
 export default REGEX;
 
 
-// TODO: unify with the REGEX above
-export const MAGIC_SYMBOLS = [
-    "gl_Position",
-    "gl_PointSize",
-    "gl_FragCoord",
-    "gl_Position",
-    "gl_PointSize",
-    "gl_FragCoord",
-    "gl_FrontFacing",
-    "gl_PointCoord",
-    "main",
-];
+export function matchCached(pattern, code) {
+    if (!REGEX.cached[pattern]) {
+        REGEX.cached[pattern] = new RegExp(pattern, 'g');
+    }
+    return code.match(REGEX.cached[pattern]);
+}

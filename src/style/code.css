@@ -148,6 +148,10 @@
     text-shadow: var(--shadow);
 }
 
+.code .directive.keyword {
+    color: #DD00DD;
+}
+
 .code .is-defined {
     color: magenta;
 }

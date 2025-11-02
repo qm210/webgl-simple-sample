@@ -10,6 +10,9 @@ export function withGlslHighlighting(code) {
         .replaceAll(REGEX.DIRECTIVE, match =>
             `<span class="directive">${match}</span>`
         )
+        .replaceAll(REGEX.DIRECTIVE_KEYWORD, match =>
+            `<span class="directive keyword">${match}</span>`
+        )
         .replaceAll(REGEX.BUILTIN_FUNCTION, match =>
             `<span class="builtin">${match}</span>`
         )
@@ -66,7 +69,8 @@ const SymbolClass = {
 
 function highlightedDefinition(symbol) {
     const classes = [];
-    if (!MAGIC_SYMBOLS.includes(symbol.name)) {
+    console.log(symbol.name, symbol);
+    if (!symbol.isMagic && !symbol.isDirectiveKeyword) {
         classes.push(SymbolClass[symbol.symbolType]);
     }
     const element = createSpan({
