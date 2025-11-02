@@ -44,6 +44,11 @@ export default {
             fb.attachments.push(gl.COLOR_ATTACHMENT1);
             gl.drawBuffers(fb.attachments);
 
+            const status = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
+            if (status !== gl.FRAMEBUFFER_COMPLETE) {
+                console.error(fb, status);
+            }
+
             gl.bindFramebuffer(gl.FRAMEBUFFER, null);
             gl.bindTexture(gl.TEXTURE_2D, null);
         }

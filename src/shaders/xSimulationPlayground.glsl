@@ -480,11 +480,13 @@ void renderNoiseClouds(in vec2 uv) {
 void morphNoiseClouds(in vec2 uv, in vec2 st) {
     fragColor = texture(iPrevImage, st);
 
-    if (STUPID_SMEAR) { // just as to know we are set up... |o|
+    #if defined(DRAW_LOGO)
+    if (STUPID_SMEAR) { /* just as to know we are set up... |o| */
         vec3 imageClone = texture(iPrevImage, st - vec2(0., 0.002)).rgb;
         fragColor.rgb = mix(fragColor.rgb, imageClone, 0.5);
         return;
     }
+    #endif
 
     fragColor = pow(fragColor, vec4(9.));
     float time = 0.5 * iTime;
@@ -571,6 +573,7 @@ void main() {
             renderNoiseClouds(uv);
             break;
         case 1:
+        outVelocity = vec2(step(0., uv.x), 0.);
             morphNoiseClouds(uv, st);
             break;
         case 2:
@@ -578,6 +581,8 @@ void main() {
             break;
         case 3:
             postprocess(uv, st);
-            break;
+            fragColor.rg += outVelocity;
+            // outVelocity += 1.e-1 * c.yz;
+        break;
     }
 }
