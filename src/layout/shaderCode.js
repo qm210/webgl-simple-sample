@@ -69,14 +69,14 @@ function prepareElements(line, shaderKey) {
     const errors = line.error
         ?.inRow
         .map(error => error.message)
-        .join('; ') ?? "";
-    if (errors) {
+        ?? [];
+    if (errors.length > 0) {
         elements.line.classList.add("error");
-        elements.line.title = errors;
-        annotation = errors;
+        elements.line.title = errors.join("; ");
+        annotation = errors.join("<br/>");
     }
 
-    elements.annotation.textContent = annotation;
+    elements.annotation.innerHTML = annotation;
 
     if (annotation) {
         elements.annotation.classList.add("annotated");

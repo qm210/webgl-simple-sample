@@ -35,6 +35,10 @@ function applyExtendedAnalysis(analyzed, references, scrollStack) {
         code = withSymbolsHighlighted(code, analyzed.symbols, line.number);
         element.code.innerHTML = code;
 
+        if (element.line.classList.contains("error")) {
+            continue;
+        }
+
         if (line.belongsToUnusedBlock) {
             element.line.classList.add("unused-definition");
             element.annotation.textContent = "unused";

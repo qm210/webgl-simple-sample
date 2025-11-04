@@ -22,7 +22,7 @@ export function setupWebGl(canvas, geometry) {
     // WebGL2-spezifisch müsen manche Erweiterungen für manche Anwendungszwecke nachgeladen werden,
     // https://developer.mozilla.org/en-US/docs/Web/API/WebGL_API/Using_Extensions
     // EXT_color_buffer_float: braucht man (später) für Float-Texturen / Framebuffer
-    const WEBGL_EXTENSIONS = ["EXT_color_buffer_float"];
+    const WEBGL_EXTENSIONS = ["EXT_color_buffer_float", "KHR_parallel_shader_compile"];
     gl.ext = {};
     for (const extension of WEBGL_EXTENSIONS) {
         const ext = gl.getExtension(extension);
@@ -86,9 +86,7 @@ function createInitialState(sources) {
  * @param {{vertex: string, fragment, string}} sources - the Fragment and Vertex Shader Source
  */
 export function compile(gl, sources) {
-
     const result = createInitialState(sources);
-
     result.resolution = [gl.drawingBufferWidth, gl.drawingBufferHeight];
 
     const v = createShader(gl, gl.VERTEX_SHADER, sources.vertex);
@@ -105,8 +103,9 @@ export function compile(gl, sources) {
         gl.attachShader(program, f.shader);
     }
     gl.linkProgram(program);
-    result.error.linker = gl.getProgramInfoLog(program);
+
     if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+        result.error.linker = gl.getProgramInfoLog(program);
         gl.deleteProgram(program);
         return result;
     }

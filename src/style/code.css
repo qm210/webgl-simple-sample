@@ -38,6 +38,11 @@
     font-weight: bold;
 }
 
+pre.error {
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
 .code {
     font-family: monospace;
     white-space: pre-wrap;
@@ -88,11 +93,14 @@
 }
 
 .annotation {
+    text-align: right;
     font-size: 0.8rem;
-    height: 0.7rem;
     margin-left: auto;
+    padding-left: 2rem;
     padding-right: 0.5em;
-    overflow: visible;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .unused-definition .annotation {
