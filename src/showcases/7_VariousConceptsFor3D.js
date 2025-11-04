@@ -4,6 +4,7 @@ import {createTextureFromImage} from "../webgl/helpers.js";
 import fragmentShaderSource from "../shaders/raymarchingPlusVariousConcepts.glsl";
 import imageFrame from "../textures/frame.png";
 import imageSpace from "../textures/hubble_extreme_deep_field.jpg";
+import imageRock from "../textures/Rock032_1K-JPG_Color.jpg";
 
 export default {
     title: "Various 3D Concepts",
@@ -26,9 +27,15 @@ export default {
             wrapT: gl.REPEAT,
             minFilter: gl.LINEAR,
         });
+        state.textureRock = createTextureFromImage(gl, imageRock, {
+            wrapS: gl.REPEAT,
+            wrapT: gl.REPEAT,
+            minFilter: gl.LINEAR,
+        });
 
         state.location.texFrame = gl.getUniformLocation(state.program, "texFrame");
         state.location.texSpace = gl.getUniformLocation(state.program, "texSpace");
+        state.location.texRock = gl.getUniformLocation(state.program, "texRock");
         state.location.iCamOrigin = gl.getUniformLocation(state.program, "iCamOrigin");
         state.location.iCamLook = gl.getUniformLocation(state.program, "iCamLook");
         state.location.iCamRoll = gl.getUniformLocation(state.program, "iCamRoll");
@@ -86,6 +93,16 @@ function render(gl, state) {
     gl.uniform3fv(state.location.vecFree3, state.vecFree3);
     gl.uniform3fv(state.location.vecFree4, state.vecFree4);
     gl.uniform3fv(state.location.vecFree5, state.vecFree5);
+
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, state.textureFrame);
+    gl.uniform1i(state.location.texFrame, 0);
+    gl.activeTexture(gl.TEXTURE1);
+    gl.bindTexture(gl.TEXTURE_2D, state.textureSpace);
+    gl.uniform1i(state.location.texSpace, 1);
+    gl.activeTexture(gl.TEXTURE2);
+    gl.bindTexture(gl.TEXTURE_2D, state.textureRock);
+    gl.uniform1i(state.location.texRock, 2);
 
     gl.drawArrays(gl.TRIANGLES, 0, 6);
 }

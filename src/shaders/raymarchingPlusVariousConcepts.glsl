@@ -11,6 +11,7 @@ uniform float iTime;
 uniform vec4 iMouse;
 uniform sampler2D texFrame;
 uniform sampler2D texSpace;
+uniform sampler2D texRock;
 uniform vec3 iCamOrigin;
 uniform vec3 iCamLook;
 uniform float iCamRoll;
@@ -35,6 +36,7 @@ const float pi = 3.141593;
 const float twoPi = 2. * pi;
 const vec4 c = vec4(1., 0. , -1., .5);
 
+const float MATERIAL_FLOOR = 1.0;
 const float MATERIAL_BOX = 3.0;
 
 mat3 rotX(float angle) {
@@ -462,19 +464,16 @@ Marched opUnion( vec2 d1, Marched d2 )
     return d2;
 }
 
-vec2 map( in vec3 pos )
+Marched map( in vec3 pos )
 {
-    vec2 res = vec2( pos.y, 0.0 );
-
-    // Anmerkung: Anstatt der bounding boxes KÖNNTE man hier alles berechnen und jeweils opUnion() nehmen
-    // das ist aber offensichtlich viel aufwändiger und, wenn man das Ergebnis kennt, evtl. verschwendet.
+    Marched res = Marched(pos.y, 0.0, c.yy);
 
     // bounding box
     // if( sdBox( pos-vec3(-2.0,0.3,0.25),vec3(0.3,0.3,1.0) )<res.x )
-    {
-        res = opUnion( res, vec2( sdHexPrism(    pos-vec3(-2.0,0.25, 0.0), vec2(0.2,0.05) ), 18.4 ) );
-        res = opUnion( res, vec2( sdRhombus(  (pos-vec3(-2.0,0.25, 1.0)).xzy, 0.15, 0.25, 0.04, 0.08 ),17.0 ) );
-    }
+//    {
+//        res = opUnion( res, vec2( sdHexPrism(    pos-vec3(-2.0,0.25, 0.0), vec2(0.2,0.05) ), 18.4 ) );
+//        res = opUnion( res, vec2( sdRhombus(  (pos-vec3(-2.0,0.25, 1.0)).xzy, 0.15, 0.25, 0.04, 0.08 ),17.0 ) );
+//    }
 
     // bounding box
     // if( sdBox( pos-vec3(0.0,0.3,-1.0),vec3(0.35,0.3,2.5) )<res.x )
@@ -491,7 +490,7 @@ vec2 map( in vec3 pos )
     {
         res = opUnion( res, vec2( sdTorus(      (pos-vec3( 1.0,0.30, 1.0)).xzy, vec2(0.25,0.05) ), 7.1 ) );
         // res = opUnion( res, vec2( sdBox(         pos-vec3( 1.0,0.25, 0.0), vec3(0.3,0.25,0.1) ), 3.0 ) );
-        res = opUnion( res, sdTexturedBox(         pos-vec3( 1.0,0.25, 0.0), vec3(0.3,0.25,0.1) ) );
+        res = opUnion( res, sdTexturedBox(       pos-vec3( 1.0,0.25, 0.0), vec3(0.3,0.25,0.1) ) );
         res = opUnion( res, vec2( sdSphere(      pos-vec3( 1.0,0.2,-1.0), 0.25 ), 26.9 ) );
         res = opUnion( res, vec2( sdCylinder(    rotZ(0.8*iTime)* (pos-vec3( 1.0,0.25,-2.0)), vec2(0.15,0.25) ), 8.0 ) );
         res = opUnion( res, vec2( sdCapsule(     pos-vec3( 1.0,0.00,-3.0),vec3(-0.1,0.1,-0.1), vec3(0.2,0.4,0.2), 0.1  ), 31.9 ) );
@@ -539,32 +538,36 @@ Marched raycast( in vec3 ro, in vec3 rd )
     float tmin = 1.0;
     float tmax = 20.0;
 
-    // raytrace floor plane
+    // raytrace floor plane (Ebene y==0, also Sichtstrahl = Kante eines einfaches Dreiecks)
     float tp1 = (0.0-ro.y)/rd.y;
-    if( tp1>0.0 )
+    if (tp1>0.0)
     {
         tmax = min( tmax, tp1 );
-        res = Marched(tp1, 1.0, c.yy);
+        res = Marched(tp1, MATERIAL_FLOOR, c.yy);
     }
 
     // raymarch primitives
-    vec2 tb = iBox( ro-vec3(0.0,0.4,-0.5), rd, vec3(2.5,0.41,3.0) );
-    if( tb.x<tb.y && tb.y>0.0 && tb.x<tmax)
+    vec2 boundingBox = iBox( ro-vec3(0.0,0.4,-0.5), rd, vec3(2.5,0.41,3.0) );
+    // <-- bounding box = "alles was uns interessiert, findet hier drin statt"
+    //     einfach nur, um unnötige Berechnungen zu ersparen.
+    if (boundingBox.x<boundingBox.y && boundingBox.y>0.0 && boundingBox.x<tmax)
     {
-        //return vec2(tb.x,2.0);
-        tmin = max(tb.x,tmin);
-        tmax = min(tb.y,tmax);
+        tmin = max(boundingBox.x,tmin);
+        tmax = min(boundingBox.y,tmax);
 
         float t = tmin;
-        for( int i=0; i<70 && t<tmax; i++ )
+        for (int i=0; i<70 && t<tmax; i++)
         {
-            vec2 h = map( ro+rd*t );
-            if( abs(h.x)<(0.0001*t) )
+            Marched h = map(ro + rd * t);
+            if (abs(h.t) < (0.0001 * t))
             {
-                res = Marched(t, h.y, c.yy);
+                // getroffen = Länge des Strahls entspricht der SDF
+                // (die ja "Abstand der Kamera bis zur Oberfläche" ist)
+                res = h;
+                res.t = t;
                 break;
             }
-            t += h.x;
+            t += h.t;
         }
     }
     return res;
@@ -621,31 +624,46 @@ Marched raycastJustTheSphere( in vec3 ro, in vec3 rd )
 float calcSoftshadow( in vec3 ro, in vec3 rd, in float mint, in float tmax )
 {
     // bounding volume
-    float tp = (0.8-ro.y)/rd.y; if( tp>0.0 ) tmax = min( tmax, tp );
+    float tp = (0.8-ro.y)/rd.y;
+    if( tp>0.0 ) {
+        tmax = min( tmax, tp );
+    }
 
+    // Schattenbildung ist: Faktor zwischen 0 und 1 an Oberflächenfarbe anheften
+    // d.h. in diesem zweiten "Raycasting" (vom Auftrittspunkt z.B. am Boden aus Richtung Licht)
+    // geht es darum, die stärkste Abschwächung, d.h. den kleinsten Faktor zu finden
     float res = 1.0;
     float t = mint;
     for( int i=0; i<80; i++ )
     {
-        float h = map( ro + rd*t ).x;
+        float h = map( ro + rd*t ).t;
+        // Logik hinter h / t:
+        //  - t ist aktuell angenommene Länge des Strahls von Auftrittspunkt (Boden) Richtung Licht
+        //  - h ist dann minimale SDF; entspricht also dem Objekt minimalen Abstands = größten Beitrags
+        //  - h/t = Entfernung der Objektoberfläche relativ zur Strahllänge = Ausbreitung des Schattens
+        //    und macht Schatten weicher, weil Ecken "mehr Einzugsgebiet" des Schattens beziehen
+        // Aber auch hier: die genauen Zahlen sind künstlerisch / empirisch gewählt, nicht physikalisch.
         float s = clamp(8.0*h/t,0.0,1.0);
+        // kleinsten Faktor finden:
         res = min( res, s );
         t += clamp( h, 0.01, 0.2 );
         if( res<0.004 || t>tmax ) break;
     }
     res = clamp( res, 0.0, 1.0 );
     return res*res*(3.0-2.0*res);
+    // <-- entspricht smoothstep
 }
 
 // https://iquilezles.org/articles/nvscene2008/rwwtt.pdf
 float calcAO( in vec3 pos, in vec3 nor )
 {
+    // "Ambient Occlusion", interesting effect for lighting if we have time :)
     float occ = 0.0;
     float sca = 1.0;
     for( int i=0; i<5; i++ )
     {
         float h = 0.01 + 0.12*float(i)/4.0;
-        float d = map( pos + h*nor ).x;
+        float d = map( pos + h*nor ).t;
         occ += (h-d)*sca;
         sca *= 0.95;
         if( occ>0.35 ) break;
@@ -657,15 +675,15 @@ float calcAO( in vec3 pos, in vec3 nor )
 vec3 calcNormal( in vec3 pos )
 {
     vec2 e = vec2(1.0,-1.0)*0.5773*0.0005;
-    return normalize( e.xyy*map( pos + e.xyy ).x +
-    e.yyx*map( pos + e.yyx ).x +
-    e.yxy*map( pos + e.yxy ).x +
-    e.xxx*map( pos + e.xxx ).x );
+    return normalize( e.xyy*map( pos + e.xyy ).t +
+    e.yyx*map( pos + e.yyx ).t +
+    e.yxy*map( pos + e.yxy ).t +
+    e.xxx*map( pos + e.xxx ).t );
 }
 
 void render(in vec3 rayOrigin, in vec3 rayDir)
 {
-    Marched res = raycast(rayOrigin,rayDir);
+    Marched res = raycast(rayOrigin, rayDir);
     // Marched res = raycastJustTheSphere(rayOrigin, rayDir);
 
     if( res.material < -0.5 ) {
@@ -677,10 +695,11 @@ void render(in vec3 rayOrigin, in vec3 rayDir)
     // material
     col = 0.2 + 0.2*sin( res.material*2.0 + vec3(0.0,1.0,2.0) );
     float specularCoeff = 1.0;
-    bool isFloor = res.material < 1.5;
+    // bool isFloor = res.material < 1.5;
+    bool isFloor = res.material < MATERIAL_FLOOR + 0.5;
 
     // this just equals the box, we should not do this by float equality; but it works for now
-    if (res.material == 3.0) {
+    if (res.material == MATERIAL_BOX) {
         col *= texture(texFrame, res.texCoord).rgb;
     }
 
@@ -690,8 +709,23 @@ void render(in vec3 rayOrigin, in vec3 rayDir)
 
     if (isFloor)
     {
-        float f = 1. - abs(step(0.5, fract(1.5*rayPos.x)) - step(0.5, fract(1.5*rayPos.z)));
-        col = 0.15 + f*vec3(0.05);
+        // war: Schachbrettmuster
+        // float f = 1. - abs(step(0.5, fract(1.5*rayPos.x)) - step(0.5, fract(1.5*rayPos.z)));
+        // col = 0.15 + f*vec3(0.05);
+
+        // jetzt: Textur.
+        // hier kommen wir mit einfacher Geometrie an die richtige Koordinate "st":
+        // wir projizieren einfach den Strahl auf die y-Ebene (Boden y == 0); skalieren nach Laune
+        res.texCoord = rayPos.xz * 0.3;
+        col = texture(texRock, res.texCoord).rgb;
+        /*
+        col += (
+            0.66 * texture(texRock, 2. * res.texCoord).rgb +
+            0.44 * texture(texRock, 4. * res.texCoord).rgb
+        );
+        col /= 2.1;
+        */
+        col = pow(col, vec3(2.8));
         specularCoeff = 0.4;
     }
 
