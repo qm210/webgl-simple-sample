@@ -22,7 +22,6 @@ export function registerShaderCode(elements, shaderSource, errorLog, shaderKey, 
     for (const line of analyzed.lines) {
         const elements = prepareElements(line, shaderKey);
         sources.appendChild(elements.line);
-
         references[line.number] = elements;
     }
 

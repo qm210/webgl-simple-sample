@@ -33,7 +33,12 @@ export const addFreeRow = ({parent, label, id, content}) => {
 };
 
 export function createInputElements(state, control) {
-    if (control.hidden) {
+
+    const expected = state.expectedUniforms.find(
+        uniform => uniform.name === control.name
+    );
+    if (!expected) {
+        console.warn("Could not find expected uniform", control.name, "(is it declared?), ", control, state);
         return;
     }
 
@@ -42,15 +47,14 @@ export function createInputElements(state, control) {
     if (storedState) {
         state[control.name] = JSON.parse(storedState);
     }
+    if (state[control.name] === undefined) {
+        state[control.name] = control.defaultValue;
+        if (control.defaultValue === undefined) {
+            console.warn("Uniform control has no defaultValue defined: ", control.name, control);
+        }
+    }
 
-    const expected = state.expectedUniforms
-        .find(uniform => uniform.name === control.name);
-
-    if (!expected) {
-        console.warn(
-            "Could not find expected uniform", control.name,
-            "(is it declared?), control:", control, "state:", state
-        );
+    if (control.hidden) {
         return;
     }
 
@@ -106,8 +110,6 @@ export const asFloatInput = (elements, state, control, onUpdate = undefined) => 
     control.defaultValue ??= 0;
     control.step ??= 0.01;
     const digits = -Math.log10(control.step);
-
-    state[control.name] ??= control.defaultValue;
 
     elements.reset.textContent = `reset: ${control.defaultValue}`;
     elements.control.type = "range";
@@ -212,6 +214,8 @@ const asCursorInput = (elements, state, control) => {
     elements.control.innerHTML = ` -> use <kbd>${moveKeys}</kbd> to move, <kbd>${reset}</kbd> to reset.`;
     elements.reset.style.visibility = "collapse";
 
+    control.step ??= 1;
+
     update();
 
     document.addEventListener("keydown", event => {
@@ -219,30 +223,27 @@ const asCursorInput = (elements, state, control) => {
             // something else focussed? then ignore key input here.
             return;
         }
-        if (!state[control.name]) {
-            state[control.name] = [0, 0, 0];
-        }
         switch (event.key.toUpperCase()) {
             case front:
-                state[control.name][2] -= 1.;
+                state[control.name][2] -= control.step;
                 break;
             case back:
-                state[control.name][2] += 1.;
+                state[control.name][2] += control.step;
                 break;
             case left:
-                state[control.name][0] -= 1.;
+                state[control.name][0] -= control.step;
                 break;
             case right:
-                state[control.name][0] += 1.;
+                state[control.name][0] += control.step;
                 break;
             case up:
-                state[control.name][1] += 1.;
+                state[control.name][1] += control.step;
                 break;
             case down:
-                state[control.name][1] -= 1.;
+                state[control.name][1] -= control.step;
                 break;
             case reset:
-                state[control.name] = [0, 0, 0];
+                state[control.name] = control.defaultValue;
                 break;
             default:
                 return;

@@ -129,7 +129,6 @@ export const addControlsToPage = (elements, state, controls, autoRenderOnLoad) =
             continue;
         }
 
-
         const input = createInputElements(state, control);
         if (!input) {
             continue;
