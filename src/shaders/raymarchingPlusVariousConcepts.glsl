@@ -43,10 +43,14 @@ const float MATERIAL_FLOOR = 1.0;
 const float MATERIAL_BOX = 3.0;
 const float MATERIAL_CYLINDER = 8.0;
 const float MATERIAL_PYRAMID = 13.0;
-const float MATERIAL_PATH_POINT = 1.5;
+const float MATERIAL_PATH_POINT = 1.4;
 
+// SHADER OPTIONS ////////
+const bool DRAW_GRID_ON_FLOOR = true;
+const bool SHOW_POINT_LIGHT_SOURCE = true;
 const bool USE_AUTOMATED_CAMERA_PATH = false;
 const bool USE_AUTOMATED_CAMERA_TARGET_PATH = false;
+/////////////////////////
 
 const int nPath = 6;
 vec3 camPosPath[nPath] = vec3[6](
@@ -316,7 +320,7 @@ MarchHit takeCloser( MarchHit d1, float d2, float material2)
     return MarchHit(d2, material2, c.yy);
 }
 
-const vec4 pyramidPosAndHeight = vec4(-1.0, 0.0, -2.6, 0.96);
+const vec4 pyramidPosAndHeight = vec4(-1.0, 0.0, -2.6, 1.1);
 
 MarchHit map( in vec3 pos )
 {
@@ -369,6 +373,7 @@ MarchHit map( in vec3 pos )
     );
     vec3 cylinderPos = (pos-vec3( 1.0,0.35,-2.0));
     // Eulerwinkel-Drehung am Beispiel des Zylinders:
+    // (sieht man gut, wenn man den Pfad mit iPathOffset so wählt
     cylinderPos *= rotY(0.0*iTime + 0.25); // dreht um eigene Achse
     cylinderPos *= rotZ(0.0*iTime + 2.);
     cylinderPos *= rotY(0.0*iTime);
@@ -406,15 +411,16 @@ vec2 iBox( in vec3 ro, in vec3 rd, in vec3 rad )
 
 MarchHit raycast( in vec3 ro, in vec3 rd )
 {
-    MarchHit res = MarchHit(-1.0, -1.0, c.yy);
+    MarchHit res = MarchHit(-1.0, MISSING_MATERIAL, c.yy);
 
-    float tmin = 0.1; // war 1.0 - macht Kamerafahrt kaputt
+    float tmin = 0.1; // war letzte Woche noch 1.0: wird richtig hässlich beim bewegen :)
     float tmax = 20.0;
 
     // raytrace floor plane (Ebene y==0, also Sichtstrahl = Kante eines einfaches Dreiecks)
     float tp1 = (0.0-ro.y)/rd.y;
     if (tp1>0.0)
     {
+        // hier erstmal für den Bereich außerhalb der Bounding Box, wohlgemerkt.
         tmax = min( tmax, tp1 );
         res = MarchHit(tp1, MATERIAL_FLOOR, c.yy);
     }
@@ -423,7 +429,8 @@ MarchHit raycast( in vec3 ro, in vec3 rd )
     vec2 boundingBox = iBox( ro-vec3(0.0,1.,-0.5), rd, vec3(2.5,1.,3.0) );
     // <-- bounding box = "alles was uns interessiert, findet hier drin statt"
     //     einfach nur, um unnötige Berechnungen zu ersparen.
-    if (boundingBox.x<boundingBox.y && boundingBox.y>0.0 && boundingBox.x<tmax)
+    //     Ruhig mal ausschalten und vergleichen, ob überhaupt nötig.
+    // if (boundingBox.x<boundingBox.y && boundingBox.y>0.0 && boundingBox.x<tmax)
     {
         tmin = max(boundingBox.x,tmin);
         tmax = min(boundingBox.y,tmax);
@@ -441,53 +448,6 @@ MarchHit raycast( in vec3 ro, in vec3 rd )
                 break;
             }
             t += h.t;
-        }
-    }
-    return res;
-}
-
-MarchHit raycastJustTheSphere( in vec3 ro, in vec3 rd )
-{
-    MarchHit res = MarchHit(-1.0, -1.0, c.yy);
-
-    float tmin = 1.0;
-    float tmax = 20.0;
-
-    // raytrace floor plane
-    float tp1 = (0.0-ro.y)/rd.y;
-    if( tp1>0.0 )
-    {
-        tmax = min( tmax, tp1 );
-        res = MarchHit(tp1, 1.0, c.yy);
-    }
-
-    // raymarch primitives
-    vec2 tb = iBox( ro-vec3(0.0,0.4,-0.5), rd, vec3(2.5,0.41,3.0) );
-    if( tb.x<tb.y && tb.y>0.0 && tb.x<tmax)
-    {
-        tmin = max(tb.x,tmin);
-        tmax = min(tb.y,tmax);
-
-        float t = tmin;
-        for( int i=0; i<70 && t<tmax; i++ )
-        {
-            vec3 pos = ro + rd * t;
-
-            /* best guess up to here: the floor is closest */
-            float minDistance = pos.y;
-            float material = 1.0;
-
-            float sphereDistance = sdSphere(pos-vec3( 1.0,0.2,-1.0), 0.25 );
-            if (sphereDistance < minDistance) {
-                minDistance = sphereDistance;
-                material = 1.5 + 0.1 * iTime; // rotes Sphere-Material
-            }
-            if( abs(minDistance) < (0.0001*t) )
-            {
-                res = MarchHit(t, material, c.yy);
-                break;
-            }
-            t += minDistance;
         }
     }
     return res;
@@ -569,16 +529,15 @@ vec3 materialPalette(float parameter) {
     // muss die letzte Spalte ("d") jeder Farbe -> vec3(-1.57, -0.57, 0.43)
 }
 
-void render(in vec3 rayOrigin, in vec3 rayDir)
+void render(out vec3 col, in vec3 rayOrigin, in vec3 rayDir)
 {
     // Diese Funktion folgt der selben Logik wie letzter Woche,
     // ich habe ein bisschen refakturiert und neue Effekte eingebaut,
     // aber prüft mal, ob ihr grundlegende Vorgehen (wieder) erkennen könnt.
 
     MarchHit res = raycast(rayOrigin, rayDir);
-    // MarchHit res = raycastJustTheSphere(rayOrigin, rayDir);
 
-    if (res.t > 10.) {
+    if (res.t > 15.) {
         // early return: wir schneiden die Ebene mal früher ab
         // (um mehr Weltall zu sehen, oder so)
         return;
@@ -590,9 +549,12 @@ void render(in vec3 rayOrigin, in vec3 rayDir)
         return;
     }
 
-    bool isFloor = res.material < MATERIAL_FLOOR + 0.1;
+    // Material: Floats auf Gleichheit zu prüfen wirkt gefährlich, geht hier nur,
+    // weil wir exakt wissen, dass wir diesen Wert so gesetzt haben, nicht berechnet.
+    bool isFloor = res.material == MATERIAL_FLOOR;
 
-    vec3 col = materialPalette(res.material);
+    col = materialPalette(res.material);
+
     float specularCoeff = 1.0;
 
     // berechneten Strahl rekonstruieren
@@ -600,8 +562,6 @@ void render(in vec3 rayOrigin, in vec3 rayDir)
     // und Normalvektoren, für Beleuchtungseffekte der Oberflächen
     vec3 normal = isFloor ? vec3(0.0,1.0,0.0) : calcNormal(rayPos);
 
-    // Material: Floats auf Gleichheit zu prüfen wirkt gefährlich, geht hier nur,
-    // weil wir exakt wissen, dass wir diesen Wert so gesetzt haben, nicht berechnet.
     if (res.material == MATERIAL_BOX) {
         // res.texCoord haben wir uns oben gemerkt, um hier nicht dieselbe Geometrie
         // nochmal in alle Richtungen fallunterscheiden zu müssen. Möglich wärs aber.
@@ -634,22 +594,29 @@ void render(in vec3 rayOrigin, in vec3 rayDir)
     else if (isFloor)
     {
         // war: Schachbrettmuster
-        // float f = 1. - abs(step(0.5, fract(1.5*rayPos.x)) - step(0.5, fract(1.5*rayPos.z)));
+        // float checkerboard = 1. - abs(step(0.5, fract(1.5*rayPos.x)) - step(0.5, fract(1.5*rayPos.z)));
         // col = 0.15 + f*vec3(0.05);
+        float grid = 1. - abs(step(0.97, fract(2. * rayPos.x)) - step(0.97, fract(2.*rayPos.z)));
 
         // jetzt: Textur.
         // hier kommen wir mit einfacher Geometrie an die richtige Koordinate "st":
         // wir projizieren einfach den Strahl auf die y-Ebene (Boden y == 0); skalieren nach Laune
         res.texCoord = rayPos.xz * 0.3;
         col = texture(texRock, res.texCoord).rgb;
-        // "Fraktale" Verfeinerung ähnlich "fractal Brownian motion"
+        // "Fraktale" Verfeinerung ähnlich "fractal Brownian motion" - kann auch ausbleiben
+        /*
         col += (
             0.66 * texture(texRock, 2. * res.texCoord).rgb +
             0.44 * texture(texRock, 4. * res.texCoord).rgb
         );
         col /= 2.1;
+        */
         col = pow(col, vec3(2.8));
-        specularCoeff = 0.4;
+        specularCoeff = 0.12;
+
+        if (DRAW_GRID_ON_FLOOR) {
+            col *= 0.3 + 0.7 * vec3(grid);
+        }
     }
 
     vec3 shade = vec3(0.0);
@@ -657,9 +624,16 @@ void render(in vec3 rayOrigin, in vec3 rayDir)
     vec3 lightPointSource;
     vec3 lightSourceColor;
 
-    const bool SHOW_POINT_LIGHT_SOURCE = true;
-
-    // FÜr den Vergleich Punktlicht -- Richtungslicht bauen wir beide zusammen ein:
+    // Wir hatten letzte Woche mal eine einzelne (Richtungs)-Lichtquelle, und da die
+    // verschiedenen Beiträge für etwa Phong/Blinn-Phong-Shading gesehen.
+    // Jegliches "Shading" war: Finde den passenden Faktor zwischen
+    // 1 = voll beleuchtet
+    // 0 = hier kommt absolut kein Licht hin
+    // mit mehreren Lichtquellen kann man das ähnlich machen, muss aber fallbezogen
+    // entscheiden, wie man die gegeneinander gewichtet.
+    // Probiert hier einfach mal an den Konstanten rum.
+    //
+    // FÜr den Vergleich Richtungslicht vs. Punktlicht bauen wir einfach mal beide zusammen ein:
     for (int light = 0; light < 2; light++) {
 
         if (light == 0) {
@@ -668,7 +642,8 @@ void render(in vec3 rayOrigin, in vec3 rayDir)
             // immer noch aufpassen mit dem Vorzeichen: Richtung ZUM Licht
             lightSourceColor = vec3(1.30, 1.00, 0.70);
         } else {
-            lightPointSource = vec3(-1., 1.5, -2.6);
+            // lightPointSource = vec3(-1., 1.5, -2.6);
+            lightPointSource = vec3(-.5, 1. + 0.5 * sin(iTime), -2.6);
             // Punktlicht: Richtung unterschiedlich / relativ zum Strahl eben.
             lightDirection = normalize(lightPointSource - rayDir);
             // lightSourceColor = materialPalette(17.) * 1.5;
@@ -678,12 +653,11 @@ void render(in vec3 rayOrigin, in vec3 rayDir)
                 // einfache Logik:
                 vec3 rayDirectionIntoTheLight = normalize(lightPointSource - rayOrigin);
                 float overlap = dot(rayDir, rayDirectionIntoTheLight);
-                fragColor += vec4(lightSourceColor, 1.) * exp(-pow(overlap, 2.));
+                col += lightSourceColor * exp(-pow(0.2*overlap, 2.));
                 // Alternative: only an improvised 2D circle
                 if (overlap > 0.9999) {
-                    fragColor.rgb = lightPointSource;
-                    fragColor.a = 1.;
-                    continue;
+                    col = lightSourceColor;
+                    return;
                 }
             }
         }
@@ -705,8 +679,6 @@ void render(in vec3 rayOrigin, in vec3 rayDir)
     col = shade;
 
     applyDistanceFog(col, res.t, vec3(0.003,0.,0.008), 0.01, 3.0);
-
-    fragColor = vec4(col, 1.);
 }
 
 vec3 splineCatmullRom(vec3 p0, vec3 p1, vec3 p2, vec3 p3, float t) {
@@ -758,17 +730,27 @@ mat3 setCamera( in vec3 origin, in vec3 target, float rollAngle )
     return mat3(cameraRight, cameraUp, cameraForward);
 }
 
+void background() {
+    vec2 st = gl_FragCoord.xy / iResolution.y;
+    st -= 0.5 * vec2(iResolution.x/iResolution.y, 1.);
+    // st *= 0.8 * rot2D(0.1 * iTime);
+    vec4 space = texture(texSpace, st);
+    space.rgb = pow(space.rgb, vec3(1.5));
+    fragColor.rgb = mix(space.rgb, fragColor.rgb, fragColor.a);
+    fragColor.a = 1.;
+}
+
 void main()
 {
     vec2 uv = (2.0 * gl_FragCoord.xy - iResolution.xy) / iResolution.y;
 
-    fragColor = c.yyyy; // transparent
+    background();
 
     // Fixed Cam Origin:
     vec3 camOrigin = vec3(-0.75, 1.5, 3.);
     // mit fester Blick_richtung_ (im Gegensatz zu festem Blick-Zielpunkt)
     // (je nachdem eben, ob relativ zu Kameraposition oder unabhängig)
-    vec3 camTarget = camOrigin + vec3(0.27, -0.34, -0.84) + vecFree2;
+    vec3 camTarget = camOrigin + vec3(0.27, -0.32, -0.84) + vecFree2;
     float camRoll = iCamRoll;
 
     // Demonstration: Automatisierten Pfad ablaufen (per Spline-Interpolation)
@@ -798,25 +780,17 @@ void main()
     vec3 rayDirection = camMatrix * normalize(vec3(uv, iCamFocalLength));
 
     // render
-    render(camOrigin, rayDirection);
+    vec3 col;
+    render(col, camOrigin, rayDirection);
 
     // gain ("HDR compression", Konstanten so gewählt dass [0,1] erhalten bleibt)
     // col = col * 2.5/(1.5 + col);
     // col = col * 3.0/(2.5 + col)
     // <-- quasi Alternativen zur pow()-Gammakorrektur, man wähle was einem gefällt. Siehe auch:
     // https://graphtoy.com/?f1(x,t)=pow(x,1./2.2)&v1=true&f2(x,t)=x*3./(2.5+x)&v2=true&f3(x,t)=x*2.5/(1.5+x)&v3=true&f4(x,t)=&v4=false&f5(x,t)=&v5=false&f6(x,t)=&v6=false&grid=1&coords=0.744623141762885,0.5386673261892163,1.2183071759372475
-
     // gamma
     const float gamma = 2.2;
-    fragColor.rgb = pow(fragColor.rgb, vec3(1./gamma));
+    col = pow(col, vec3(1./gamma));
 
-    // mix background where alpha allows it
-
-    vec2 st = gl_FragCoord.xy / iResolution.y;
-    st -= 0.5 * vec2(iResolution.x/iResolution.y, 1.);
-    // st *= 0.8 * rot2D(0.1 * iTime);
-    vec4 space = texture(texSpace, st);
-    space.rgb = pow(space.rgb, vec3(1.5));
-    fragColor.rgb = mix(space.rgb, fragColor.rgb, fragColor.a);
-    fragColor.a = 1.;
+    fragColor = vec4(col, 1.);
 }
