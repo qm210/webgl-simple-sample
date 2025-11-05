@@ -745,6 +745,7 @@ void render(in vec3 rayOrigin, in vec3 rayDir)
 }
 
 vec3 splineCatmullRom(vec3 p0, vec3 p1, vec3 p2, vec3 p3, float t) {
+    // uniform version, cf. https://en.wikipedia.org/wiki/Cubic_Hermite_spline#Catmull%E2%80%93Rom_spline
     return (((-p0 + p1*3. - p2*3. + p3)*t*t*t + (p0*2. - p1*5. + p2*4. - p3)*t*t + (-p0 + p2)*t + p1*2.)*.5);
 }
 
