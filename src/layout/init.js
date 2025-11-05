@@ -28,7 +28,8 @@ export default function initLayout(rootId) {
         canvas: document.getElementById("canvas"),
         controls: document.getElementById("shader-controls"),
         displayControls: document.getElementById("display-controls"),
-        startRendering: performance.now(),
+        initialMs: performance.now(),
+        pageLoadingMs: null,
     };
 }
 

@@ -36,11 +36,12 @@ export default {
         state.location.texFrame = gl.getUniformLocation(state.program, "texFrame");
         state.location.texSpace = gl.getUniformLocation(state.program, "texSpace");
         state.location.texRock = gl.getUniformLocation(state.program, "texRock");
-        state.location.iCamOrigin = gl.getUniformLocation(state.program, "iCamOrigin");
-        state.location.iCamLook = gl.getUniformLocation(state.program, "iCamLook");
+        state.location.iCamOffset = gl.getUniformLocation(state.program, "iCamOffset");
+        state.location.iCamLookOffset = gl.getUniformLocation(state.program, "iCamLookOffset");
         state.location.iCamRoll = gl.getUniformLocation(state.program, "iCamRoll");
         state.location.iCamFocalLength = gl.getUniformLocation(state.program, "iCamFocalLength");
-        state.location.iPathProgress = gl.getUniformLocation(state.program, "iPathProgress");
+        state.location.iPathSpeed = gl.getUniformLocation(state.program, "iPathSpeed");
+        state.location.iPathOffset = gl.getUniformLocation(state.program, "iPathOffset");
         state.location.iFree0 = gl.getUniformLocation(state.program, "iFree0");
         state.location.iFree1 = gl.getUniformLocation(state.program, "iFree1");
         state.location.iFree2 = gl.getUniformLocation(state.program, "iFree2");
@@ -75,11 +76,12 @@ function render(gl, state) {
     gl.uniform2fv(state.location.iResolution, state.resolution);
     gl.uniform4fv(state.location.iMouse, state.iMouse);
 
-    gl.uniform3fv(state.location.iCamOrigin, state.iCamOrigin);
-    gl.uniform3fv(state.location.iCamLook, state.iCamLook);
+    gl.uniform3fv(state.location.iCamOffset, state.iCamOffset);
+    gl.uniform3fv(state.location.iCamLookOffset, state.iCamLookOffset);
     gl.uniform1f(state.location.iCamRoll, state.iCamRoll);
     gl.uniform1f(state.location.iCamFocalLength, state.iCamFocalLength);
-    gl.uniform1f(state.location.iPathProgress, state.iPathProgress);
+    gl.uniform1f(state.location.iPathSpeed, state.iPathSpeed);
+    gl.uniform1f(state.location.iPathOffset, state.iPathOffset);
 
     gl.uniform1f(state.location.iFree0, state.iFree0);
     gl.uniform1f(state.location.iFree1, state.iFree1);
@@ -110,16 +112,16 @@ function render(gl, state) {
 function defineUniformControlsBelow() {
     return [{
         type: "cursorInput",
-        name: "iCamOrigin",
+        name: "iCamOffset",
         keys: ["w", "a", "s", "d", "r", "f", "q"],
-        defaultValue: [-0.75, 1.5, 3],
+        defaultValue: [0, 0, 0],
         step: 0.25,
     }, {
         type: "vec3Input",
-        name: "iCamLook",
-        defaultValue: [0.34, -0.34, -0.84],
-        min: -1,
-        max: +1,
+        name: "iCamLookOffset",
+        defaultValue: [0, 0, 0],
+        min: -2,
+        max: +2,
     }, {
         type: "floatInput",
         name: "iCamRoll",
@@ -134,10 +136,16 @@ function defineUniformControlsBelow() {
         max: 20,
     }, {
         type: "floatInput",
-        name: "iPathProgress",
+        name: "iPathSpeed",
         defaultValue: 0,
         min: 0.,
         max: 2.,
+    }, {
+        type: "floatInput",
+        name: "iPathOffset",
+        defaultValue: 0,
+        min: 0.,
+        max: 12.,
     }, {
         type: "floatInput",
         name: "iFree0",

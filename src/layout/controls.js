@@ -51,6 +51,8 @@ export function createInputElements(state, control) {
         state[control.name] = control.defaultValue;
         if (control.defaultValue === undefined) {
             console.warn("Uniform control has no defaultValue defined: ", control.name, control);
+        } else if (control.defaultValue instanceof Array) {
+            state[control.name] = [...control.defaultValue];
         }
     }
 
@@ -73,10 +75,14 @@ export function createInputElements(state, control) {
 }
 
 function sessionStoreControlState(state, control) {
-    sessionStorage.setItem(
-        control.storageKey,
-        JSON.stringify(state[control.name])
-    );
+    if (state[control.name] === control.defaultValue) {
+        sessionStorage.removeItem(control.storageKey);
+    } else {
+        sessionStorage.setItem(
+            control.storageKey,
+            JSON.stringify(state[control.name])
+        );
+    }
 }
 
 function createSmallButton(title) {
@@ -106,90 +112,103 @@ const createInputControlElements = (control) => {
     return elements;
 };
 
-export const asFloatInput = (elements, state, control, onUpdate = undefined) => {
+export const asFloatInput = (elements, state, control) => {
     control.defaultValue ??= 0;
-    control.step ??= 0.01;
-    const digits = -Math.log10(control.step);
 
     elements.reset.textContent = `reset: ${control.defaultValue}`;
-    elements.control.type = "range";
-    elements.control.step = control.step;
-    elements.control.style.flex = "3";
+    asSlider(elements.control, control);
 
-    update(true);
+    updateSlider(elements, state, control, true);
 
     elements.control.addEventListener("input", event => {
         state[control.name] = event.target.value;
-        update();
+        updateSlider(elements, state, control, false);
     });
-
     elements.control.addEventListener("change", event => {
         state[control.name] = event.target.value;
-        update(true);
+        updateSlider(elements, state, control, true);
         sessionStoreControlState(state, control);
     });
 
     elements.reset.addEventListener("click", () => {
         state[control.name] = control.defaultValue;
-        update(true);
-        sessionStorage.removeItem(control.storageKey);
+        updateSlider(elements, state, control,true);
+        sessionStoreControlState(state, control);
     });
 
     return elements;
-
-    function round(value) {
-        return Math.round(parseFloat(value) / control.step) * control.step;
-    }
-
-    function update(full = false) {
-        const value = round(state[control.name]);
-        if (full) {
-            const defaultMin =
-                value === 0
-                    ? -1
-                    : value < 0
-                        ? 2 * value
-                        : 0;
-            const defaultMax =
-                value === 0
-                    ? +1
-                    : value > 0
-                        ? 2 * value
-                        : 0;
-            elements.control.min = control.min ?? round(defaultMin);
-            elements.control.max = control.max ?? round(defaultMax);
-            elements.min.textContent = (+elements.control.min).toFixed(digits);
-            elements.max.textContent = (+elements.control.max).toFixed(digits);
-        }
-        elements.control.value = value.toFixed(digits);
-        elements.value.textContent = ` = ${value.toFixed(digits)}`;
-        if (onUpdate) {
-            onUpdate(elements.control.value);
-        }
-    }
 };
+
+function asSlider(inputElement, control) {
+    control.step ??= 0.01;
+    inputElement.type = "range";
+    inputElement.step = control.step;
+    if (control.min !== undefined) {
+        inputElement.min = control.min;
+    }
+    if (control.max !== undefined) {
+        inputElement.max = control.max;
+    }
+    inputElement.style.flex = "3";
+}
+
+function round(value, control) {
+    return Math.round(parseFloat(value) / control.step) * control.step;
+}
+
+function updateSlider(elements, state, control, full = false, value = undefined) {
+    value ??= state[control.name];
+    value = round(value, control);
+    const digits = -Math.log10(control.step);
+    if (full) {
+        const defaultMin =
+            value === 0 ? -1
+            : value > 0 ? 0
+            : 2 * value;
+        const defaultMax =
+            value === 0 ? +1
+            : value < 0 ? 0
+            : 2 * value;
+        elements.control.min = control.min ?? round(defaultMin);
+        elements.control.max = control.max ?? round(defaultMax);
+        elements.min.textContent = (+elements.control.min).toFixed(digits);
+        elements.max.textContent = (+elements.control.max).toFixed(digits);
+    }
+    elements.control.value = value.toFixed(digits);
+    elements.value.textContent = ` = ${value.toFixed(digits)}`;
+    return elements.control.value;
+}
 
 export const asVec3Input = (elements, state, control) => {
     elements.control = document.createElement("div");
     elements.control.style.gap = "0.5rem";
 
-    const componentControls = [];
+    const sliders = [];
     for (let i = 0; i < 3; i++) {
-        const componentElements = createInputControlElements();
-        asFloatInput(componentElements, state, control, updateAll);
-        componentControls.push(componentElements.control);
-        componentElements.control.value = control.defaultValue[i];
-        elements.control.appendChild(componentElements.control);
-        elements.min = componentElements.min;
-        elements.max = componentElements.max;
+        const componentInput = document.createElement("input");
+        sliders.push(componentInput);
+        elements.control.appendChild(componentInput);
+        asSlider(componentInput, control);
+        componentInput.value =
+            updateSlider(elements, state, control, true, state[control.name][i]);
+        componentInput.addEventListener("input", event => {
+            updateSlider(elements, state, control, false, event.target.value);
+            updateAll();
+        });
+        componentInput.addEventListener("change", event => {
+            updateSlider(elements, state, control, true, event.target.value);
+            updateAll();
+            sessionStoreControlState(state, control);
+        });
     }
 
     elements.reset.addEventListener("click", () => {
         state[control.name] = control.defaultValue;
-        componentControls.forEach((input, index) => {
+        sliders.forEach((input, index) => {
             input.value = control.defaultValue[index];
         });
         updateAll();
+        sessionStoreControlState(state, control);
     });
 
     updateAll();
@@ -197,7 +216,7 @@ export const asVec3Input = (elements, state, control) => {
     return elements;
 
     function updateAll() {
-        state[control.name] = componentControls.map(i => +i.value);
+        state[control.name] = sliders.map(i => +i.value);
         const componentsText = state[control.name]
             .map(i => i.toFixed(2))
             .join(", ");

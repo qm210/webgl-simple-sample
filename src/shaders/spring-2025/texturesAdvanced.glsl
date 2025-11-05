@@ -101,8 +101,8 @@ Surface sdPatternSphere( vec3 p, vec3 b, vec3 offset, vec3 col, mat3 transform, 
     float d = length(p / b) - 1.;
     col = mix(col, checkerCol, surfaceCheckerPattern(p, nSegments));
     vec2 surface = vec2(
-    atan(p.z, p.x) / (2. * pi) + 0.5,
-    p.y / 2. + 0.5
+        atan(p.z, p.x) / (2. * pi) + 0.5,
+        p.y / 2. + 0.5
     );
     return Surface(d, col, MATERIAL_SPHERE, surface);
 }

@@ -13,10 +13,10 @@ const glContext = setupWebGl(elements.canvas, {aspectRatio: 16 / 9});
 
 const state = prepareShowcase(showcase, glContext);
 
-console.log("WebGL objects initialized:", state);
+console.info("WebGL objects initialized:", state);
 
 const controls = showcase.generateControls(glContext, state, elements);
 
 generatePage(glContext, elements, state, controls);
 
-console.log("Page took", elements.initialRenderMs.toFixed(1), "ms to render.");
+console.info("Page took", elements.pageLoadingMs.toFixed(1), "ms to render.");

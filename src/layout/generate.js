@@ -64,7 +64,7 @@ const generatePage = (glContext, elements, state, controls, autoRenderOnLoad = t
     addControlsToPage(elements, state, controls, autoRenderOnLoad);
     addDisplayControls(elements, state, glContext);
 
-    elements.initialRenderMs = performance.now() - elements.startRendering;
+    elements.pageLoadingMs = performance.now() - elements.initialMs;
 };
 
 export default generatePage;

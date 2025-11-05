@@ -12,11 +12,12 @@ uniform vec4 iMouse;
 uniform sampler2D texFrame;
 uniform sampler2D texSpace;
 uniform sampler2D texRock;
-uniform vec3 iCamOrigin;
-uniform vec3 iCamLook;
+uniform vec3 iCamOffset;
+uniform vec3 iCamLookOffset;
 uniform float iCamRoll;
 uniform float iCamFocalLength;
-uniform float iPathProgress;
+uniform float iPathSpeed;
+uniform float iPathOffset;
 
 // and for you to play around with:
 uniform float iFree0;
@@ -34,10 +35,37 @@ uniform vec3 vecFree5;
 
 const float pi = 3.141593;
 const float twoPi = 2. * pi;
+const float piHalf = .5 * pi;
 const vec4 c = vec4(1., 0. , -1., .5);
 
+const float MISSING_MATERIAL = -0.5;
 const float MATERIAL_FLOOR = 1.0;
 const float MATERIAL_BOX = 3.0;
+const float MATERIAL_CYLINDER = 8.0;
+const float MATERIAL_PYRAMID = 13.0;
+const float MATERIAL_PATH_POINT = 1.5;
+
+const bool USE_AUTOMATED_CAMERA_PATH = false;
+const bool USE_AUTOMATED_CAMERA_TARGET_PATH = false;
+
+const int nPath = 6;
+vec3 camPosPath[nPath] = vec3[6](
+    vec3(-0.75, 1.5, 3.),
+    vec3(0.4, 0.35, 1.25),
+    vec3(-0.3, 0.65, -3.3),
+    vec3(-2.1,0.73, -1.3),
+    vec3(1.5, 0.4, -3.0),
+    vec3(0.1, 0.8, 0.1)
+);
+
+vec4 targetPath[nPath] = vec4[6](
+    vec4(-0.3, 0.35, 1.05, 0.),
+    vec4(-0.3, 0.65, -3.3, -.2),
+    vec4(-2.,0.73, -1.3, 1.6),
+    vec4(0.6, 0.5, -0.8, 3.1),
+    vec4(0.1, 0.0, 0.1, 0.),
+    vec4(-0.75, 1.5, 3., -1.)
+);
 
 mat3 rotX(float angle) {
     float c = cos(angle);
@@ -80,10 +108,49 @@ mat2 rot2D(float angle) {
     );
 }
 
-//------------------------------------------------------------------
-float dot2( in vec2 v ) { return dot(v,v); }
-float dot2( in vec3 v ) { return dot(v,v); }
-float ndot( in vec2 a, in vec2 b ) { return a.x*b.x - a.y*b.y; }
+mat3 squeezeY(float sqY) {
+    float sqXZ = 1./sqY;
+    return mat3(
+         sqXZ,  0.,   0.,
+           0., sqY,   0.,
+           0.,  0., sqXZ
+    );
+}
+
+vec2 hash22(vec2 p) {
+    float n = sin(dot(p, vec2(127.1, 311.7))) * 43758.5453;
+    return fract(vec2(n, n * 1.2154));
+}
+
+float voronoi(vec2 uv) {
+    vec2 uvInt = floor(uv);
+    vec2 uvFrac = fract(uv);
+    float dMin = 1.0;
+    float dSecondMin = 1.0;
+    for (float y = -1.; y <= 1.1; y += 1.) {
+        for (float x = -1.; x <= 1.1; x += 1.) {
+            vec2 b = vec2(x, y);
+            vec2 r = b + hash22(uvInt + b) - uvFrac;
+            float d = length(r);
+            if (d < dMin) {
+                dSecondMin = dMin;
+                dMin = d;
+            } else if (d < dSecondMin) {
+                dSecondMin = d;
+            }
+        }
+    }
+    // return dMin;
+    return dSecondMin - dMin;
+}
+
+float bounceParabola(float h, float g, float T, float t) {
+    t = fract(t/T) - 0.5;
+    t *= -g*t;
+    t += h + 0.25*g;
+    return t;
+}
+
 
 float sdPlane( vec3 p )
 {
@@ -101,16 +168,6 @@ float sdBox( vec3 p, vec3 b )
     return min(max(d.x,max(d.y,d.z)),0.0) + length(max(d,0.0));
 }
 
-float sdBoxFrame( vec3 p, vec3 b, float e )
-{
-    p = abs(p  )-b;
-    vec3 q = abs(p+e)-e;
-
-    return min(min(
-    length(max(vec3(p.x,q.y,q.z),0.0))+min(max(p.x,max(q.y,q.z)),0.0),
-    length(max(vec3(q.x,p.y,q.z),0.0))+min(max(q.x,max(p.y,q.z)),0.0)),
-    length(max(vec3(q.x,q.y,p.z),0.0))+min(max(q.x,max(q.y,p.z)),0.0));
-}
 float sdEllipsoid( in vec3 p, in vec3 r ) // approximated
 {
     float k0 = length(p/r);
@@ -121,211 +178,6 @@ float sdEllipsoid( in vec3 p, in vec3 r ) // approximated
 float sdTorus( vec3 p, vec2 t )
 {
     return length( vec2(length(p.xz)-t.x,p.y) )-t.y;
-}
-
-float sdCappedTorus(in vec3 p, in vec2 sc, in float ra, in float rb)
-{
-    p.x = abs(p.x);
-    float k = (sc.y*p.x>sc.x*p.y) ? dot(p.xy,sc) : length(p.xy);
-    return sqrt( dot(p,p) + ra*ra - 2.0*ra*k ) - rb;
-}
-
-float sdHexPrism( vec3 p, vec2 h )
-{
-    vec3 q = abs(p);
-
-    const vec3 k = vec3(-0.8660254, 0.5, 0.57735);
-    p = abs(p);
-    p.xy -= 2.0*min(dot(k.xy, p.xy), 0.0)*k.xy;
-    vec2 d = vec2(
-    length(p.xy - vec2(clamp(p.x, -k.z*h.x, k.z*h.x), h.x))*sign(p.y - h.x),
-    p.z-h.y );
-    return min(max(d.x,d.y),0.0) + length(max(d,0.0));
-}
-
-float sdOctogonPrism( in vec3 p, in float r, float h )
-{
-    const vec3 k = vec3(-0.9238795325,   // sqrt(2+sqrt(2))/2
-    0.3826834323,   // sqrt(2-sqrt(2))/2
-    0.4142135623 ); // sqrt(2)-1
-    // reflections
-    p = abs(p);
-    p.xy -= 2.0*min(dot(vec2( k.x,k.y),p.xy),0.0)*vec2( k.x,k.y);
-    p.xy -= 2.0*min(dot(vec2(-k.x,k.y),p.xy),0.0)*vec2(-k.x,k.y);
-    // polygon side
-    p.xy -= vec2(clamp(p.x, -k.z*r, k.z*r), r);
-    vec2 d = vec2( length(p.xy)*sign(p.y), p.z-h );
-    return min(max(d.x,d.y),0.0) + length(max(d,0.0));
-}
-
-float sdCapsule( vec3 p, vec3 a, vec3 b, float r )
-{
-    vec3 pa = p-a, ba = b-a;
-    float h = clamp( dot(pa,ba)/dot(ba,ba), 0.0, 1.0 );
-    return length( pa - ba*h ) - r;
-}
-
-float sdRoundCone( in vec3 p, in float r1, float r2, float h )
-{
-    vec2 q = vec2( length(p.xz), p.y );
-
-    float b = (r1-r2)/h;
-    float a = sqrt(1.0-b*b);
-    float k = dot(q,vec2(-b,a));
-
-    if( k < 0.0 ) return length(q) - r1;
-    if( k > a*h ) return length(q-vec2(0.0,h)) - r2;
-
-    return dot(q, vec2(a,b) ) - r1;
-}
-
-float sdRoundCone(vec3 p, vec3 a, vec3 b, float r1, float r2)
-{
-    // sampling independent computations (only depend on shape)
-    vec3  ba = b - a;
-    float l2 = dot(ba,ba);
-    float rr = r1 - r2;
-    float a2 = l2 - rr*rr;
-    float il2 = 1.0/l2;
-
-    // sampling dependant computations
-    vec3 pa = p - a;
-    float y = dot(pa,ba);
-    float z = y - l2;
-    float x2 = dot2( pa*l2 - ba*y );
-    float y2 = y*y*l2;
-    float z2 = z*z*l2;
-
-    // single square root!
-    float k = sign(rr)*rr*rr*x2;
-    if( sign(z)*a2*z2 > k ) return  sqrt(x2 + z2)        *il2 - r2;
-    if( sign(y)*a2*y2 < k ) return  sqrt(x2 + y2)        *il2 - r1;
-    return (sqrt(x2*a2*il2)+y*rr)*il2 - r1;
-}
-
-float sdTriPrism( vec3 p, vec2 h )
-{
-    const float k = sqrt(3.0);
-    h.x *= 0.5*k;
-    p.xy /= h.x;
-    p.x = abs(p.x) - 1.0;
-    p.y = p.y + 1.0/k;
-    if( p.x+k*p.y>0.0 ) p.xy=vec2(p.x-k*p.y,-k*p.x-p.y)/2.0;
-    p.x -= clamp( p.x, -2.0, 0.0 );
-    float d1 = length(p.xy)*sign(-p.y)*h.x;
-    float d2 = abs(p.z)-h.y;
-    return length(max(vec2(d1,d2),0.0)) + min(max(d1,d2), 0.);
-}
-
-// vertical
-float sdCylinder( vec3 p, vec2 h )
-{
-    vec2 d = abs(vec2(length(p.xz),p.y)) - h;
-    return min(max(d.x,d.y),0.0) + length(max(d,0.0));
-}
-
-// arbitrary orientation
-float sdCylinder(vec3 p, vec3 a, vec3 b, float r)
-{
-    vec3 pa = p - a;
-    vec3 ba = b - a;
-    float baba = dot(ba,ba);
-    float paba = dot(pa,ba);
-
-    float x = length(pa*baba-ba*paba) - r*baba;
-    float y = abs(paba-baba*0.5)-baba*0.5;
-    float x2 = x*x;
-    float y2 = y*y*baba;
-    float d = (max(x,y)<0.0)?-min(x2,y2):(((x>0.0)?x2:0.0)+((y>0.0)?y2:0.0));
-    return sign(d)*sqrt(abs(d))/baba;
-}
-
-// vertical
-float sdCone( in vec3 p, in vec2 c, float h )
-{
-    vec2 q = h*vec2(c.x,-c.y)/c.y;
-    vec2 w = vec2( length(p.xz), p.y );
-
-    vec2 a = w - q*clamp( dot(w,q)/dot(q,q), 0.0, 1.0 );
-    vec2 b = w - q*vec2( clamp( w.x/q.x, 0.0, 1.0 ), 1.0 );
-    float k = sign( q.y );
-    float d = min(dot( a, a ),dot(b, b));
-    float s = max( k*(w.x*q.y-w.y*q.x),k*(w.y-q.y)  );
-    return sqrt(d)*sign(s);
-}
-
-float sdCappedCone( in vec3 p, in float h, in float r1, in float r2 )
-{
-    vec2 q = vec2( length(p.xz), p.y );
-
-    vec2 k1 = vec2(r2,h);
-    vec2 k2 = vec2(r2-r1,2.0*h);
-    vec2 ca = vec2(q.x-min(q.x,(q.y < 0.0)?r1:r2), abs(q.y)-h);
-    vec2 cb = q - k1 + k2*clamp( dot(k1-q,k2)/dot2(k2), 0.0, 1.0 );
-    float s = (cb.x < 0.0 && ca.y < 0.0) ? -1.0 : 1.0;
-    return s*sqrt( min(dot2(ca),dot2(cb)) );
-}
-
-float sdCappedCone(vec3 p, vec3 a, vec3 b, float ra, float rb)
-{
-    float rba  = rb-ra;
-    float baba = dot(b-a,b-a);
-    float papa = dot(p-a,p-a);
-    float paba = dot(p-a,b-a)/baba;
-
-    float x = sqrt( papa - paba*paba*baba );
-
-    float cax = max(0.0,x-((paba<0.5)?ra:rb));
-    float cay = abs(paba-0.5)-0.5;
-
-    float k = rba*rba + baba;
-    float f = clamp( (rba*(x-ra)+paba*baba)/k, 0.0, 1.0 );
-
-    float cbx = x-ra - f*rba;
-    float cby = paba - f;
-
-    float s = (cbx < 0.0 && cay < 0.0) ? -1.0 : 1.0;
-
-    return s*sqrt( min(cax*cax + cay*cay*baba,
-    cbx*cbx + cby*cby*baba) );
-}
-
-// c is the sin/cos of the desired cone angle
-float sdSolidAngle(vec3 pos, vec2 c, float ra)
-{
-    vec2 p = vec2( length(pos.xz), pos.y );
-    float l = length(p) - ra;
-    float m = length(p - c*clamp(dot(p,c),0.0,ra) );
-    return max(l,m*sign(c.y*p.x-c.x*p.y));
-}
-
-float sdOctahedron(vec3 p, float s)
-{
-    p = abs(p);
-    float m = p.x + p.y + p.z - s;
-
-    // exact distance
-    #if 0
-    vec3 o = min(3.0*p - m, 0.0);
-    o = max(6.0*p - m*2.0 - o*3.0 + (o.x+o.y+o.z), 0.0);
-    return length(p - s*o/(o.x+o.y+o.z));
-    #endif
-
-    // exact distance
-    #if 1
-    vec3 q;
-    if( 3.0*p.x < m ) q = p.xyz;
-    else if( 3.0*p.y < m ) q = p.yzx;
-    else if( 3.0*p.z < m ) q = p.zxy;
-    else return m*0.57735027;
-    float k = clamp(0.5*(q.z-q.y+s),0.0,s);
-    return length(vec3(q.x,q.y-s+k,q.z-k));
-    #endif
-
-    // bound, not exact
-    #if 0
-    return m*0.57735027;
-    #endif
 }
 
 float sdPyramid( in vec3 p, in float h )
@@ -352,31 +204,6 @@ float sdPyramid( in vec3 p, in float h )
     return sqrt( (d2+q.z*q.z)/m2 ) * sign(max(q.z,-p.y));;
 }
 
-// la,lb=semi axis, h=height, ra=corner
-float sdRhombus(vec3 p, float la, float lb, float h, float ra)
-{
-    p = abs(p);
-    vec2 b = vec2(la,lb);
-    float f = clamp( (ndot(b,b-2.0*p.xz))/dot(b,b), -1.0, 1.0 );
-    vec2 q = vec2(length(p.xz-0.5*b*vec2(1.0-f,1.0+f))*sign(p.x*b.y+p.z*b.x-b.x*b.y)-ra, p.y-h);
-    return min(max(q.x,q.y),0.0) + length(max(q,0.0));
-}
-
-float sdHorseshoe( in vec3 p, in vec2 c, in float r, in float le, vec2 w )
-{
-    p.x = abs(p.x);
-    float l = length(p.xy);
-    p.xy = mat2(-c.x, c.y,
-    c.y, c.x)*p.xy;
-    p.xy = vec2((p.y>0.0 || p.x>0.0)?p.x:l*sign(-c.x),
-    (p.x>0.0)?p.y:l );
-    p.xy = vec2(p.x,abs(p.y-r))-vec2(le,0.0);
-
-    vec2 q = vec2(length(max(p.xy,0.0)) + min(0.0,max(p.x,p.y)),p.z);
-    vec2 d = abs(q) - w;
-    return min(max(d.x,d.y),0.0) + length(max(d,0.0));
-}
-
 float sdU( in vec3 p, in float r, in float le, vec2 w )
 {
     p.x = (p.y>0.0) ? abs(p.x) : length(p.xy);
@@ -387,13 +214,24 @@ float sdU( in vec3 p, in float r, in float le, vec2 w )
     return length(max(q,0.0)) + min(max(q.x,q.y),0.0);
 }
 
-struct Marched {
+struct MarchHit {
     float t;
     float material;
     vec2 texCoord;
 };
 
-Marched sdTexturedBox( vec3 p, vec3 b) {
+MarchHit texturedSdSphere(vec3 p, float s)
+{
+    float d = length(p) - s;
+    // hint: https://de.wikipedia.org/wiki/Kugelkoordinaten
+    vec2 surfaceCoord = vec2(
+        atan(p.z, p.x) / twoPi + 0.5,
+        p.y / 2. + 0.5
+    );
+    return MarchHit(d, 0., surfaceCoord);
+}
+
+MarchHit texturedSdBox( vec3 p, vec3 b) {
     vec3 q = abs(p) - b;
     float d = length(max(q,0.0)) + min(max(q.x,max(q.y,q.z)),0.0);
 
@@ -430,9 +268,29 @@ Marched sdTexturedBox( vec3 p, vec3 b) {
     //        step(0.5, abs(a.x))
     //    );
 
-    return Marched(d, MATERIAL_BOX, uv);
+    return MarchHit(d, MATERIAL_BOX, uv);
 }
 
+float sdCylinder( vec3 p, vec2 h )
+{
+    // vertical ~ along y-axis
+    h.y *= 1. + iFree2;
+    vec2 d = abs(vec2(length(p.xz),p.y)) - h;
+    return min(max(d.x,d.y),0.0) + length(max(d,0.0));
+}
+
+MarchHit texturedSdCylinder(vec3 p, vec2 h) {
+    // Analog mit Zylinder -- SDF ist bekannt (s.o.), bzw.
+    // ist ein Zylinder ja in einer Ebene wie ein Kreis, in den anderen wie ein Rechteck
+    // womit sich diese SDF erklärt:
+    float radius = length(p.xz);
+    vec2 q = abs(vec2(radius,p.y)) - h;
+    float d = min(max(q.x,q.y),0.0) + length(max(q,0.0));
+    // nun aber...
+    float s = atan(p.z / h.x, p.x / h.x) / twoPi + 0.5;
+    float t = 0.5 * p.y / h.y + 0.5;
+    return MarchHit(d, MATERIAL_CYLINDER, vec2(s, t));
+}
 
 //------------------------------------------------------------------
 
@@ -441,79 +299,94 @@ vec2 opUnion( vec2 d1, vec2 d2 )
     return (d1.x<d2.x) ? d1 : d2;
 }
 
-Marched opUnion( Marched d1, Marched d2 )
+// Erweiterte Versionen von opUnion, bei der Gelegenheit gleich umbenannt:
+
+MarchHit takeCloser(MarchHit d1, MarchHit d2)
 {
-    if (d1.t < d2.t)
+    if (d1.t < d2.t) {
         return d1;
+    }
     return d2;
 }
 
-// Hilfsvariante
-Marched opUnion( Marched d1, vec2 d2 )
+MarchHit takeCloser( MarchHit d1, float d2, float material2)
 {
-    if (d1.t < d2.x)
-        return d1;
-    return Marched(d2.x, d2.y, c.yy);
+    if (d1.t < d2) return d1;
+    // haben kein Wissen über texCoord:
+    return MarchHit(d2, material2, c.yy);
 }
 
-// Hilfsvariante
-Marched opUnion( vec2 d1, Marched d2 )
+const vec4 pyramidPosAndHeight = vec4(-1.0, 0.0, -2.6, 0.96);
+
+MarchHit map( in vec3 pos )
 {
-    if (d1.x < d2.t)
-        return Marched(d1.x, d1.y, c.yy);
-    return d2;
-}
+    MarchHit res = MarchHit(pos.y, 0.0, c.yy);
 
-Marched map( in vec3 pos )
-{
-    Marched res = Marched(pos.y, 0.0, c.yy);
+    // das hier ist im Kern weiterhin die "Kette an opUnion(...)" von letztem Mal,
+    // aber weniger Objekte, und umformuliert, weil MarchHit() jetzt mehr ist als "vec2":
 
-    // bounding box
-    // if( sdBox( pos-vec3(-2.0,0.3,0.25),vec3(0.3,0.3,1.0) )<res.x )
-//    {
-//        res = opUnion( res, vec2( sdHexPrism(    pos-vec3(-2.0,0.25, 0.0), vec2(0.2,0.05) ), 18.4 ) );
-//        res = opUnion( res, vec2( sdRhombus(  (pos-vec3(-2.0,0.25, 1.0)).xzy, 0.15, 0.25, 0.04, 0.08 ),17.0 ) );
-//    }
+    res = takeCloser(res,
+        sdTorus((pos-vec3( .5,0.30, 1.0)).xzy, vec2(0.25,0.05)),
+        7.1
+    );
+    res = takeCloser(res,
+        sdTorus((pos-vec3(-0.89,0.33, -1.5)).yxz, vec2(0.25,0.05)),
+        11.7
+    );
+    res = takeCloser(res,
+        sdTorus((pos-vec3(0.5,0.30,-2.5)).xzy, vec2(0.25,0.05)),
+        17.5
+    );
+    // <-- man beachte die 90°-Drehung über das Vektor-Swizzling (= Richtungen vertauschen)
 
-    // bounding box
-    // if( sdBox( pos-vec3(0.0,0.3,-1.0),vec3(0.35,0.3,2.5) )<res.x )
-    {
-        res = opUnion( res, vec2( sdCappedTorus((pos-vec3( 0.0,0.30, 1.0))*vec3(1,-1,1), vec2(0.866025,-0.5), 0.25, 0.05), 25.0) );
-        res = opUnion( res, vec2( sdBoxFrame(    pos-vec3( 0.0,0.25, 0.0), vec3(0.3,0.25,0.2), 0.025 ), 16.9 ) );
-        res = opUnion( res, vec2( sdCone(        pos-vec3( 0.0,0.45,-1.0), vec2(0.6,0.8),0.45 ), 55.0 ) );
-        res = opUnion( res, vec2( sdCappedCone(  pos-vec3( 0.0,0.25,-2.0), 0.25, 0.25, 0.1 ), 13.67 ) );
-        res = opUnion( res, vec2( sdSolidAngle(  pos-vec3( 0.0,0.00,-3.0), vec2(3,4)/5.0, 0.4 ), 49.13 ) );
-    }
+    res = takeCloser(res,
+        sdPyramid(pos - pyramidPosAndHeight.xyz, pyramidPosAndHeight.a),
+        MATERIAL_PYRAMID
+    );
 
-    // bounding box
-    // if( sdBox( pos-vec3(1.0,0.3,-1.0),vec3(0.35,0.3,2.5) )<res.x )
-    {
-        res = opUnion( res, vec2( sdTorus(      (pos-vec3( 1.0,0.30, 1.0)).xzy, vec2(0.25,0.05) ), 7.1 ) );
-        // res = opUnion( res, vec2( sdBox(         pos-vec3( 1.0,0.25, 0.0), vec3(0.3,0.25,0.1) ), 3.0 ) );
-        res = opUnion( res, sdTexturedBox(       pos-vec3( 1.0,0.25, 0.0), vec3(0.3,0.25,0.1) ) );
-        res = opUnion( res, vec2( sdSphere(      pos-vec3( 1.0,0.2,-1.0), 0.25 ), 26.9 ) );
-        res = opUnion( res, vec2( sdCylinder(    rotZ(0.8*iTime)* (pos-vec3( 1.0,0.25,-2.0)), vec2(0.15,0.25) ), 8.0 ) );
-        res = opUnion( res, vec2( sdCapsule(     pos-vec3( 1.0,0.00,-3.0),vec3(-0.1,0.1,-0.1), vec3(0.2,0.4,0.2), 0.1  ), 31.9 ) );
-    }
+    // Mal ein Beispiel einer ungewöhnlichen Transformation, die wir mit aktuellen Mitteln
+    // aber schon komplett verstehen können (und mich außerdem ziemlich erheitert).
+    float sphereRadius = 0.25;
+    float sphereY = bounceParabola(0.9, 3., 1., iTime) - 1.2;
+    float squeeze = -min(0., sphereY) + 1.;
+    sphereY = max(0., sphereY);
+    vec3 spherePos = vec3(2.,sphereY + sphereRadius, 0.4);
+    mat3 transformMatrix = squeezeY(squeeze);
+    res = takeCloser(res,
+        sdSphere(transformMatrix * (pos - spherePos), sphereRadius),
+        24.9 - 1. * squeeze
+    );
 
-    // bounding box
-    // if( sdBox( pos-vec3(-1.0,0.35,-1.0),vec3(0.35,0.35,2.5))<res.x )
-    {
-        res = opUnion( res, vec2( sdPyramid(    pos-vec3(-1.0,-0.6,-3.0), 1.0 ), 13.56 ) );
-        res = opUnion( res, vec2( sdOctahedron( pos-vec3(-1.0,0.15,-2.0) - rotY(iTime * 1.3)*vec3(-2.0,0.,0.), 0.35 ), 23.56 ) );
-        res = opUnion( res, vec2( sdTriPrism(   pos-vec3(-1.0,0.15,-1.0), vec2(0.3,0.05) ),43.5 ) );
-        res = opUnion( res, vec2( sdEllipsoid(  pos-vec3(-1.0,0.25, 0.0), vec3(0.2, 0.25, 0.05) ), 43.17 ) );
-        res = opUnion( res, vec2( sdHorseshoe(  pos-vec3(-1.0,0.25 + 0.25 * cos(twoPi * 2. * iTime), 1.0), vec2(cos(1.3),sin(1.3)), 0.2, 0.3, vec2(0.03,0.08) ), 11.5 ) );
-    }
+    // mit erweiterter sdBox, die auch noch die Aufprallkoordinate des Strahls mitspeichert
+    // um später die Textur abbilden zu können. Wir bleiben da mal beim Quader...
 
-    // bounding box
-    // if( sdBox( pos-vec3(2.0,0.3,-1.0),vec3(0.35,0.3,2.5) )<res.x )
-    {
-        res = opUnion( res, vec2( sdOctogonPrism(pos-vec3( 2.0,0.2,-3.0), 0.2, 0.05), 51.8 ) );
-        res = opUnion( res, vec2( sdCylinder(    pos-vec3( 2.0,0.14,-2.0), vec3(0.1,-0.1,0.0), vec3(-0.2,0.35,0.1), 0.08), 31.2 ) );
-        res = opUnion( res, vec2( sdCappedCone(  pos-vec3( 2.0,0.09,-1.0), vec3(0.1,0.0,0.0), vec3(-0.2,0.40,0.1), 0.15, 0.05), 46.1 ) );
-        res = opUnion( res, vec2( sdRoundCone(   pos-vec3( 2.0,0.15, 0.0), vec3(0.1,0.0,0.0), vec3(-0.1,0.35,0.1), 0.15, 0.05), 51.7 ) );
-        res = opUnion( res, vec2( sdRoundCone(   pos-vec3( 2.0,0.20, 1.0), 0.2, 0.1, 0.3 ), 37.0 ) );
+    res = takeCloser(res,
+        texturedSdBox(pos-vec3( -.5,0.25, 0.0), vec3(0.5,0.2,0.5))
+    );
+
+    res = takeCloser(res,
+        texturedSdBox(rotY(0.1 * iTime)*(pos-vec3(1.32,0.4,-0.8)), vec3(0.5,0.4,0.3))
+    );
+    vec3 cylinderPos = (pos-vec3( 1.0,0.35,-2.0));
+    // Eulerwinkel-Drehung am Beispiel des Zylinders:
+    cylinderPos *= rotY(0.0*iTime + 0.25); // dreht um eigene Achse
+    cylinderPos *= rotZ(0.0*iTime + 2.);
+    cylinderPos *= rotY(0.0*iTime);
+    res = takeCloser(res,
+        texturedSdCylinder(cylinderPos, vec2(0.15,0.25))
+    );
+
+    // render the path points for debugging
+    if (USE_AUTOMATED_CAMERA_PATH)
+    for (int p = 0; p < nPath; p++) {
+        res = takeCloser(res,
+            MarchHit(
+                sdSphere(pos - camPosPath[p].xyz, 0.03),
+                MATERIAL_PATH_POINT,
+                vec2(float(p), 0.) // <-- Zweckentfremdung von texCoord für Unterscheidung :)
+            )
+        );
+
     }
 
     return res;
@@ -531,11 +404,11 @@ vec2 iBox( in vec3 ro, in vec3 rd, in vec3 rad )
     min( min( t2.x, t2.y ), t2.z ) );
 }
 
-Marched raycast( in vec3 ro, in vec3 rd )
+MarchHit raycast( in vec3 ro, in vec3 rd )
 {
-    Marched res = Marched(-1.0, -1.0, c.yy);
+    MarchHit res = MarchHit(-1.0, -1.0, c.yy);
 
-    float tmin = 1.0;
+    float tmin = 0.1; // war 1.0 - macht Kamerafahrt kaputt
     float tmax = 20.0;
 
     // raytrace floor plane (Ebene y==0, also Sichtstrahl = Kante eines einfaches Dreiecks)
@@ -543,11 +416,11 @@ Marched raycast( in vec3 ro, in vec3 rd )
     if (tp1>0.0)
     {
         tmax = min( tmax, tp1 );
-        res = Marched(tp1, MATERIAL_FLOOR, c.yy);
+        res = MarchHit(tp1, MATERIAL_FLOOR, c.yy);
     }
 
     // raymarch primitives
-    vec2 boundingBox = iBox( ro-vec3(0.0,0.4,-0.5), rd, vec3(2.5,0.41,3.0) );
+    vec2 boundingBox = iBox( ro-vec3(0.0,1.,-0.5), rd, vec3(2.5,1.,3.0) );
     // <-- bounding box = "alles was uns interessiert, findet hier drin statt"
     //     einfach nur, um unnötige Berechnungen zu ersparen.
     if (boundingBox.x<boundingBox.y && boundingBox.y>0.0 && boundingBox.x<tmax)
@@ -558,7 +431,7 @@ Marched raycast( in vec3 ro, in vec3 rd )
         float t = tmin;
         for (int i=0; i<70 && t<tmax; i++)
         {
-            Marched h = map(ro + rd * t);
+            MarchHit h = map(ro + rd * t);
             if (abs(h.t) < (0.0001 * t))
             {
                 // getroffen = Länge des Strahls entspricht der SDF
@@ -573,9 +446,9 @@ Marched raycast( in vec3 ro, in vec3 rd )
     return res;
 }
 
-Marched raycastJustTheSphere( in vec3 ro, in vec3 rd )
+MarchHit raycastJustTheSphere( in vec3 ro, in vec3 rd )
 {
-    Marched res = Marched(-1.0, -1.0, c.yy);
+    MarchHit res = MarchHit(-1.0, -1.0, c.yy);
 
     float tmin = 1.0;
     float tmax = 20.0;
@@ -585,7 +458,7 @@ Marched raycastJustTheSphere( in vec3 ro, in vec3 rd )
     if( tp1>0.0 )
     {
         tmax = min( tmax, tp1 );
-        res = Marched(tp1, 1.0, c.yy);
+        res = MarchHit(tp1, 1.0, c.yy);
     }
 
     // raymarch primitives
@@ -611,7 +484,7 @@ Marched raycastJustTheSphere( in vec3 ro, in vec3 rd )
             }
             if( abs(minDistance) < (0.0001*t) )
             {
-                res = Marched(t, material, c.yy);
+                res = MarchHit(t, material, c.yy);
                 break;
             }
             t += minDistance;
@@ -681,33 +554,84 @@ vec3 calcNormal( in vec3 pos )
     e.xxx*map( pos + e.xxx ).t );
 }
 
+void applyDistanceFog(inout vec3 col, float distance, vec3 fogColor, float density, float growth) {
+    float opacity = 1.0 - exp( -density * pow(distance, growth));
+    col = mix(col, fogColor, opacity);
+    col = clamp(col, 0.0, 1.0);
+}
+
+vec3 materialPalette(float parameter) {
+    // Das ist wieder eine "Cosinus-Palette" (hier ein sin(), aber selbes Prinzip):
+    return 0.2 + 0.2 * sin(parameter * 2.0 + vec3(0.0,1.0,2.0));
+    // sin(x) = cos(x - 0.5*pi) = cos(x - 1.571)
+    // d.h. um diese Palette in der cos()-Konvention zu sehen, z.B.
+    // https://dev.thi.ng/gradients/
+    // muss die letzte Spalte ("d") jeder Farbe -> vec3(-1.57, -0.57, 0.43)
+}
+
 void render(in vec3 rayOrigin, in vec3 rayDir)
 {
-    Marched res = raycast(rayOrigin, rayDir);
-    // Marched res = raycastJustTheSphere(rayOrigin, rayDir);
+    // Diese Funktion folgt der selben Logik wie letzter Woche,
+    // ich habe ein bisschen refakturiert und neue Effekte eingebaut,
+    // aber prüft mal, ob ihr grundlegende Vorgehen (wieder) erkennen könnt.
 
-    if( res.material < -0.5 ) {
+    MarchHit res = raycast(rayOrigin, rayDir);
+    // MarchHit res = raycastJustTheSphere(rayOrigin, rayDir);
+
+    if (res.t > 10.) {
+        // early return: wir schneiden die Ebene mal früher ab
+        // (um mehr Weltall zu sehen, oder so)
         return;
     }
 
-    vec3 col = fragColor.rgb;
-
-    // material
-    col = 0.2 + 0.2*sin( res.material*2.0 + vec3(0.0,1.0,2.0) );
-    float specularCoeff = 1.0;
-    // bool isFloor = res.material < 1.5;
-    bool isFloor = res.material < MATERIAL_FLOOR + 0.5;
-
-    // this just equals the box, we should not do this by float equality; but it works for now
-    if (res.material == MATERIAL_BOX) {
-        col *= texture(texFrame, res.texCoord).rgb;
+    // Materialkonstanten mit Namen machen mehr Freude.
+    // war: if (res.material < -0.5) { ... }
+    if (res.material <= MISSING_MATERIAL) {
+        return;
     }
 
-    // ray evaluation
+    bool isFloor = res.material < MATERIAL_FLOOR + 0.1;
+
+    vec3 col = materialPalette(res.material);
+    float specularCoeff = 1.0;
+
+    // berechneten Strahl rekonstruieren
     vec3 rayPos = rayOrigin + res.t * rayDir;
+    // und Normalvektoren, für Beleuchtungseffekte der Oberflächen
     vec3 normal = isFloor ? vec3(0.0,1.0,0.0) : calcNormal(rayPos);
 
-    if (isFloor)
+    // Material: Floats auf Gleichheit zu prüfen wirkt gefährlich, geht hier nur,
+    // weil wir exakt wissen, dass wir diesen Wert so gesetzt haben, nicht berechnet.
+    if (res.material == MATERIAL_BOX) {
+        // res.texCoord haben wir uns oben gemerkt, um hier nicht dieselbe Geometrie
+        // nochmal in alle Richtungen fallunterscheiden zu müssen. Möglich wärs aber.
+        col *= texture(texFrame, res.texCoord).rgb;
+    }
+    else if (res.material == MATERIAL_CYLINDER) {
+        col = c.yyy - col * texture(texFrame, res.texCoord).rgb;
+    }
+    else if (res.material == MATERIAL_PYRAMID) {
+        // hier z.B.: Farbverlauf an y-Achse
+        col = materialPalette(13.56 + 1.1 * rayPos.y);
+        specularCoeff = 0.6;
+        // s.o. die Pyramiden-SDF wurde aufgerufen mit:
+        // sdPyramid(pos - pyramidPosAndHeight.xyz, pyramidPosAndHeight.a)
+        // -> kann Mapping "einer Textur" (= eines vec2-Felds) auch erst hier machen.
+        // Dann müssen wir die Geometrie eben neu auswerten. s.o.: Ist ja aber möglich :)
+        vec3 pos = (rayPos - pyramidPosAndHeight.xyz) / pyramidPosAndHeight.a;
+        // Einfach mal die Wände des umschließenden Würfels auswerten:
+        vec3 n = abs(normal);
+        vec2 st = n.x > n.y && n.x > n.z ? pos.zy : pos.xy;
+        float pattern = voronoi(10. * st + iFree3);
+        pattern = smoothstep(0.0, 0.5, pattern);
+        col = mix(col, pattern * col, 1. - pos.y);
+    }
+    else if (res.material == MATERIAL_PATH_POINT) {
+        // einfache Visualisierung von Punkten im Raum (z.B: unserer Kamerapfad, falls aktiv)
+        col = vec3(0., res.texCoord.x * 0.2, 1. - res.texCoord.x * 0.2);
+        specularCoeff = 0.1;
+    }
+    else if (isFloor)
     {
         // war: Schachbrettmuster
         // float f = 1. - abs(step(0.5, fract(1.5*rayPos.x)) - step(0.5, fract(1.5*rayPos.z)));
@@ -718,54 +642,118 @@ void render(in vec3 rayOrigin, in vec3 rayDir)
         // wir projizieren einfach den Strahl auf die y-Ebene (Boden y == 0); skalieren nach Laune
         res.texCoord = rayPos.xz * 0.3;
         col = texture(texRock, res.texCoord).rgb;
-        /*
+        // "Fraktale" Verfeinerung ähnlich "fractal Brownian motion"
         col += (
             0.66 * texture(texRock, 2. * res.texCoord).rgb +
             0.44 * texture(texRock, 4. * res.texCoord).rgb
         );
         col /= 2.1;
-        */
         col = pow(col, vec3(2.8));
         specularCoeff = 0.4;
     }
 
     vec3 shade = vec3(0.0);
+    vec3 lightDirection;
+    vec3 lightPointSource;
+    vec3 lightSourceColor;
 
-    // Licht: reines Richtungslicht (passt zu einer Sonne, die weit weg ist, im Gegensatz zu Punktlicht)
-    {
-        vec3  lightDirection = normalize( vec3(-0.2 + iFree3, 0.4 + iFree4, -0.2 + iFree5) ); // Vorsicht, Vorzeichenkonvention
-        vec3  halfway = normalize(lightDirection - rayDir); // was ist das, geometrisch?
-        float diffuse = clamp( dot(normal, lightDirection), 0.0, 1.0); // dot(normal, lightSource) <-- diffus (warum?)
-        diffuse *= calcSoftshadow(rayPos, lightDirection, 0.02, 2.5); // warum hier *= ...?
-        float specular = pow( clamp( dot( normal, halfway ), 0.0, 1.0), 20.0); // <-- glänzend (warum?)
+    const bool SHOW_POINT_LIGHT_SOURCE = true;
+
+    // FÜr den Vergleich Punktlicht -- Richtungslicht bauen wir beide zusammen ein:
+    for (int light = 0; light < 2; light++) {
+
+        if (light == 0) {
+            // Reines Richtungslicht (wie letztes Mal):
+            lightDirection = normalize(vec3(-0.2, 1.4, -0.4) + vecFree5);
+            // immer noch aufpassen mit dem Vorzeichen: Richtung ZUM Licht
+            lightSourceColor = vec3(1.30, 1.00, 0.70);
+        } else {
+            lightPointSource = vec3(-1., 1.5, -2.6);
+            // Punktlicht: Richtung unterschiedlich / relativ zum Strahl eben.
+            lightDirection = normalize(lightPointSource - rayDir);
+            // lightSourceColor = materialPalette(17.) * 1.5;
+
+            // um die Punktquelle SELBST zu sehen, müssen wir sie aber extra zeichnen
+            if (SHOW_POINT_LIGHT_SOURCE) {
+                // einfache Logik:
+                vec3 rayDirectionIntoTheLight = normalize(lightPointSource - rayOrigin);
+                float overlap = dot(rayDir, rayDirectionIntoTheLight);
+                fragColor += vec4(lightSourceColor, 1.) * exp(-pow(overlap, 2.));
+                // Alternative: only an improvised 2D circle
+                if (overlap > 0.9999) {
+                    fragColor.rgb = lightPointSource;
+                    fragColor.a = 1.;
+                    continue;
+                }
+            }
+        }
+
+        vec3  halfway = normalize(lightDirection - rayDir);// was ist das, geometrisch?
+
+        float diffuse = clamp(dot(normal, lightDirection), 0.0, 1.0);// dot(normal, lightSource) <-- diffus (warum?)
+        diffuse *= calcSoftshadow(rayPos, lightDirection, 0.02, 2.5);// warum hier *= ...?
+
+        float specular = pow(clamp(dot(normal, halfway), 0.0, 1.0), 20.0);// <-- glänzend (warum?)
+
         // float fresnelAttenuation = 0.04 + 0.36*pow(clamp(1.0-dot(halfway,lightDirection), 0.0, 1.0), 5.0);
         // specular *= fresnelAttenuation;
-        const vec3 sourceCol = vec3(1.30,1.00,0.70);
-        shade += col * 2.20 * sourceCol * diffuse;
-        shade +=       3.00 * sourceCol * specular * specularCoeff;
-    }
 
-    if (res.t > 10.) {
-        // just cut the plane early on (to see more background)
-        return;
+        shade += col * 2.20 * lightSourceColor * diffuse;
+        shade +=       3.00 * lightSourceColor * specular * specularCoeff;
     }
 
     col = shade;
 
-    // "Distanznebel", inwiefern macht dieser Begriff Sinn?
-    const vec3 colFog = vec3(0.0, 0.0, 0.0);
-    float fogOpacity = 1.0 - exp( -0.01 * pow(res.t, 3.0));
-    col = mix(col, colFog, fogOpacity);
-    col = clamp(col, 0.0, 1.0);
+    applyDistanceFog(col, res.t, vec3(0.003,0.,0.008), 0.01, 3.0);
 
     fragColor = vec4(col, 1.);
 }
 
+vec3 splineCatmullRom(vec3 p0, vec3 p1, vec3 p2, vec3 p3, float t) {
+    return (((-p0 + p1*3. - p2*3. + p3)*t*t*t + (p0*2. - p1*5. + p2*4. - p3)*t*t + (-p0 + p2)*t + p1*2.)*.5);
+}
+
+vec4 splineCatmullRom(vec4 p0, vec4 p1, vec4 p2, vec4 p3, float t) {
+    return (((-p0 + p1*3. - p2*3. + p3)*t*t*t + (p0*2. - p1*5. + p2*4. - p3)*t*t + (-p0 + p2)*t + p1*2.)*.5);
+}
+
+vec3 getPathPosition(float progress) {
+    progress = mod(progress, float(nPath));
+    // Wir definieren den Pfad so, dass dieselbe Zeit zwischen allen Punkten vergeht.
+    // -> macht die folgende Pfadberechnung einfach(er).
+    int seg = int(progress);
+    float segProgress = progress - floor(progress);
+    int seg_1 = (seg - 1 + nPath) % nPath;
+    int seg1 = (seg + 1 + nPath) % nPath;
+    int seg2 = (seg + 2 + nPath) % nPath;
+    return splineCatmullRom(
+        camPosPath[seg_1], camPosPath[seg], camPosPath[seg1], camPosPath[seg2],
+        segProgress
+    );
+}
+
+vec4 getTargetPathAndRoll(float progress) {
+    // stumpf kopiert von getPathPosition(), aber uns bleibt nicht viel
+    // (man könnte das per #define-Makros abbilden, aber _hübsch_ ist es dann auch nicht,
+    //  und beim kompilieren werden die ja eh wieder ersetzt, d.h. keine Vorteile da).
+    progress = mod(progress, float(nPath));
+    int seg = int(progress);
+    float segProgress = progress - floor(progress);
+    int seg_1 = (seg - 1 + nPath) % nPath;
+    int seg1 = (seg + 1 + nPath) % nPath;
+    int seg2 = (seg + 2 + nPath) % nPath;
+    return splineCatmullRom(
+        targetPath[seg_1], targetPath[seg], targetPath[seg1], targetPath[seg2],
+        segProgress
+    );
+}
+
 mat3 setCamera( in vec3 origin, in vec3 target, float rollAngle )
 {
+    // transforms from "world coordinates" to "camera / view coordinates"
     vec3 cameraForward = normalize(target - origin);
-    vec3 cp = vec3(sin(rollAngle), cos(rollAngle), 0.0);
-    vec3 cameraRight = normalize( cross(cameraForward, cp) );
+    vec3 rolledWorldUp = vec3(sin(rollAngle), cos(rollAngle), 0.0);
+    vec3 cameraRight = normalize( cross(cameraForward, rolledWorldUp) );
     vec3 cameraUp = cross(cameraRight, cameraForward); // already normalized
     return mat3(cameraRight, cameraUp, cameraForward);
 }
@@ -773,27 +761,44 @@ mat3 setCamera( in vec3 origin, in vec3 target, float rollAngle )
 void main()
 {
     vec2 uv = (2.0 * gl_FragCoord.xy - iResolution.xy) / iResolution.y;
-    vec2 mo = iMouse.zw / iResolution.y;
-    float rot = mo.x == 0. ? 0.02 * iTime : mo.x;
 
     fragColor = c.yyyy; // transparent
 
-    vec3 rayOrigin = iCamOrigin;
-    vec3 cameraTarget = iCamOrigin + iCamLook;
+    // Fixed Cam Origin:
+    vec3 camOrigin = vec3(-0.75, 1.5, 3.);
+    // mit fester Blick_richtung_ (im Gegensatz zu festem Blick-Zielpunkt)
+    // (je nachdem eben, ob relativ zu Kameraposition oder unabhängig)
+    vec3 camTarget = camOrigin + vec3(0.27, -0.34, -0.84) + vecFree2;
+    float camRoll = iCamRoll;
 
-    /*
-    // camera
-    vec3 rayOrigin = iCamOrigin;
-    // vec3 cameraTarget = iCamOrigin + normalize(iCamLook);
-    vec3 rayOrigin = cameraTarget + vec3( 4.5 * cos(twoPi * rot), 1.2, 4.5 * sin(-twoPi * rot));
-    */
+    // Demonstration: Automatisierten Pfad ablaufen (per Spline-Interpolation)
+    vec3 pathPos;
+    if (USE_AUTOMATED_CAMERA_PATH) {
+        pathPos = getPathPosition(iPathOffset + iPathSpeed * iTime);
+        camOrigin = pathPos.xyz;
+        if (USE_AUTOMATED_CAMERA_TARGET_PATH) {
+            // dann Blickpunkt mit weiterem Pfad angeben...
+            // (+ hier noch im sonst ungenutzten .w den Rollwinkel animiert)
+            vec4 pathTarget = getTargetPathAndRoll(iPathOffset + iPathSpeed * iTime);
+            camTarget = pathTarget.xyz;
+            camRoll = pathTarget.w;
+        } else {
+            // ... oder halt die Kamera auf auf etwas weiter vorne im Pfad richten:
+            pathPos = getPathPosition(iPathOffset + iPathSpeed * iTime + 0.1 + iFree0);
+            camTarget = pathPos.xyz;
+        }
+    }
+    // iCamOffset, iCamLookOffset: frei variabel, um Effekte zu testen / debuggen
+    camOrigin += iCamOffset;
+    camTarget += iCamLookOffset;
+
     // camera-to-world transformation
-    mat3 ca = setCamera(rayOrigin, cameraTarget, iCamRoll);
+    mat3 camMatrix = setCamera(camOrigin, camTarget, camRoll);
     // ray direction via screen coordinate and "screen distance" ~ focal length ("field of view")
-    vec3 rayDirection = ca * normalize(vec3(uv, iCamFocalLength));
+    vec3 rayDirection = camMatrix * normalize(vec3(uv, iCamFocalLength));
 
     // render
-    render(rayOrigin, rayDirection);
+    render(camOrigin, rayDirection);
 
     // gain ("HDR compression", Konstanten so gewählt dass [0,1] erhalten bleibt)
     // col = col * 2.5/(1.5 + col);
@@ -809,7 +814,7 @@ void main()
 
     vec2 st = gl_FragCoord.xy / iResolution.y;
     st -= 0.5 * vec2(iResolution.x/iResolution.y, 1.);
-    st *= 0.8 * rot2D(0.1 * iTime);
+    // st *= 0.8 * rot2D(0.1 * iTime);
     vec4 space = texture(texSpace, st);
     space.rgb = pow(space.rgb, vec3(1.5));
     fragColor.rgb = mix(space.rgb, fragColor.rgb, fragColor.a);
