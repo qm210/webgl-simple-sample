@@ -18,7 +18,20 @@ uniform float iCamRoll;
 uniform float iCamFocalLength;
 uniform float iPathSpeed;
 uniform float iPathOffset;
-
+uniform vec3 vecDirectionalLight;
+uniform float iLightSourceMix;
+uniform float iLightPointPaletteColor;
+uniform float iDiffuseAmount;
+uniform float iSpecularAmount;
+uniform float iSpecularExponent;
+uniform float iBacklightAmount;
+uniform float iSubsurfaceAmount;
+uniform float iAmbientOcclusionScale;
+uniform float iAmbientOcclusionStep;
+uniform float iAmbientOcclusionSamples;
+uniform float iToneMapExposure;
+uniform float iToneCompressedGain;
+uniform float iGammaExponent;
 // and for you to play around with:
 uniform float iFree0;
 uniform float iFree1;
@@ -29,9 +42,6 @@ uniform float iFree5;
 uniform vec3 vecFree0;
 uniform vec3 vecFree1;
 uniform vec3 vecFree2;
-uniform vec3 vecFree3;
-uniform vec3 vecFree4;
-uniform vec3 vecFree5;
 
 const float pi = 3.141593;
 const float twoPi = 2. * pi;
@@ -49,15 +59,15 @@ const float MATERIAL_PATH_POINT = 1.4;
 const bool DRAW_GRID_ON_FLOOR = true;
 const bool SHOW_POINT_LIGHT_SOURCE = true;
 const bool USE_AUTOMATED_CAMERA_PATH = false;
-const bool USE_AUTOMATED_CAMERA_TARGET_PATH = false;
+const bool USE_AUTOMATED_CAMERA_TARGET_PATH = false; // try it :)
 /////////////////////////
 
 const int nPath = 6;
 vec3 camPosPath[nPath] = vec3[6](
     vec3(-0.75, 1.5, 3.),
     vec3(0.4, 0.35, 1.25),
-    vec3(-0.3, 0.65, -3.3),
-    vec3(-2.1,0.73, -1.3),
+    vec3(-0.3, 0.7, -3.3),
+    vec3(-2.3,0.73, -1.3),
     vec3(1.5, 0.4, -3.0),
     vec3(0.1, 0.8, 0.1)
 );
@@ -65,7 +75,7 @@ vec3 camPosPath[nPath] = vec3[6](
 vec4 targetPath[nPath] = vec4[6](
     vec4(-0.3, 0.35, 1.05, 0.),
     vec4(-0.3, 0.65, -3.3, -.2),
-    vec4(-2.,0.73, -1.3, 1.6),
+    vec4(-2.,0.73, -1.3, 2.),
     vec4(0.6, 0.5, -0.8, 3.1),
     vec4(0.1, 0.0, 0.1, 0.),
     vec4(-0.75, 1.5, 3., -1.)
@@ -155,6 +165,16 @@ float bounceParabola(float h, float g, float T, float t) {
     return t;
 }
 
+void applyToneMapping(inout vec3 col, float exposure, float mixReinhard) {
+    vec3 exposureTone = c.xxx - exp(-col * exposure);
+    vec3 reinhardMapping = col / (col + c.xxx);
+    col = mix(exposureTone, reinhardMapping, mixReinhard);
+}
+
+void applyGammaCorrection(inout vec3 col) {
+    // const float gamma = 2.2;
+    col = pow(col, vec3(1./iGammaExponent));
+}
 
 float sdPlane( vec3 p )
 {
@@ -235,9 +255,13 @@ MarchHit texturedSdSphere(vec3 p, float s)
     return MarchHit(d, 0., surfaceCoord);
 }
 
-MarchHit texturedSdBox( vec3 p, vec3 b) {
+MarchHit texturedSdBox( vec3 p, vec3 b, float rounding) {
     vec3 q = abs(p) - b;
+    b.x -= rounding;
+    b.y -= rounding;
+    b.z -= rounding;
     float d = length(max(q,0.0)) + min(max(q.x,max(q.y,q.z)),0.0);
+    d -= 2. * rounding;
 
     // Koordinatentransformation:
     // Um Textur zuzuordnen, müssen wir uns nochmal "in den Würfel hineinversetzen."
@@ -278,7 +302,6 @@ MarchHit texturedSdBox( vec3 p, vec3 b) {
 float sdCylinder( vec3 p, vec2 h )
 {
     // vertical ~ along y-axis
-    h.y *= 1. + iFree2;
     vec2 d = abs(vec2(length(p.xz),p.y)) - h;
     return min(max(d.x,d.y),0.0) + length(max(d,0.0));
 }
@@ -365,11 +388,11 @@ MarchHit map( in vec3 pos )
     // um später die Textur abbilden zu können. Wir bleiben da mal beim Quader...
 
     res = takeCloser(res,
-        texturedSdBox(pos-vec3( -.5,0.25, 0.0), vec3(0.5,0.2,0.5))
+        texturedSdBox(pos-vec3( -.5,0.2, 0.0), vec3(0.5,0.2,0.5), 0.02)
     );
 
     res = takeCloser(res,
-        texturedSdBox(rotY(0.1 * iTime)*(pos-vec3(1.32,0.4,-0.8)), vec3(0.5,0.4,0.3))
+        texturedSdBox(rotY(0.1 * iTime)*(pos-vec3(1.32,0.4,-0.8)), vec3(0.5,0.4,0.3), 0.0)
     );
     vec3 cylinderPos = (pos-vec3( 1.0,0.35,-2.0));
     // Eulerwinkel-Drehung am Beispiel des Zylinders:
@@ -429,8 +452,8 @@ MarchHit raycast( in vec3 ro, in vec3 rd )
     vec2 boundingBox = iBox( ro-vec3(0.0,1.,-0.5), rd, vec3(2.5,1.,3.0) );
     // <-- bounding box = "alles was uns interessiert, findet hier drin statt"
     //     einfach nur, um unnötige Berechnungen zu ersparen.
-    //     Ruhig mal ausschalten und vergleichen, ob überhaupt nötig.
-    // if (boundingBox.x<boundingBox.y && boundingBox.y>0.0 && boundingBox.x<tmax)
+    //     Ruhig mal ausschalten und vergleichen (FPS und Optik), ob überhaupt nötig.
+    if (boundingBox.x<boundingBox.y && boundingBox.y>0.0 && boundingBox.x<tmax)
     {
         tmin = max(boundingBox.x,tmin);
         tmax = min(boundingBox.y,tmax);
@@ -488,20 +511,26 @@ float calcSoftshadow( in vec3 ro, in vec3 rd, in float mint, in float tmax )
 }
 
 // https://iquilezles.org/articles/nvscene2008/rwwtt.pdf
-float calcAO( in vec3 pos, in vec3 nor )
+float calcAmbientOcclusion(in vec3 pos, in vec3 normal)
 {
-    // "Ambient Occlusion", interesting effect for lighting if we have time :)
-    float occ = 0.0;
-    float sca = 1.0;
-    for( int i=0; i<5; i++ )
+    float occlusion = 0.0;
+    float scale = 1.0;
+    // Idee: wir werten die gesamte Map in verschiedenen Abständen von der Oberfläche aus
+    //       (vom Auftrittspunkt also Richtung Normalenvektor) und summieren auf:
+    //       (h - d) ~ Wenn d entlang dieser Linie zu klein bleibt, haben wir "Verdeckung", d.h.
+    //                 schätzen Schatten / Hohlräume ab, ohne die Rays zum Licht _tracen_ zu müssen
+    for (float i=0.; i < iAmbientOcclusionSamples; i += 1.)
     {
-        float h = 0.01 + 0.12*float(i)/4.0;
-        float d = map( pos + h*nor ).t;
-        occ += (h-d)*sca;
-        sca *= 0.95;
-        if( occ>0.35 ) break;
+        // iAmbientOcclusionSamples ~ 5
+        // iAmbientOcclusionStep ~ 0.12
+        float h = 0.01 + iAmbientOcclusionStep * i / (iAmbientOcclusionSamples - 1.);
+        float d = map(pos + h*normal).t;
+        occlusion += (h-d) * scale;
+        // iAmbientOcclusionScale ~ 0.95;
+        scale *= iAmbientOcclusionScale;
+        if( occlusion>0.35 ) break;
     }
-    return clamp( 1.0 - 3.0*occ, 0.0, 1.0 ) * (0.5+0.5*nor.y);
+    return clamp( 1.0 - 3.0*occlusion, 0.0, 1.0 ) * (0.5+0.5*normal.y);
 }
 
 // https://iquilezles.org/articles/normalsSDF
@@ -529,7 +558,7 @@ vec3 materialPalette(float parameter) {
     // muss die letzte Spalte ("d") jeder Farbe -> vec3(-1.57, -0.57, 0.43)
 }
 
-void render(out vec3 col, in vec3 rayOrigin, in vec3 rayDir)
+void render(in vec3 rayOrigin, in vec3 rayDir)
 {
     // Diese Funktion folgt der selben Logik wie letzter Woche,
     // ich habe ein bisschen refakturiert und neue Effekte eingebaut,
@@ -537,31 +566,27 @@ void render(out vec3 col, in vec3 rayOrigin, in vec3 rayDir)
 
     MarchHit res = raycast(rayOrigin, rayDir);
 
-    if (res.t > 15.) {
-        // early return: wir schneiden die Ebene mal früher ab
-        // (um mehr Weltall zu sehen, oder so)
-        return;
-    }
-
     // Materialkonstanten mit Namen machen mehr Freude.
     // war: if (res.material < -0.5) { ... }
     if (res.material <= MISSING_MATERIAL) {
         return;
     }
 
-    // Material: Floats auf Gleichheit zu prüfen wirkt gefährlich, geht hier nur,
-    // weil wir exakt wissen, dass wir diesen Wert so gesetzt haben, nicht berechnet.
-    bool isFloor = res.material == MATERIAL_FLOOR;
+    bool isFloor = res.material <= MATERIAL_FLOOR;
 
-    col = materialPalette(res.material);
+    vec3 col = materialPalette(res.material);
 
     float specularCoeff = 1.0;
+
+    float subSurfaceCoefficient = 1.0;
 
     // berechneten Strahl rekonstruieren
     vec3 rayPos = rayOrigin + res.t * rayDir;
     // und Normalvektoren, für Beleuchtungseffekte der Oberflächen
     vec3 normal = isFloor ? vec3(0.0,1.0,0.0) : calcNormal(rayPos);
 
+    // Material-Floats auf Gleichheit zu prüfen wirkt gefährlich/fahrlässig, geht hier zwar,
+    // aber nur, weil wir exakt wissen, dass wir diesen Wert so gesetzt haben. nicht berechnet.
     if (res.material == MATERIAL_BOX) {
         // res.texCoord haben wir uns oben gemerkt, um hier nicht dieselbe Geometrie
         // nochmal in alle Richtungen fallunterscheiden zu müssen. Möglich wärs aber.
@@ -582,7 +607,8 @@ void render(out vec3 col, in vec3 rayOrigin, in vec3 rayDir)
         // Einfach mal die Wände des umschließenden Würfels auswerten:
         vec3 n = abs(normal);
         vec2 st = n.x > n.y && n.x > n.z ? pos.zy : pos.xy;
-        float pattern = voronoi(10. * st + iFree3);
+        st = 10. * st; /* try something like + iFree3 */
+        float pattern = voronoi(st);
         pattern = smoothstep(0.0, 0.5, pattern);
         col = mix(col, pattern * col, 1. - pos.y);
     }
@@ -621,7 +647,6 @@ void render(out vec3 col, in vec3 rayOrigin, in vec3 rayDir)
 
     vec3 shade = vec3(0.0);
     vec3 lightDirection;
-    vec3 lightPointSource;
     vec3 lightSourceColor;
 
     // Wir hatten letzte Woche mal eine einzelne (Richtungs)-Lichtquelle, und da die
@@ -631,54 +656,92 @@ void render(out vec3 col, in vec3 rayOrigin, in vec3 rayDir)
     // 0 = hier kommt absolut kein Licht hin
     // mit mehreren Lichtquellen kann man das ähnlich machen, muss aber fallbezogen
     // entscheiden, wie man die gegeneinander gewichtet.
-    // Probiert hier einfach mal an den Konstanten rum.
+    // Wir addieren erstmal einfach.
+    // --> Probiert hier einfach mal an allen Konstanten rum.
     //
     // FÜr den Vergleich Richtungslicht vs. Punktlicht bauen wir einfach mal beide zusammen ein:
     for (int light = 0; light < 2; light++) {
 
         if (light == 0) {
-            // Reines Richtungslicht (wie letztes Mal):
-            lightDirection = normalize(vec3(-0.2, 1.4, -0.4) + vecFree5);
-            // immer noch aufpassen mit dem Vorzeichen: Richtung ZUM Licht
+            // Reines Richtungslicht (ähnlich letztes Mal, nur jetzt als uniform für Flexibilität):
+            // aber immer noch aufpassen mit dem Vorzeichen: Richtung ZUM Licht!
+            lightDirection = normalize(vecDirectionalLight);
             lightSourceColor = vec3(1.30, 1.00, 0.70);
-        } else {
-            // lightPointSource = vec3(-1., 1.5, -2.6);
-            lightPointSource = vec3(-.5, 1. + 0.5 * sin(iTime), -2.6);
-            // Punktlicht: Richtung unterschiedlich / relativ zum Strahl eben.
+            // iLightSourceMix ist wie ein mix() zwischen den beiden Quellen gedacht.
+            lightSourceColor *= max(0., 1. - iLightSourceMix);
+        }
+        else {
+            // lightPointSource = vec3(-1., 1.1, -2.6);
+            vec3 lightPointSource = vec3(-.8 * cos(0.56 * iTime), 1.1 + 0.1 * cos(0.4 * iTime + 0.2), -1.5 -sin(0.8 * iTime) );
+            // Punktlicht: Richtung unterschiedlich je nach Strahl, es geht um die Differenz:
             lightDirection = normalize(lightPointSource - rayDir);
-            // lightSourceColor = materialPalette(17.) * 1.5;
+            lightSourceColor = mix(c.xxx, materialPalette(14.5 + iLightPointPaletteColor), 0.7);
+            // iLightSourceMix ist wie ein mix() zwischen den beiden Quellen gedacht. (s.o.)
+            lightSourceColor *= max(0., iLightSourceMix);
 
             // um die Punktquelle SELBST zu sehen, müssen wir sie aber extra zeichnen
             if (SHOW_POINT_LIGHT_SOURCE) {
-                // einfache Logik:
+                // einfache Logik: wenn unsere Blickrichtung direkt überlappt, färben wir fragColor ein.
+                // -> ergibt dann einen improvisierten Kreis. Reicht.
                 vec3 rayDirectionIntoTheLight = normalize(lightPointSource - rayOrigin);
                 float overlap = dot(rayDir, rayDirectionIntoTheLight);
-                col += lightSourceColor * exp(-pow(0.2*overlap, 2.));
-                // Alternative: only an improvised 2D circle
-                if (overlap > 0.9999) {
-                    col = lightSourceColor;
+                if (overlap > 0.99999) {
+                    fragColor = vec4(lightSourceColor, 1.);
                     return;
                 }
             }
         }
 
-        vec3  halfway = normalize(lightDirection - rayDir);// was ist das, geometrisch?
+        vec3  halfway = normalize(lightDirection - rayDir);
+        float diffuse, specular;
 
-        float diffuse = clamp(dot(normal, lightDirection), 0.0, 1.0);// dot(normal, lightSource) <-- diffus (warum?)
-        diffuse *= calcSoftshadow(rayPos, lightDirection, 0.02, 2.5);// warum hier *= ...?
+        // diffuse: ~ dot(normal, lightDirection)
+        diffuse = clamp(dot(normal, lightDirection), 0.0, 1.0);
+        diffuse *= 2.2 * calcSoftshadow(rayPos, lightDirection, 0.02, 2.5);
+        shade += col * iDiffuseAmount * lightSourceColor * diffuse;
 
-        float specular = pow(clamp(dot(normal, halfway), 0.0, 1.0), 20.0);// <-- glänzend (warum?)
+        // specular: ~ muss irgendwie Strahlrichtung mit ein-skalarprodukt-en
+        //             Gewichtung, Verlauf (pow()), Farbe etc. wählt man nach Eigenempfinden ;)
+        specular = pow(clamp(dot(normal, halfway), 0.0, 1.0), iSpecularExponent);
 
+        // Beispiel eines abschwächenden Effekt (der eine physikalische Approximation ist)
         // float fresnelAttenuation = 0.04 + 0.36*pow(clamp(1.0-dot(halfway,lightDirection), 0.0, 1.0), 5.0);
         // specular *= fresnelAttenuation;
+        specular *= 3.00 * specularCoeff;
+        shade += specular * lightSourceColor * iSpecularAmount;
 
-        shade += col * 2.20 * lightSourceColor * diffuse;
-        shade +=       3.00 * lightSourceColor * specular * specularCoeff;
+        // Heute neu -- Weitere Terme, die sich "Ambient Occlusion" bedienen:
+        float occ = calcAmbientOcclusion(rayPos, normal);
+
+        // "Backlight / Ambient Illumination", Idee ist dass in eher verdeckten Bereichen
+        // zusätzliche Beiträge durch irgendwelche Spiegelungen am Boden (für unseren festen Fall y == 0)
+        // die Schatten leicht aufweichen
+        vec3 lightFloorReflection = normalize(vec3(-lightDirection.x, 0., -lightDirection.z));
+        float backlightIllumination = occ
+            * clamp(dot(normal, lightFloorReflection), 0.0, 1.0)
+            * clamp(1.0 - rayPos.y, 0.0, 1.0);
+        shade += col * iBacklightAmount * backlightIllumination * vec3(0.25, 0.25, 0.25);
+
+        // "Sub-Surface Scattering"-Nachahmung nach, i.e. Lichtstrahlen, die das Material nach etwas
+        // Verweilzeit  wieder verlassen (man stelle sich seine Finger hinter einer Taschenlampe vor)
+        // Das ist physikalisch ein Diffusionseffekt und sieht generell weich aus, oder wachs-artig.
+        // Das hängt am Ambient-Occlusion-Faktor aufgrund der Annahme, dass die Lichtstrahlen, die
+        // in diesen Ecken bzw. Materialien etc. "verdeckt" werden, ja irgendwo hin müssen.
+        // Hat dann einen specular-artigen Beitrag wie dot(normal, rayDir), weil das Licht das Material
+        // am ehesten senkrecht verlässt und dann also entlang der Blickrichtung liegen muss.
+        float subsurfaceScattering = occ * pow(clamp(1.0+dot(normal, rayDir), 0.0, 1.0), 2.0);
+        shade += col * iSubsurfaceAmount * subsurfaceScattering * c.xxx;
     }
 
-    col = shade;
+    if (res.t > 15.) {
+        // wir schneiden die Ebene mal ab (um mehr Weltall zu sehen)
+        return;
+    }
 
+    applyToneMapping(shade, iToneMapExposure, iToneCompressedGain);
+    col = shade;
     applyDistanceFog(col, res.t, vec3(0.003,0.,0.008), 0.01, 3.0);
+    fragColor = vec4(col, 1.);
 }
 
 vec3 splineCatmullRom(vec3 p0, vec3 p1, vec3 p2, vec3 p3, float t) {
@@ -730,27 +793,28 @@ mat3 setCamera( in vec3 origin, in vec3 target, float rollAngle )
     return mat3(cameraRight, cameraUp, cameraForward);
 }
 
-void background() {
+vec3 background() {
     vec2 st = gl_FragCoord.xy / iResolution.y;
     st -= 0.5 * vec2(iResolution.x/iResolution.y, 1.);
     // st *= 0.8 * rot2D(0.1 * iTime);
     vec4 space = texture(texSpace, st);
-    space.rgb = pow(space.rgb, vec3(1.5));
-    fragColor.rgb = mix(space.rgb, fragColor.rgb, fragColor.a);
-    fragColor.a = 1.;
+    // minimale Verarbeitung reicht uns mal (Gammakorrektur)
+    return pow(space.rgb, vec3(1.5));
 }
 
 void main()
 {
     vec2 uv = (2.0 * gl_FragCoord.xy - iResolution.xy) / iResolution.y;
 
-    background();
+    // Wir machen das hier mal so herum: fragColor = absolut transparent
+    // und dann siehe (==>) unten
+    fragColor = c.yyyy;
 
     // Fixed Cam Origin:
     vec3 camOrigin = vec3(-0.75, 1.5, 3.);
     // mit fester Blick_richtung_ (im Gegensatz zu festem Blick-Zielpunkt)
     // (je nachdem eben, ob relativ zu Kameraposition oder unabhängig)
-    vec3 camTarget = camOrigin + vec3(0.27, -0.32, -0.84) + vecFree2;
+    vec3 camTarget = camOrigin + vec3(0.27, -0.32, -0.84);
     float camRoll = iCamRoll;
 
     // Demonstration: Automatisierten Pfad ablaufen (per Spline-Interpolation)
@@ -766,31 +830,25 @@ void main()
             camRoll = pathTarget.w;
         } else {
             // ... oder halt die Kamera auf auf etwas weiter vorne im Pfad richten:
-            pathPos = getPathPosition(iPathOffset + iPathSpeed * iTime + 0.1 + iFree0);
+            pathPos = getPathPosition(iPathOffset + iPathSpeed * iTime + 0.5);
             camTarget = pathPos.xyz;
         }
     }
     // iCamOffset, iCamLookOffset: frei variabel, um Effekte zu testen / debuggen
     camOrigin += iCamOffset;
-    camTarget += iCamLookOffset;
+    camTarget += iCamOffset + iCamLookOffset;
 
     // camera-to-world transformation
     mat3 camMatrix = setCamera(camOrigin, camTarget, camRoll);
     // ray direction via screen coordinate and "screen distance" ~ focal length ("field of view")
     vec3 rayDirection = camMatrix * normalize(vec3(uv, iCamFocalLength));
 
-    // render
-    vec3 col;
-    render(col, camOrigin, rayDirection);
+    render(camOrigin, rayDirection);
 
-    // gain ("HDR compression", Konstanten so gewählt dass [0,1] erhalten bleibt)
-    // col = col * 2.5/(1.5 + col);
-    // col = col * 3.0/(2.5 + col)
-    // <-- quasi Alternativen zur pow()-Gammakorrektur, man wähle was einem gefällt. Siehe auch:
-    // https://graphtoy.com/?f1(x,t)=pow(x,1./2.2)&v1=true&f2(x,t)=x*3./(2.5+x)&v2=true&f3(x,t)=x*2.5/(1.5+x)&v3=true&f4(x,t)=&v4=false&f5(x,t)=&v5=false&f6(x,t)=&v6=false&grid=1&coords=0.744623141762885,0.5386673261892163,1.2183071759372475
-    // gamma
-    const float gamma = 2.2;
-    col = pow(col, vec3(1./gamma));
+    applyGammaCorrection(fragColor.rgb);
 
-    fragColor = vec4(col, 1.);
+    // (==>) jetzt haben wir fragColor als "unabhängige Ebene" behandelt und können
+    //       den Hintergrund da druntermischen, wo der Ray Marcher noch nicht fragColor.a abdeckt
+    fragColor.rgb = mix(background(), fragColor.rgb, fragColor.a);
+    fragColor.a = 1.;
 }

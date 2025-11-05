@@ -42,6 +42,20 @@ export default {
         state.location.iCamFocalLength = gl.getUniformLocation(state.program, "iCamFocalLength");
         state.location.iPathSpeed = gl.getUniformLocation(state.program, "iPathSpeed");
         state.location.iPathOffset = gl.getUniformLocation(state.program, "iPathOffset");
+        state.location.vecDirectionalLight = gl.getUniformLocation(state.program, "vecDirectionalLight");
+        state.location.iLightPointPaletteColor = gl.getUniformLocation(state.program, "iLightPointPaletteColor");
+        state.location.iLightSourceMix = gl.getUniformLocation(state.program, "iLightSourceMix");
+        state.location.iDiffuseAmount = gl.getUniformLocation(state.program, "iDiffuseAmount");
+        state.location.iSpecularAmount = gl.getUniformLocation(state.program, "iSpecularAmount");
+        state.location.iSpecularExponent = gl.getUniformLocation(state.program, "iSpecularExponent");
+        state.location.iBacklightAmount = gl.getUniformLocation(state.program, "iBacklightAmount");
+        state.location.iSubsurfaceAmount = gl.getUniformLocation(state.program, "iSubsurfaceAmount");
+        state.location.iAmbientOcclusionScale = gl.getUniformLocation(state.program, "iAmbientOcclusionScale");
+        state.location.iAmbientOcclusionStep = gl.getUniformLocation(state.program, "iAmbientOcclusionStep");
+        state.location.iAmbientOcclusionSamples = gl.getUniformLocation(state.program, "iAmbientOcclusionSamples");
+        state.location.iToneMapExposure = gl.getUniformLocation(state.program, "iToneMapExposure");
+        state.location.iToneCompressedGain = gl.getUniformLocation(state.program, "iToneCompressedGain");
+        state.location.iGammaExponent = gl.getUniformLocation(state.program, "iGammaExponent");
         state.location.iFree0 = gl.getUniformLocation(state.program, "iFree0");
         state.location.iFree1 = gl.getUniformLocation(state.program, "iFree1");
         state.location.iFree2 = gl.getUniformLocation(state.program, "iFree2");
@@ -51,9 +65,6 @@ export default {
         state.location.vecFree0 = gl.getUniformLocation(state.program, "vecFree0");
         state.location.vecFree1 = gl.getUniformLocation(state.program, "vecFree1");
         state.location.vecFree2 = gl.getUniformLocation(state.program, "vecFree2");
-        state.location.vecFree3 = gl.getUniformLocation(state.program, "vecFree3");
-        state.location.vecFree4 = gl.getUniformLocation(state.program, "vecFree4");
-        state.location.vecFree5 = gl.getUniformLocation(state.program, "vecFree5");
 
         gl.useProgram(state.program);
 
@@ -80,8 +91,22 @@ function render(gl, state) {
     gl.uniform3fv(state.location.iCamLookOffset, state.iCamLookOffset);
     gl.uniform1f(state.location.iCamRoll, state.iCamRoll);
     gl.uniform1f(state.location.iCamFocalLength, state.iCamFocalLength);
+    gl.uniform3fv(state.location.vecDirectionalLight, state.vecDirectionalLight);
+    gl.uniform1f(state.location.iLightSourceMix, state.iLightSourceMix);
+    gl.uniform1f(state.location.iLightPointPaletteColor, state.iLightPointPaletteColor);
     gl.uniform1f(state.location.iPathSpeed, state.iPathSpeed);
     gl.uniform1f(state.location.iPathOffset, state.iPathOffset);
+    gl.uniform1f(state.location.iDiffuseAmount, state.iDiffuseAmount);
+    gl.uniform1f(state.location.iSpecularAmount, state.iSpecularAmount);
+    gl.uniform1f(state.location.iSpecularExponent, state.iSpecularExponent);
+    gl.uniform1f(state.location.iBacklightAmount, state.iBacklightAmount);
+    gl.uniform1f(state.location.iSubsurfaceAmount, state.iSubsurfaceAmount);
+    gl.uniform1f(state.location.iAmbientOcclusionScale, state.iAmbientOcclusionScale);
+    gl.uniform1f(state.location.iAmbientOcclusionStep, state.iAmbientOcclusionStep);
+    gl.uniform1f(state.location.iAmbientOcclusionSamples, state.iAmbientOcclusionSamples);
+    gl.uniform1f(state.location.iToneMapExposure, state.iToneMapExposure);
+    gl.uniform1f(state.location.iToneCompressedGain, state.iToneCompressedGain);
+    gl.uniform1f(state.location.iGammaExponent, state.iGammaExponent);
 
     gl.uniform1f(state.location.iFree0, state.iFree0);
     gl.uniform1f(state.location.iFree1, state.iFree1);
@@ -92,9 +117,6 @@ function render(gl, state) {
     gl.uniform3fv(state.location.vecFree0, state.vecFree0);
     gl.uniform3fv(state.location.vecFree1, state.vecFree1);
     gl.uniform3fv(state.location.vecFree2, state.vecFree2);
-    gl.uniform3fv(state.location.vecFree3, state.vecFree3);
-    gl.uniform3fv(state.location.vecFree4, state.vecFree4);
-    gl.uniform3fv(state.location.vecFree5, state.vecFree5);
 
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, state.textureFrame);
@@ -135,6 +157,12 @@ function defineUniformControlsBelow() {
         min: 0.001,
         max: 20,
     }, {
+        type: "vec3Input",
+        name: "vecDirectionalLight",
+        defaultValue: [-0.2, 1.4, -0.4],
+        min: -2,
+        max: 2,
+    }, {
         type: "floatInput",
         name: "iPathSpeed",
         defaultValue: 0,
@@ -146,6 +174,85 @@ function defineUniformControlsBelow() {
         defaultValue: 0,
         min: 0.,
         max: 12.,
+    }, {
+        type: "floatInput",
+        name: "iLightSourceMix",
+        defaultValue: 0,
+        min: -2,
+        max: 3,
+    }, {
+        type: "floatInput",
+        name: "iLightPointPaletteColor",
+        defaultValue: 0,
+        min: 0.,
+        max: 10.,
+    }, {
+        type: "floatInput",
+        name: "iDiffuseAmount",
+        defaultValue: 1,
+        min: 0.,
+        max: 10.,
+    }, {
+        type: "floatInput",
+        name: "iSpecularAmount",
+        defaultValue: 1,
+        min: 0.,
+        max: 10.,
+    }, {
+        type: "floatInput",
+        name: "iSpecularExponent",
+        defaultValue: 21,
+        min: -10.,
+        max: 100.,
+    }, {
+        type: "floatInput",
+        name: "iBacklightAmount",
+        defaultValue: 0.55,
+        min: 0.,
+        max: 10.,
+    }, {
+        type: "floatInput",
+        name: "iSubsurfaceAmount",
+        defaultValue: 0.25,
+        min: 0.,
+        max: 10.,
+    }, {
+        type: "floatInput",
+        name: "iAmbientOcclusionSamples",
+        defaultValue: 5,
+        min: 0.,
+        max: 100.,
+        step: 1.
+    }, {
+        type: "floatInput",
+        name: "iAmbientOcclusionStep",
+        defaultValue: 0.12,
+        min: 0.,
+        max: 2.,
+    }, {
+        type: "floatInput",
+        name: "iAmbientOcclusionScale",
+        defaultValue: 0.95,
+        min: 0.,
+        max: 1.,
+    }, {
+        type: "floatInput",
+        name: "iToneMapExposure",
+        defaultValue: 1,
+        min: 0.,
+        max: 10.,
+    }, {
+        type: "floatInput",
+        name: "iToneCompressedGain",
+        defaultValue: -1,
+        min: 0.,
+        max: 2.,
+    }, {
+        type: "floatInput",
+        name: "iGammaExponent",
+        defaultValue: 2.2,
+        min: 0.,
+        max: 10.,
     }, {
         type: "floatInput",
         name: "iFree0",
@@ -197,24 +304,6 @@ function defineUniformControlsBelow() {
     }, {
         type: "vec3Input",
         name: "vecFree2",
-        defaultValue: [0, 0, 0],
-        min: -9.99,
-        max: +9.99,
-    }, {
-        type: "vec3Input",
-        name: "vecFree3",
-        defaultValue: [0, 0, 0],
-        min: -9.99,
-        max: +9.99,
-    }, {
-        type: "vec3Input",
-        name: "vecFree4",
-        defaultValue: [0, 0, 0],
-        min: -9.99,
-        max: +9.99,
-    }, {
-        type: "vec3Input",
-        name: "vecFree5",
         defaultValue: [0, 0, 0],
         min: -9.99,
         max: +9.99,
