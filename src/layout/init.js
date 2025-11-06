@@ -17,11 +17,8 @@ export default function initLayout(rootId) {
       </div>
     `;
 
-    const shaders = document.getElementById("shaders");
-    keepScrollPosition(shaders, "shaders.scroll");
-
-    return {
-        shaders,
+    const elements = {
+        shaders: document.getElementById("shaders"),
         console: document.getElementById("console"),
         workingShader: document.getElementById("working-program"),
         canvasFrame: document.getElementById("canvas-frame"),
@@ -32,6 +29,11 @@ export default function initLayout(rootId) {
         initialMs: performance.now(),
         pageLoadingMs: null,
     };
+
+    keepScrollPosition(elements.shaders, "shaders.scroll");
+    keepScrollPosition(elements.controls, "controls.scroll");
+
+    return elements;
 }
 
 export function setFromUrlParameters(paramMap) {

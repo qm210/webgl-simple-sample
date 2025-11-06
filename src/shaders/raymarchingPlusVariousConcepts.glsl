@@ -197,7 +197,9 @@ float fractalBrownianMotion(vec2 p) {
         p = p * iFractionScale;
         a *= iFractionAmplitude;
     }
-    return v;
+    // return v;
+    // <-- ist das eigentliche fbm(), aber führt hier schnell zu zu starken Werten
+    return v / s;
 }
 
 float bounceParabola(float h, float g, float T, float t) {
@@ -761,21 +763,20 @@ void render(in vec3 rayOrigin, in vec3 rayDir)
             }
         }
 
-        vec3  halfway = normalize(lightDirection - rayDir);
-        float diffuse, specular;
+        vec3 halfway = normalize(lightDirection - rayDir);
 
         // diffuse: ~ dot(normal, lightDirection)
-        diffuse = clamp(dot(normal, lightDirection), 0.0, 1.0);
+        float diffuse = clamp(dot(normal, lightDirection), 0.0, 1.0);
         diffuse *= 2.2 * calcSoftshadow(rayPos, lightDirection, 0.02, 2.5);
         shade += col * iDiffuseAmount * lightSourceColor * diffuse;
 
         // specular: ~ muss irgendwie Strahlrichtung mit ein-skalarprodukt-en
         //             Gewichtung, Verlauf (pow()), Farbe etc. wählt man nach Eigenempfinden ;)
-        specular = pow(clamp(dot(normal, halfway), 0.0, 1.0), iSpecularExponent);
+        float specular = pow(clamp(dot(normal, halfway), 0.0, 1.0), iSpecularExponent);
 
         // Beispiel eines abschwächenden Effekt (der eine physikalische Approximation ist)
-        // float fresnelAttenuation = 0.04 + 0.36*pow(clamp(1.0-dot(halfway,lightDirection), 0.0, 1.0), 5.0);
-        // specular *= fresnelAttenuation;
+//        float fresnelAttenuation = 0.04 + 0.36*pow(clamp(1.0-dot(halfway,lightDirection), 0.0, 1.0), 5.0);
+//        specular *= fresnelAttenuation;
         specular *= 3.00 * specularCoeff;
         shade += specular * lightSourceColor * iSpecularAmount;
 
