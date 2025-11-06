@@ -188,7 +188,7 @@ float perlin2D(vec2 p)
 }
 
 float fractalBrownianMotion(vec2 p) {
-    float v = 1.;
+    float v = 0.;
     float a = 1.;
     float s = 0.;
     for (int i = 0; i < iFractionSteps; i++) {
@@ -367,7 +367,7 @@ float sdNoiseMountains(vec3 p) {
     float height = max(0., length(p.xz) - 3.);
     // <-- -3. damit mittlere Arena ungestört bleibt
     height *= height * 0.2;
-    height *= iNoiseLevel * fractalBrownianMotion(p.xz * iNoiseFreq);
+    height *= iNoiseLevel * (1. + fractalBrownianMotion(p.xz * iNoiseFreq));
     return p.y - height;
 }
 
@@ -441,8 +441,12 @@ MarchHit map( in vec3 pos )
         float squeezedGap = (1. - 1./squeeze) * sphereRadius;
         spherePos.y -= squeezedGap;
 
+        vec3 transformed = transformMatrix * (pos - spherePos);
+        // nonlinear squeeze
+        transformed.xz /= (1. - (squeeze - 1.) * 2. * (transformed.y - sphereRadius));
+
         res = takeCloser(res,
-            sdSphere(transformMatrix * (pos - spherePos), sphereRadius),
+            sdSphere(transformed, sphereRadius),
             24.9 - 1. * squeeze
         );
 

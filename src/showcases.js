@@ -8,13 +8,13 @@ import showcase5 from "./showcases/5_Noise.js";
 import showcase6a from "./showcases/6a_RayMarchingPrimitivesSimplified.js";
 import showcase6b from "./showcases/6b_RayMarchingPrimitives.js";
 import showcase7 from "./showcases/7_VariousConceptsFor3D.js";
-import showcase8 from "./showcases/retired/8_Multipass.js";
+import showcase8 from "./showcases/8_MultiPassAndExtraData.js";
 import showcase9 from "./showcases/retired/9_FramebufferPingPong.js";
 import showcase10 from "./showcases/retired/10_StochasticRayTracing.js";
 import showcase11 from "./showcases/retired/11_Volumetric.js";
 import showcaseX from "./showcases/X_SimulationPlayground.js";
 
-const defaultShowcase = showcase7;
+const defaultShowcase = showcase8;
 
 export function selectShowcase() {
 

@@ -5,6 +5,7 @@ import {createScrollStackOn, scrollToFirstInterestingLine} from "./events.js";
 import {deferExtendedAnalysis} from "../glslCode/deferredAnalysis.js";
 import {shiftTime} from "../webgl/render.js";
 import {setCanvasResolution} from "../webgl/setup.js";
+import {recreateFramebufferWithTexture} from "../webgl/helpers.js";
 
 
 const generatePage = (glContext, elements, state, controls, autoRenderOnLoad = true) => {
@@ -253,14 +254,18 @@ function addDisplayControls(elements, state, glContext) {
             height = Math.max(Math.round(height * factor), 1);
             setCanvasResolution(elements.canvas, glContext, width, height);
             state.resolution = [width, height];
-            // TODO: if we have framebuffers etc. we have to rescale them NOW
+            /*
+            TODO: must recreate framebuffers, but for that we need a short break from rendering
+            state.framebuffer.forEach(fb => {
+                recreateFramebufferWithTexture(glContext, fb);
+            });
+             */
         };
     }
 
     function pageFontResize(relativeFactor) {
         return () => {
             const currentFactor = JSON.parse(localStorage.getItem(PAGE_FONT.storageKey) ?? "1");
-            const oldValue = document.documentElement.style.getPropertyValue(PAGE_FONT.storageKey);
             const newFactor = Math.max(0.1, currentFactor * relativeFactor).toFixed(3);
             document.documentElement.style.setProperty(PAGE_FONT.cssProperty, newFactor);
             localStorage.setItem(PAGE_FONT.storageKey, newFactor);

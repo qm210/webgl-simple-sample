@@ -1,12 +1,11 @@
 import {startRenderLoop} from "../webgl/render.js";
-import {createFramebufferWithTexture, createTextureFromImage, takePingPongFramebuffers} from "../webgl/helpers.js";
+import {createFramebufferWithTexture} from "../webgl/helpers.js";
 
-import fragmentShaderSource from "../shaders/xSimulationPlayground.glsl";
+import fragmentShaderSource from "../shaders/multipassPlayground.glsl";
 import {initBasicState} from "./common.js";
-import schnoergl210 from "../textures/210_schnoerkel.png";
 
 export default {
-    title: "Advanced Playground",
+    title: "Multi-Pass Playground",
     init: (gl, sources = {}) => {
         sources.fragment ??= fragmentShaderSource;
         const state = initBasicState(gl, sources);
@@ -17,13 +16,14 @@ export default {
 
         // TODO: Resizing the canvas DOES NOT scale the framebuffers / textures yet!! MUST DO
         state.resolution = [gl.drawingBufferWidth, gl.drawingBufferHeight];
+        const [width, height] = state.resolution;
         state.frameIndex = 0;
-        state.nPasses = 4;
+        state.nPasses = 3;
 
         state.framebuffer = [0, 1].map((index) =>
             createFramebufferWithTexture(gl, {
-                width: gl.drawingBufferWidth,
-                height: gl.drawingBufferHeight,
+                width,
+                height,
                 colorAttachment: gl.COLOR_ATTACHMENT0,
                 // Diese Formate werden später wichtig, können hier aber auf dem Default bleiben:
                 // internalFormat: gl.RGBA,
@@ -35,30 +35,27 @@ export default {
         state.fbPongIndex = 1;
 
         // for the second, i.e. layout(location=1) out ... we need another texture PER FRAMEBUFFER.
-        const extraOut = {
+        const extraData = {
             // The specific linking between one framebuffer object (FBO) and one texture is called "attachment",
             // as this FBO already has its primary texture on COLOR_ATTACHMENT0, we need a second one.
             attachment: gl.COLOR_ATTACHMENT1,
             // We need to choose fitting format (number of channels) / type (bytes per channel) parameters,
-            // this CAN BE TRICKY, so best not to leave the vec4 alignment, and I needed to
-            // use gl.RGBA16F because the "more natural sounding" gl.RGBA32F just wouldn't work ¯\_(ツ)_/¯
+            // and gl.RGBA16F due for reasons unknown, gl.RGBA32F did not work for me ¯\_(ツ)_/¯
             dataFormat: gl.RGBA,
             dataType: gl.FLOAT,
             internalFormat: gl.RGBA16F,
             // Also, to initialize these values, we need these typed WebGL Arrays (e.g. Float32Array),
-            // they should be sized as (resolution * 4), even if only used for one vec2
-            // ignoring z and w is easier than caring for the different alignment ;)
-            // Also: 4 bytes / 32 bit for floats is the WebGL standard, (even with gl.RGBA16F).
-            initialData: new Float32Array(gl.drawingBufferWidth * gl.drawingBufferHeight * 4),
+            // they should be sized as (resolution * 4) as WebGL standard, (even with gl.RGBA16F).
+            initialData: new Float32Array(width * height * 4),
             // and we might want to read the pixels at a later time
-            readData: new Float32Array(gl.drawingBufferWidth * gl.drawingBufferHeight * 4),
+            readData: new Float32Array(width * height * 4),
             readAtTime: null,
         };
-        initializeExtraValues(extraOut.initialData, ...state.resolution);
-        state.extraOut = extraOut;
-        state.wantToReadExtraOut = false;
+        initializeExtraValues(extraData.initialData, ...state.resolution);
+        state.extraData = extraData;
+        state.wantToReadExtraData = false;
 
-        for (const fb of state.framebuffer) {
+        state.framebuffer.forEach((fb, index) => {
             fb.extraDataTexture = gl.createTexture();
             gl.bindTexture(gl.TEXTURE_2D, fb.extraDataTexture);
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
@@ -69,19 +66,18 @@ export default {
             gl.texImage2D(
                 gl.TEXTURE_2D,
                 0,
-                extraOut.internalFormat,
+                extraData.internalFormat,
                 ...state.resolution,
                 0,
-                extraOut.dataFormat,
-                extraOut.dataType,
-                extraOut.initialData,
-                // <-- NOTE: would suffice to supply the data to the first READ fbo, but which is it?
-                //           let's just init both, the first WRITE will overwrite it anyway.
+                extraData.dataFormat,
+                extraData.dataType,
+                index === state.fbPongIndex ? extraData.initialData : null,
+                // <-- need the data only in the first "read" buffer
             );
 
-            fb.attachments.push(extraOut.attachment);
+            fb.attachments.push(extraData.attachment);
             gl.bindFramebuffer(gl.FRAMEBUFFER, fb.fbo);
-            gl.framebufferTexture2D(gl.FRAMEBUFFER, extraOut.attachment, gl.TEXTURE_2D, fb.extraDataTexture, 0);
+            gl.framebufferTexture2D(gl.FRAMEBUFFER, extraData.attachment, gl.TEXTURE_2D, fb.extraDataTexture, 0);
             gl.drawBuffers(fb.attachments);
 
             const status = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
@@ -90,12 +86,12 @@ export default {
             }
             gl.bindFramebuffer(gl.FRAMEBUFFER, null);
             gl.bindTexture(gl.TEXTURE_2D, null);
-        }
+        });
 
         state.location.iTime = gl.getUniformLocation(state.program, "iTime");
         state.location.iResolution = gl.getUniformLocation(state.program, "iResolution");
         state.location.prevImage = gl.getUniformLocation(state.program, "iPrevImage");
-        state.location.prevVelocity = gl.getUniformLocation(state.program, "iPrevVelocity");
+        state.location.prevData = gl.getUniformLocation(state.program, "iPrevData");
         state.location.passIndex = gl.getUniformLocation(state.program, "iPassIndex");
 
         state.location.iFrame = gl.getUniformLocation(state.program, "iFrame");
@@ -110,14 +106,6 @@ export default {
         state.location.iFree0 = gl.getUniformLocation(state.program, "iFree0");
         state.location.iFree1 = gl.getUniformLocation(state.program, "iFree1");
         state.location.iFree2 = gl.getUniformLocation(state.program, "iFree2");
-
-        state.dream210logo = createTextureFromImage(gl, schnoergl210, {
-            wrapS: gl.CLAMP_TO_EDGE,
-            wrapT: gl.CLAMP_TO_EDGE,
-            minFilter: gl.LINEAR,
-            magFilter: gl.NEAREST,
-        });
-        state.location.iDream210 = gl.getUniformLocation(state.program, "iDream210");
 
         gl.useProgram(state.program);
 
@@ -206,7 +194,7 @@ export default {
             name: "readButton",
             label: "read second \"out\" texture (check F12 console)",
             onClick: () => {
-                state.wantToReadExtraOut = true;
+                state.wantToReadExtraData = true;
             }
         }]
     })
@@ -229,10 +217,6 @@ function render(gl, state) {
     gl.uniform3fv(state.location.iFree1, state.iFree1);
     gl.uniform3fv(state.location.iFree2, state.iFree2);
 
-    gl.activeTexture(gl.TEXTURE2);
-    gl.bindTexture(gl.TEXTURE_2D, state.dream210logo);
-    gl.uniform1i(state.location.iDream210, 2);
-
     let pass, write, read;
     for (pass = 0; pass < state.nPasses; pass++) {
 
@@ -241,15 +225,13 @@ function render(gl, state) {
         read = state.framebuffer[state.fbPongIndex];
         [state.fbPingIndex, state.fbPongIndex] = [state.fbPongIndex, state.fbPingIndex];
 
-        // ... but the last pass needs to go to the screen
+        // ... but the last pass needs to go to the screen (framebuffer == null)
         if (pass < state.nPasses - 1) {
             gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo);
             gl.drawBuffers(write.attachments);
         } else {
-            // null == Screen ("Back Buffer")
             gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-            // Note: this amounts to gl.drawBuffers([gl.BACK]);
-            //       i.e. this will not render the extra output anymore, only fragColor!
+            // Note: will not render the extra output anymore, only fragColor!
         }
 
         // get the previously rendered image from the other buffer on its attachment
@@ -257,10 +239,10 @@ function render(gl, state) {
         gl.bindTexture(gl.TEXTURE_2D, read.texture);
         gl.uniform1i(state.location.prevImage, 0);
 
-        // that is the previously calculated extraOut from the other buffer on its different attachment
+        // that is the previously calculated extraData from the other buffer on its different attachment
         gl.activeTexture(gl.TEXTURE1);
         gl.bindTexture(gl.TEXTURE_2D, read.extraDataTexture);
-        gl.uniform1i(state.location.prevVelocity, 1);
+        gl.uniform1i(state.location.prevData, 1);
 
         gl.uniform1i(state.location.passIndex, pass);
         gl.drawArrays(gl.TRIANGLES, 0, 6);
@@ -268,8 +250,8 @@ function render(gl, state) {
 
     // Demonstration: how gl.readPixels() could work (this transfers GPU -> CPU, but that takes time)
 
-    if (state.wantToReadExtraOut) {
-        state.wantToReadExtraOut = false;
+    if (state.wantToReadExtraData) {
+        state.wantToReadExtraData = false;
         console.time("readPixels()");
         gl.bindFramebuffer(gl.READ_FRAMEBUFFER, read.fbo);
         gl.readBuffer(state.extraData.attachment);
@@ -278,7 +260,6 @@ function render(gl, state) {
         console.timeEnd("readPixels()");
         console.info(
             "Read:", state.extraData.readData,
-            "extraOut:", state.extraData,
             "resolution:", state.resolution
         );
     }

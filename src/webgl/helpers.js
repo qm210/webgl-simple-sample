@@ -153,12 +153,12 @@ export function createFramebufferWithTexture(gl, options, fbIndex = undefined) {
         fbo,
         texture,
         attachments: [colorAttachment],
-        extraOutTexture: null,
+        extraDataTexture: null,
         // for debugging:
         index: fbIndex,
         status,
         // stored in here because we might care about resizing the canvas one day (we don't, for now.) // TODO
-        options: {
+        params: {
             width,
             height,
             internalFormat,
@@ -170,6 +170,47 @@ export function createFramebufferWithTexture(gl, options, fbIndex = undefined) {
             minFilter,
             magFilter,
         },
+    };
+}
+
+export function recreateFramebufferWithTexture(gl, framebuffer) {
+    const old = framebuffer.params;
+
+    // RESOURCE CLEANUP: Not done automatically by OpenGL!
+    gl.deleteFramebuffer(framebuffer.fbo);
+    gl.deleteTexture(framebuffer.texture);
+
+    const texture = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, old.minFilter);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, old.magFilter);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, old.wrapS);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, old.wrapT);
+
+    gl.texImage2D(
+        gl.TEXTURE_2D, 0, old.internalFormat,
+        old.width, old.height,
+        0, old.dataFormat, old.dataType,
+        null
+    );
+
+    const fbo = gl.createFramebuffer();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, old.colorAttachment, gl.TEXTURE_2D, texture, 0 );
+
+    const status = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
+    warnAboutBadFramebufferStatus(gl, status);
+
+    gl.bindTexture(gl.TEXTURE_2D, null);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+
+    return {
+        ...framebuffer,
+        fbo,
+        texture,
+        status,
+        extraDataTexture: null,
     };
 }
 

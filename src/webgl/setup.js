@@ -77,6 +77,7 @@ function createInitialState(sources) {
         },
         program: undefined,
         location: {},
+        framebuffer: [],
     };
 }
 
