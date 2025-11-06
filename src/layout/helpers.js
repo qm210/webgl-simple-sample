@@ -13,6 +13,7 @@ export const createDiv = (...args) =>
 export function appendElement(parent, content, tagName = "div", classes = "") {
     const element = createElement(tagName, content, classes);
     parent.appendChild(element);
+    return element;
 }
 
 export function createSpan({text, id, classes, title, data}) {

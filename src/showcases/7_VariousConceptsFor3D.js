@@ -56,6 +56,12 @@ export default {
         state.location.iToneMapExposure = gl.getUniformLocation(state.program, "iToneMapExposure");
         state.location.iToneCompressedGain = gl.getUniformLocation(state.program, "iToneCompressedGain");
         state.location.iGammaExponent = gl.getUniformLocation(state.program, "iGammaExponent");
+        state.location.iNoiseLevel = gl.getUniformLocation(state.program, "iNoiseLevel");
+        state.location.iNoiseFreq = gl.getUniformLocation(state.program, "iNoiseFreq");
+        state.location.iNoiseOffset = gl.getUniformLocation(state.program, "iNoiseOffset");
+        state.location.iFractionSteps = gl.getUniformLocation(state.program, "iFractionSteps");
+        state.location.iFractionScale = gl.getUniformLocation(state.program, "iFractionScale");
+        state.location.iFractionAmplitude = gl.getUniformLocation(state.program, "iFractionAmplitude");
         state.location.iFree0 = gl.getUniformLocation(state.program, "iFree0");
         state.location.iFree1 = gl.getUniformLocation(state.program, "iFree1");
         state.location.iFree2 = gl.getUniformLocation(state.program, "iFree2");
@@ -107,6 +113,12 @@ function render(gl, state) {
     gl.uniform1f(state.location.iToneMapExposure, state.iToneMapExposure);
     gl.uniform1f(state.location.iToneCompressedGain, state.iToneCompressedGain);
     gl.uniform1f(state.location.iGammaExponent, state.iGammaExponent);
+    gl.uniform1f(state.location.iNoiseLevel, state.iNoiseLevel);
+    gl.uniform1f(state.location.iNoiseFreq, state.iNoiseFreq);
+    gl.uniform1f(state.location.iNoiseOffset, state.iNoiseOffset);
+    gl.uniform1i(state.location.iFractionSteps, Math.floor(state.iFractionSteps));
+    gl.uniform1f(state.location.iFractionScale, state.iFractionScale);
+    gl.uniform1f(state.location.iFractionAmplitude, state.iFractionAmplitude);
 
     gl.uniform1f(state.location.iFree0, state.iFree0);
     gl.uniform1f(state.location.iFree1, state.iFree1);
@@ -215,7 +227,7 @@ function defineUniformControlsBelow() {
         name: "iSubsurfaceAmount",
         defaultValue: 0.25,
         min: 0.,
-        max: 10.,
+        max: 100.,
     }, {
         type: "floatInput",
         name: "iAmbientOcclusionSamples",
@@ -244,8 +256,8 @@ function defineUniformControlsBelow() {
     }, {
         type: "floatInput",
         name: "iToneCompressedGain",
-        defaultValue: -1,
-        min: 0.,
+        defaultValue: 0,
+        min: -1.,
         max: 2.,
     }, {
         type: "floatInput",
@@ -253,6 +265,45 @@ function defineUniformControlsBelow() {
         defaultValue: 2.2,
         min: 0.,
         max: 10.,
+    }, {
+        type: "floatInput",
+        name: "iNoiseLevel",
+        defaultValue: 0.,
+        min: 0.,
+        max: 0.2,
+        step: 0.001
+    }, {
+        type: "floatInput",
+        name: "iNoiseFreq",
+        defaultValue: 1,
+        min: 0.001,
+        max: 0.5,
+        step: 0.001,
+    }, {
+        type: "floatInput",
+        name: "iNoiseOffset",
+        defaultValue: 0,
+        min: -1,
+        max: 1,
+    }, {
+        type: "floatInput",
+        name: "iFractionSteps",
+        defaultValue: 1,
+        min: 1,
+        max: 20.,
+        step: 1,
+    }, {
+        type: "floatInput",
+        name: "iFractionScale",
+        defaultValue: 2.,
+        min: 0.01,
+        max: 10.,
+    }, {
+        type: "floatInput",
+        name: "iFractionAmplitude",
+        defaultValue: 0.5,
+        min: 0.01,
+        max: 2.,
     }, {
         type: "floatInput",
         name: "iFree0",

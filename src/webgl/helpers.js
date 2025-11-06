@@ -84,10 +84,9 @@ export function createTextureFromImage(gl, imageSource, options) {
     // <-- TEXTURE_MAG_FILTER kann auch ausgelassen werden, ist aber oft sinnvoll.
     // wir lassen hier das Konzept "Mipmaps" aus, kann man aber mal bei Gelegenheit vertiefen.. :)
 
-    // Laden im Browser notwendigerweise asynchron.
-    // -> wird kurz (< 1sec) flackern, aber das akzeptieren wir halt (geht im Browser nicht anders).
+    // Laden im Browser notwendigerweise asynchron, flackert dann leider kurz. (< 1 sec)
 
-    const startLoading = performance.now();
+    // const startLoading = performance.now();
 
     loadImage(imageSource, (img) => {
         // -> daher auch: Textur lieber neu binden, weil inzwischen alles mögliche passiert sein kann.
@@ -100,7 +99,7 @@ export function createTextureFromImage(gl, imageSource, options) {
             gl.UNSIGNED_BYTE,
             img
         );
-        console.log("Image Loaded in", (performance.now() - startLoading).toFixed(2), "ms");
+        // console.log("Image Loaded in", (performance.now() - startLoading).toFixed(2), "ms");
     });
 
     return texture;

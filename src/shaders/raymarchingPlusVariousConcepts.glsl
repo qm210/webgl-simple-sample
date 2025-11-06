@@ -32,6 +32,12 @@ uniform float iAmbientOcclusionSamples;
 uniform float iToneMapExposure;
 uniform float iToneCompressedGain;
 uniform float iGammaExponent;
+uniform float iNoiseLevel;
+uniform float iNoiseFreq;
+uniform float iNoiseOffset;
+uniform int iFractionSteps;
+uniform float iFractionScale;
+uniform float iFractionAmplitude;
 // and for you to play around with:
 uniform float iFree0;
 uniform float iFree1;
@@ -49,16 +55,18 @@ const float piHalf = .5 * pi;
 const vec4 c = vec4(1., 0. , -1., .5);
 
 const float MISSING_MATERIAL = -0.5;
+const float UNKNOWN_MATERIAL = 0.0;
 const float MATERIAL_FLOOR = 1.0;
 const float MATERIAL_BOX = 3.0;
 const float MATERIAL_CYLINDER = 8.0;
 const float MATERIAL_PYRAMID = 13.0;
+const float MATERIAL_MOUNTAINS = 2.0;
 const float MATERIAL_PATH_POINT = 1.4;
 
 // SHADER OPTIONS ////////
 const bool DRAW_GRID_ON_FLOOR = true;
 const bool SHOW_POINT_LIGHT_SOURCE = true;
-const bool USE_AUTOMATED_CAMERA_PATH = false;
+const bool USE_AUTOMATED_CAMERA_PATH = true;
 const bool USE_AUTOMATED_CAMERA_TARGET_PATH = false; // try it :)
 /////////////////////////
 
@@ -132,11 +140,14 @@ mat3 squeezeY(float sqY) {
 }
 
 vec2 hash22(vec2 p) {
+    // this is a pseudorandom generator with 2d input -> 2d output
     float n = sin(dot(p, vec2(127.1, 311.7))) * 43758.5453;
+    // custom phase shift just to have more variation, is not commonly used
+    n += iNoiseOffset;
     return fract(vec2(n, n * 1.2154));
 }
 
-float voronoi(vec2 uv) {
+float voronoiPattern(vec2 uv) {
     vec2 uvInt = floor(uv);
     vec2 uvFrac = fract(uv);
     float dMin = 1.0;
@@ -144,7 +155,7 @@ float voronoi(vec2 uv) {
     for (float y = -1.; y <= 1.1; y += 1.) {
         for (float x = -1.; x <= 1.1; x += 1.) {
             vec2 b = vec2(x, y);
-            vec2 r = b + hash22(uvInt + b) - uvFrac;
+            vec2 r = b + hash22(uvInt + b + iNoiseOffset) - uvFrac;
             float d = length(r);
             if (d < dMin) {
                 dSecondMin = dMin;
@@ -155,7 +166,38 @@ float voronoi(vec2 uv) {
         }
     }
     // return dMin;
+    // <-- würde die Voronoi-Zellen ausgeben, wir wollen aber die Bereichgrenzen:
     return dSecondMin - dMin;
+}
+
+float perlin2D(vec2 p)
+{
+    vec2 pi = floor(p);
+    vec2 pf = p - pi;
+    vec2 w = pf * pf * (3.-2.*pf);
+
+    float f00 = dot(hash22(pi+vec2(.0,.0)),pf-vec2(.0,.0));
+    float f01 = dot(hash22(pi+vec2(.0,1.)),pf-vec2(.0,1.));
+    float f10 = dot(hash22(pi+vec2(1.0,0.)),pf-vec2(1.0,0.));
+    float f11 = dot(hash22(pi+vec2(1.0,1.)),pf-vec2(1.0,1.));
+
+    float xm1 = mix(f00,f10,w.x);
+    float xm2 = mix(f01,f11,w.x);
+    float ym = mix(xm1,xm2,w.y);
+    return ym;
+}
+
+float fractalBrownianMotion(vec2 p) {
+    float v = 1.;
+    float a = 1.;
+    float s = 0.;
+    for (int i = 0; i < iFractionSteps; i++) {
+        v += a * perlin2D(p);
+        s += a;
+        p = p * iFractionScale;
+        a *= iFractionAmplitude;
+    }
+    return v;
 }
 
 float bounceParabola(float h, float g, float T, float t) {
@@ -252,7 +294,7 @@ MarchHit texturedSdSphere(vec3 p, float s)
         atan(p.z, p.x) / twoPi + 0.5,
         p.y / 2. + 0.5
     );
-    return MarchHit(d, 0., surfaceCoord);
+    return MarchHit(d, UNKNOWN_MATERIAL, surfaceCoord);
 }
 
 MarchHit texturedSdBox( vec3 p, vec3 b, float rounding) {
@@ -319,6 +361,14 @@ MarchHit texturedSdCylinder(vec3 p, vec2 h) {
     return MarchHit(d, MATERIAL_CYLINDER, vec2(s, t));
 }
 
+float sdNoiseMountains(vec3 p) {
+    float height = max(0., length(p.xz) - 3.);
+    // <-- -3. damit mittlere Arena ungestört bleibt
+    height *= height * 0.2;
+    height *= iNoiseLevel * fractalBrownianMotion(p.xz * iNoiseFreq);
+    return p.y - height;
+}
+
 //------------------------------------------------------------------
 
 vec2 opUnion( vec2 d1, vec2 d2 )
@@ -347,7 +397,13 @@ const vec4 pyramidPosAndHeight = vec4(-1.0, 0.0, -2.6, 1.1);
 
 MarchHit map( in vec3 pos )
 {
-    MarchHit res = MarchHit(pos.y, 0.0, c.yy);
+    // flacher Boden auf y == 0
+    MarchHit res = MarchHit(pos.y, MATERIAL_FLOOR, c.yy);
+
+    float floorY = sdNoiseMountains(pos - vec3(0.8,0.0,-1.6));
+    res = takeCloser(res,
+        MarchHit(floorY, MATERIAL_MOUNTAINS, fract(pos.xz))
+    );
 
     // das hier ist im Kern weiterhin die "Kette an opUnion(...)" von letztem Mal,
     // aber weniger Objekte, und umformuliert, weil MarchHit() jetzt mehr ist als "vec2":
@@ -372,20 +428,32 @@ MarchHit map( in vec3 pos )
     );
 
     // Mal ein Beispiel einer ungewöhnlichen Transformation, die wir mit aktuellen Mitteln
-    // aber schon komplett verstehen können (und mich außerdem ziemlich erheitert).
-    float sphereRadius = 0.25;
-    float sphereY = bounceParabola(0.9, 3., 1., iTime) - 1.2;
-    float squeeze = -min(0., sphereY) + 1.;
-    sphereY = max(0., sphereY);
-    vec3 spherePos = vec3(2.,sphereY + sphereRadius, 0.4);
-    mat3 transformMatrix = squeezeY(squeeze);
-    res = takeCloser(res,
-        sdSphere(transformMatrix * (pos - spherePos), sphereRadius),
-        24.9 - 1. * squeeze
-    );
+    // aber schon einigermaßen verstehen können
+    {
+        float sphereRadius = 0.25;
+        vec3 spherePos = vec3(2., sphereRadius, 0.4);
+        float bounceY = bounceParabola(0.9, 3., 2., iTime) - 1.2;
+        float squeeze = -min(0., bounceY) + 1.;
+        spherePos.y += max(0., bounceY);
+        mat3 transformMatrix = squeezeY(squeeze);
+        float squeezedGap = (1. - 1./squeeze) * sphereRadius;
+        spherePos.y -= squeezedGap;
 
-    // mit erweiterter sdBox, die auch noch die Aufprallkoordinate des Strahls mitspeichert
-    // um später die Textur abbilden zu können. Wir bleiben da mal beim Quader...
+        res = takeCloser(res,
+            sdSphere(transformMatrix * (pos - spherePos), sphereRadius),
+            24.9 - 1. * squeeze
+        );
+
+        // Erklärung:
+        // sich wiederholende Parabel (s. https://de.wikipedia.org/wiki/Wurfparabel),
+        // aber alles < 0 wird nicht auf die y-Koordinate berechnet, sondern zum "squeeze".
+        // squeezeY() ist eine Transformationsmatrix, die zu einer Verzerrung / Stauchung führ.
+        // Die Stauchung schafft dann wieder einen Spalt zum Boden, der noch abgezogen wird
+        // Außerdem geben wir den "squeeze"-Wert über den Material-Parameter in die Farbe
+    }
+
+    // texturedSdBox: sdBox erweitert um die Aufprallkoordinate des Strahls,
+    // um später die Textur abbilden zu können. Lässt sich beim Quader noch überschauen...
 
     res = takeCloser(res,
         texturedSdBox(pos-vec3( -.5,0.2, 0.0), vec3(0.5,0.2,0.5), 0.02)
@@ -397,8 +465,8 @@ MarchHit map( in vec3 pos )
     vec3 cylinderPos = (pos-vec3( 1.0,0.35,-2.0));
     // Eulerwinkel-Drehung am Beispiel des Zylinders:
     // (sieht man gut, wenn man den Pfad mit iPathOffset so wählt
-    cylinderPos *= rotY(0.0*iTime + 0.25); // dreht um eigene Achse
-    cylinderPos *= rotZ(0.0*iTime + 2.);
+    cylinderPos *= rotY(2.0*iTime + 0.25); // dreht um eigene Achse
+    cylinderPos *= rotZ(0.0*iTime);
     cylinderPos *= rotY(0.0*iTime);
     res = takeCloser(res,
         texturedSdCylinder(cylinderPos, vec2(0.15,0.25))
@@ -416,6 +484,7 @@ MarchHit map( in vec3 pos )
         );
 
     }
+
 
     return res;
 }
@@ -449,14 +518,14 @@ MarchHit raycast( in vec3 ro, in vec3 rd )
     }
 
     // raymarch primitives
-    vec2 boundingBox = iBox( ro-vec3(0.0,1.,-0.5), rd, vec3(2.5,1.,3.0) );
+    // vec2 boundingBox = iBox( ro-vec3(0.0,1.,-0.5), rd, vec3(2.5,1.,3.0) );
     // <-- bounding box = "alles was uns interessiert, findet hier drin statt"
     //     einfach nur, um unnötige Berechnungen zu ersparen.
     //     Ruhig mal ausschalten und vergleichen (FPS und Optik), ob überhaupt nötig.
-    if (boundingBox.x<boundingBox.y && boundingBox.y>0.0 && boundingBox.x<tmax)
+    // if (boundingBox.x<boundingBox.y && boundingBox.y>0.0 && boundingBox.x<tmax)
     {
-        tmin = max(boundingBox.x,tmin);
-        tmax = min(boundingBox.y,tmax);
+//        tmin = max(boundingBox.x,tmin);
+//        tmax = min(boundingBox.y,tmax);
 
         float t = tmin;
         for (int i=0; i<70 && t<tmax; i++)
@@ -481,7 +550,7 @@ float calcSoftshadow( in vec3 ro, in vec3 rd, in float mint, in float tmax )
 {
     // bounding volume
     float tp = (0.8-ro.y)/rd.y;
-    if( tp>0.0 ) {
+    if (tp > 0.0) {
         tmax = min( tmax, tp );
     }
 
@@ -513,20 +582,20 @@ float calcSoftshadow( in vec3 ro, in vec3 rd, in float mint, in float tmax )
 // https://iquilezles.org/articles/nvscene2008/rwwtt.pdf
 float calcAmbientOcclusion(in vec3 pos, in vec3 normal)
 {
-    float occlusion = 0.0;
-    float scale = 1.0;
+    // iAmbientOcclusionSamples ~ 5
+    // iAmbientOcclusionStep ~ 0.12
+    // iAmbientOcclusionScale ~ 0.95;
     // Idee: wir werten die gesamte Map in verschiedenen Abständen von der Oberfläche aus
     //       (vom Auftrittspunkt also Richtung Normalenvektor) und summieren auf:
     //       (h - d) ~ Wenn d entlang dieser Linie zu klein bleibt, haben wir "Verdeckung", d.h.
     //                 schätzen Schatten / Hohlräume ab, ohne die Rays zum Licht _tracen_ zu müssen
+    float occlusion = 0.0;
+    float scale = 1.0;
     for (float i=0.; i < iAmbientOcclusionSamples; i += 1.)
     {
-        // iAmbientOcclusionSamples ~ 5
-        // iAmbientOcclusionStep ~ 0.12
         float h = 0.01 + iAmbientOcclusionStep * i / (iAmbientOcclusionSamples - 1.);
         float d = map(pos + h*normal).t;
         occlusion += (h-d) * scale;
-        // iAmbientOcclusionScale ~ 0.95;
         scale *= iAmbientOcclusionScale;
         if( occlusion>0.35 ) break;
     }
@@ -598,6 +667,7 @@ void render(in vec3 rayOrigin, in vec3 rayDir)
     else if (res.material == MATERIAL_PYRAMID) {
         // hier z.B.: Farbverlauf an y-Achse
         col = materialPalette(13.56 + 1.1 * rayPos.y);
+
         specularCoeff = 0.6;
         // s.o. die Pyramiden-SDF wurde aufgerufen mit:
         // sdPyramid(pos - pyramidPosAndHeight.xyz, pyramidPosAndHeight.a)
@@ -607,8 +677,7 @@ void render(in vec3 rayOrigin, in vec3 rayDir)
         // Einfach mal die Wände des umschließenden Würfels auswerten:
         vec3 n = abs(normal);
         vec2 st = n.x > n.y && n.x > n.z ? pos.zy : pos.xy;
-        st = 10. * st; /* try something like + iFree3 */
-        float pattern = voronoi(st);
+        float pattern = voronoiPattern(10. * st);
         pattern = smoothstep(0.0, 0.5, pattern);
         col = mix(col, pattern * col, 1. - pos.y);
     }
@@ -617,7 +686,7 @@ void render(in vec3 rayOrigin, in vec3 rayDir)
         col = vec3(0., res.texCoord.x * 0.2, 1. - res.texCoord.x * 0.2);
         specularCoeff = 0.1;
     }
-    else if (isFloor)
+    else if (isFloor || res.material == MATERIAL_MOUNTAINS)
     {
         // war: Schachbrettmuster
         // float checkerboard = 1. - abs(step(0.5, fract(1.5*rayPos.x)) - step(0.5, fract(1.5*rayPos.z)));
@@ -640,7 +709,7 @@ void render(in vec3 rayOrigin, in vec3 rayDir)
         col = pow(col, vec3(2.8));
         specularCoeff = 0.12;
 
-        if (DRAW_GRID_ON_FLOOR) {
+        if (DRAW_GRID_ON_FLOOR && isFloor) {
             col *= 0.3 + 0.7 * vec3(grid);
         }
     }
@@ -740,7 +809,7 @@ void render(in vec3 rayOrigin, in vec3 rayDir)
 
     applyToneMapping(shade, iToneMapExposure, iToneCompressedGain);
     col = shade;
-    applyDistanceFog(col, res.t, vec3(0.003,0.,0.008), 0.01, 3.0);
+    applyDistanceFog(col, res.t, vec3(0.001,0.,0.004), 0.002, 3.0);
     fragColor = vec4(col, 1.);
 }
 
@@ -835,14 +904,18 @@ void main()
             camTarget = pathPos.xyz;
         }
     }
-    // iCamOffset, iCamLookOffset: frei variabel, um Effekte zu testen / debuggen
-    camOrigin += iCamOffset;
-    camTarget += iCamOffset + iCamLookOffset;
+    // iCamLookOffset: bewegt angeblickten _Punkt_ frei, ist deswegen
+    // aber etwas anderes Verhalten als die Blickrichtung frei zu drehen.
+    camTarget += iCamLookOffset;
 
     // camera-to-world transformation
     mat3 camMatrix = setCamera(camOrigin, camTarget, camRoll);
     // ray direction via screen coordinate and "screen distance" ~ focal length ("field of view")
     vec3 rayDirection = camMatrix * normalize(vec3(uv, iCamFocalLength));
+
+    // iCamOffset: freie Verschiebung der Kamera, soll aber im Kamera-Koordinatensystem passieren
+    // d.h. (0,0,1) soll "1 nach vorne" heißen, nicht "1 in Welt-Z-Koordinate".
+    camOrigin += camMatrix * iCamOffset;
 
     render(camOrigin, rayDirection);
 

@@ -39,7 +39,7 @@ function runLoop(renderFunction, state, elements, timestamp) {
     renderFunction(state);
 
     elements.iTime.value.textContent = state.time.toFixed(2) + " sec";
-    elements.fps.textContent = "FPS: " + state.fps;
+    elements.fps.display.textContent = state.fps;
 
     if (state.stopSignal) {
         resetFpsMeasurement(state);

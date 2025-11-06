@@ -85,9 +85,9 @@ function sessionStoreControlState(state, control) {
     }
 }
 
-function createSmallButton(title) {
+function createSmallButton(title, ...extraClasses) {
     const button = document.createElement("button");
-    button.classList.add("small-button");
+    button.classList.add("small-button", ...extraClasses);
     button.textContent = title;
     return button;
 }
@@ -99,9 +99,10 @@ const createInputControlElements = (control) => {
         control: document.createElement("input"),
         min: document.createElement("label"),
         max: document.createElement("label"),
-        reset: createSmallButton("reset"),
+        reset: createSmallButton("reset", "reset"),
     };
     if (control) {
+        elements.value.id = control.name;
         elements.name.textContent = control.name;
     }
     elements.min.style.fontSize = "small";
@@ -140,7 +141,9 @@ export const asFloatInput = (elements, state, control) => {
 };
 
 function asSlider(inputElement, control) {
-    control.step ??= 0.01;
+    control.step ??=
+        control.min > 0 && control.min <= 0.01 ? 0.001
+        : 0.01;
     inputElement.type = "range";
     inputElement.step = control.step;
     if (control.min !== undefined) {
@@ -217,10 +220,7 @@ export const asVec3Input = (elements, state, control) => {
 
     function updateAll() {
         state[control.name] = sliders.map(i => +i.value);
-        const componentsText = state[control.name]
-            .map(i => i.toFixed(2))
-            .join(", ");
-        elements.value.textContent = ` = vec3(${componentsText})`;
+        updateVec3Label(elements.value, state, control);
     }
 };
 
@@ -244,22 +244,22 @@ const asCursorInput = (elements, state, control) => {
         }
         switch (event.key.toUpperCase()) {
             case front:
-                state[control.name][2] -= control.step;
+                shiftComponent(2, control.step);
                 break;
             case back:
-                state[control.name][2] += control.step;
+                shiftComponent(2, -control.step);
                 break;
             case left:
-                state[control.name][0] -= control.step;
+                shiftComponent(0, -control.step);
                 break;
             case right:
-                state[control.name][0] += control.step;
+                shiftComponent(0, control.step);
                 break;
             case up:
-                state[control.name][1] += control.step;
+                shiftComponent(1, control.step);
                 break;
             case down:
-                state[control.name][1] -= control.step;
+                shiftComponent(1, -control.step);
                 break;
             case reset:
                 state[control.name] = control.defaultValue;
@@ -274,6 +274,43 @@ const asCursorInput = (elements, state, control) => {
     return elements;
 
     function update() {
-        elements.value.textContent = `= vec3(${state[control.name]})`;
+        updateVec3Label(elements.value, state, control)
     }
+
+    function shiftComponent(index, shift) {
+        state[control.name] = state[control.name].map((value, i) =>
+            index !== i ? value :
+                value + shift
+        );
+    }
+}
+
+function updateVec3Label(labelElement, state, control) {
+    let value = state[control.name];
+    if (value instanceof Array) {
+        value = value
+            .map(i => i.toFixed(2))
+            .join(", ");
+    }
+    labelElement.textContent = `= vec3(${value})`;
+}
+
+export function createResetAllButton(elements, state, controls) {
+    const button = createSmallButton("Reset All", "right-align");
+    button.addEventListener("click", event => {
+        const allResetButtons = elements.controls.querySelectorAll("button.reset");
+        for (const button of allResetButtons) {
+            button.click();
+        }
+        for (const control of controls.uniforms) {
+            if (control.type === "cursorInput") {
+                state[control.name] = control.defaultValue;
+                const label = elements.uniformLabels[control.name];
+                updateVec3Label(label, state, control);
+                sessionStoreControlState(state, control);
+            }
+        }
+        event.target.blur();
+    });
+    return button;
 }

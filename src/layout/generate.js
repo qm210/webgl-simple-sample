@@ -1,6 +1,6 @@
-import {addButton, createInputElements, addFreeRow} from "./controls.js";
+import {addButton, createInputElements, addFreeRow, createResetAllButton} from "./controls.js";
 import {registerShaderCode} from "./shaderCode.js";
-import {appendButton, appendElement, createDiv} from "./helpers.js";
+import {appendButton, appendElement, createDiv, createElement} from "./helpers.js";
 import {createScrollStackOn, scrollToFirstInterestingLine} from "./events.js";
 import {deferExtendedAnalysis} from "../glslCode/deferredAnalysis.js";
 import {shiftTime} from "../webgl/render.js";
@@ -97,8 +97,9 @@ export const addControlsToPage = (elements, state, controls, autoRenderOnLoad) =
         id: "iTime",
         content: createDiv("=", "value-label"),
     });
-    elements.fps = createDiv("", "value-label right-align fps");
-    elements.iTime.container.appendChild(elements.fps);
+    elements.iTime.container.appendChild(
+        createResetAllButton(elements, state, controls)
+    );
 
     for (const control of controls.uniforms ?? []) {
 
@@ -139,6 +140,7 @@ export const addControlsToPage = (elements, state, controls, autoRenderOnLoad) =
         elements.controls.appendChild(input.control);
         elements.controls.appendChild(input.max);
         elements.controls.appendChild(input.reset);
+        elements.uniformLabels[control.name] = input.value;
     }
 
     document.addEventListener("keydown", event => {
@@ -222,16 +224,26 @@ const PAGE_FONT = {
 };
 
 function addDisplayControls(elements, state, glContext) {
-    appendButton(elements.displayControls, "+", canvasResize(1.05));
-    appendButton(elements.displayControls, "–", canvasResize(0.95));
-    appendElement(elements.displayControls, "canvas", "label", "space-below");
-    // Note: the EN DASH ("\u2013") is more pretty as minus than the hyphen :)
+    const canvasControls = createDiv();
+    elements.displayControls.appendChild(canvasControls);
+    appendButton(canvasControls, "+", canvasResize(1.05));
+    appendButton(canvasControls, "–", canvasResize(0.95));
+    appendElement(canvasControls, "canvas", "label");
 
-    appendButton(elements.displayControls, "↑", pageFontResize(1.05));
-    appendButton(elements.displayControls, "￬", pageFontResize(0.95));
-    appendElement(elements.displayControls, "font", "label");
-
+    const fontControls = createDiv();
+    elements.displayControls.appendChild(fontControls);
+    appendButton(fontControls, "↑", pageFontResize(1.05));
+    appendButton(fontControls, "￬", pageFontResize(0.95));
+    appendElement(fontControls, "font", "label");
     pageFontInitialize();
+
+    const info = appendElement(elements.displayControls, "", "div");
+    elements.fps = {
+        label: createElement("label", "FPS"),
+        display: createDiv("", "fps"),
+    }
+    info.appendChild(elements.fps.label);
+    info.appendChild(elements.fps.display);
 
     function canvasResize(factor) {
         return () => {

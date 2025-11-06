@@ -160,6 +160,8 @@ button.render-button {
 
 .free-row .right-align {
     margin-left: auto;
+    max-width: fit-content;
+    text-align: right;
 }
 
 .small-button {
@@ -172,33 +174,39 @@ button.render-button {
 #display-controls {
     display: flex;
     flex-direction: column;
-    justify-content: flex-start;
+    justify-content: space-around;
     height: 100%;
+}
+
+#display-controls > div {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
     gap: 0.25rem;
 }
 
-#display-controls > button {
+#display-controls button {
     padding: 0.2rem 0.5rem;
     font-size: x-large;
     font-family: monospace;
 }
 
-#display-controls > label {
-    font-size: 0.9em;
+#display-controls label {
+    font-size: 1em;
     font-weight: bold;
     opacity: 0.7;
     margin: 0;
     text-align: center;
 }
 
-#display-controls .space-below {
-    margin-bottom: 2.5rem;
+#display-controls > div:last-of-type {
+    border: 1px solid silver;
+    text-align: center;
+    gap: 0;
 }
 
 .fps {
     font-size: smaller;
     font-weight: bold;
-    align-self: flex-start;
     opacity: 0.6;
-    margin-right: 0.25rem;
 }

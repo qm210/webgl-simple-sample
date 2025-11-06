@@ -143,7 +143,7 @@ pre.error {
 }
 
 .code .number {
-    color: green;
+    color: darkcyan;
 }
 
 .code .builtin {

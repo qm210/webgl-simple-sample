@@ -28,6 +28,7 @@ export default function initLayout(rootId) {
         canvas: document.getElementById("canvas"),
         controls: document.getElementById("shader-controls"),
         displayControls: document.getElementById("display-controls"),
+        uniformLabels: {},
         initialMs: performance.now(),
         pageLoadingMs: null,
     };

@@ -286,7 +286,7 @@ float noise(vec2 p){
 }
 
 // Fractional Brownian Motion for low-frequency noise
-#define FBM_ITERATIONS 6
+#define FBM_ITERATIONS 14
 float fbm(vec2 p) {
     float f = 0.0;
     float amp = 0.5;
@@ -299,8 +299,8 @@ float fbm(vec2 p) {
 }
 
 float floorLevel = -2.;
-float noiseHeight = 3.; // was passiert bei zu hohen Werten, v.A. in Verbindung mit hohen FBM_ITERATIONS?
-float noiseFreq = 0.2;
+float noiseHeight = 4.; // was passiert bei zu hohen Werten, v.A. in Verbindung mit hohen FBM_ITERATIONS?
+float noiseFreq = 0.4;
 
 MarchResult sdFloor(vec3 p) {
     vec3 floorColor = vec3(1.);
@@ -317,6 +317,7 @@ MarchResult sdFloor(vec3 p) {
     float noise = fbm(noiseFreq * p.xz + someOffset); // mal im Argument sowas wie... 0.03 * iTime ?
     float noisyLevel = floorLevel - noiseHeight * (noise - 0.5);
     d = p.y - noisyLevel;
+
 
     // oder aber: Height Map / Bump Map als Textur reingeben.
 //    vec2 st = clamp(0.033 * p.xz + vec2(.5,.8), vec2(0), vec2(1));
@@ -466,7 +467,7 @@ MarchResult rayMarch(vec3 ro, vec3 rd) {
 void main() {
     vec2 uv = (2.0 * gl_FragCoord.xy - iResolution) / iResolution.y;
 
-    vec4 bgColor = c.xyxx;
+    vec4 bgColor = c.xxxx;
     vec4 col = vec4(0.);
     float d;
 

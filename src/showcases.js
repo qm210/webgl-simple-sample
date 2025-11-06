@@ -8,7 +8,6 @@ import showcase5 from "./showcases/5_Noise.js";
 import showcase6a from "./showcases/6a_RayMarchingPrimitivesSimplified.js";
 import showcase6b from "./showcases/6b_RayMarchingPrimitives.js";
 import showcase7 from "./showcases/7_VariousConceptsFor3D.js";
-// import showcase7 from "./showcases/retired/6_TexturesIn3D.js";
 import showcase8 from "./showcases/retired/8_Multipass.js";
 import showcase9 from "./showcases/retired/9_FramebufferPingPong.js";
 import showcase10 from "./showcases/retired/10_StochasticRayTracing.js";
