@@ -34,6 +34,8 @@ export const REGEX = {
         /\b(defined|optimize|debug)\b/g,
     BLOCK_DELIMITER:
         /(?<braceOpen>\{)|(?<braceClose>})|(?<commentOpen>\/\*)|(?<commentClose>\*\/)/g,
+    LEADING_SPACES:
+        /^ *(?=\S)/,
 
     ERROR_LOG:
         /:\s*([0-9]*):([0-9]*):\s*(.*)/g,

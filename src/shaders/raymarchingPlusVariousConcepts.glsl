@@ -152,8 +152,8 @@ float voronoiPattern(vec2 uv) {
     vec2 uvFrac = fract(uv);
     float dMin = 1.0;
     float dSecondMin = 1.0;
-    for (float y = -1.; y <= 1.1; y += 1.) {
-        for (float x = -1.; x <= 1.1; x += 1.) {
+    for (float y = -1.; y < 1.01; y += 1.) {
+        for (float x = -1.; x < 1.01; x += 1.) {
             vec2 b = vec2(x, y);
             vec2 r = b + hash22(uvInt + b + iNoiseOffset) - uvFrac;
             float d = length(r);

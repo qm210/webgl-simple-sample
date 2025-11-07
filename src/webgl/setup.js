@@ -22,7 +22,11 @@ export function setupWebGl(canvas, geometry) {
     // WebGL2-spezifisch müsen manche Erweiterungen für manche Anwendungszwecke nachgeladen werden,
     // https://developer.mozilla.org/en-US/docs/Web/API/WebGL_API/Using_Extensions
     // EXT_color_buffer_float: braucht man (später) für Float-Texturen / Framebuffer
-    const WEBGL_EXTENSIONS = ["EXT_color_buffer_float", "KHR_parallel_shader_compile"];
+    const WEBGL_EXTENSIONS = [
+        "EXT_color_buffer_float",
+        "OES_texture_float_linear",
+        "KHR_parallel_shader_compile",
+    ];
     gl.ext = {};
     for (const extension of WEBGL_EXTENSIONS) {
         const ext = gl.getExtension(extension);
@@ -76,6 +80,7 @@ function createInitialState(sources) {
             linker: "",
         },
         program: undefined,
+        uniforms: [],
         location: {},
         framebuffer: [],
     };

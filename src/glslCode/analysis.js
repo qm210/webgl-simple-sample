@@ -104,10 +104,27 @@ export function analyzeShader(source, errorLog, shaderKey) {
             line.changedBlock = analyzed.changedBlockAt[line.number]
             line.changedBlock.removed = line.changedBlock.diffs
                 .filter(d => d.removed);
+            line.changedBlock.indent = commonIndentation(line.changedBlock.removed);
         }
     }
 
     return analyzed;
+}
+
+function commonIndentation(diffs) {
+    return diffs.reduce(
+        (acc, diff) => {
+            const leadingSpaces = diff.value.match(REGEX.LEADING_SPACES)?.[0].length;
+            if (leadingSpaces === undefined) {
+                return acc;
+            }
+            if (acc === null) {
+                return leadingSpaces;
+            }
+            return Math.min(acc, leadingSpaces);
+        },
+        null
+    ) ?? 0;
 }
 
 export async function extendAnalysis(analyzed) {

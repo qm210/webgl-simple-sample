@@ -32,9 +32,17 @@ export function initBasicState(gl, sources) {
     gl.clearColor(0.0, 0.0, 0.0, 1.0);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
-    state.location.iTime = gl.getUniformLocation(state.program, "iTime");
-    state.location.iResolution = gl.getUniformLocation(state.program, "iResolution");
-    state.location.iMouse = gl.getUniformLocation(state.program, "iMouse");
+    // state.location.iTime = gl.getUniformLocation(state.program, "iTime");
+    // state.location.iResolution = gl.getUniformLocation(state.program, "iResolution");
+    // state.location.iMouse = gl.getUniformLocation(state.program, "iMouse");
+    // etc...
+    // this can be unified with WebGL functions (active == the uniform is actually accessed)
+    const uniformCount = gl.getProgramParameter(state.program, gl.ACTIVE_UNIFORMS);
+    for (let u = 0; u < uniformCount; u++) {
+        const uniform = gl.getActiveUniform(state.program, u);
+        state.uniforms.push(uniform);
+        state.location[uniform.name] = gl.getUniformLocation(state.program, uniform.name);
+    }
 
     gl.useProgram(state.program);
 

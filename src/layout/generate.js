@@ -3,9 +3,9 @@ import {registerShaderCode} from "./shaderCode.js";
 import {appendButton, appendElement, createDiv, createElement} from "./helpers.js";
 import {createScrollStackOn, scrollToFirstInterestingLine} from "./events.js";
 import {deferExtendedAnalysis} from "../glslCode/deferredAnalysis.js";
-import {shiftTime} from "../webgl/render.js";
+import {shiftTime, whilePausingRendering} from "../webgl/render.js";
 import {setCanvasResolution} from "../webgl/setup.js";
-import {recreateFramebufferWithTexture} from "../webgl/helpers.js";
+import {recreateFramebufferWithTexture, updateResolutionInState} from "../webgl/helpers.js";
 
 
 const generatePage = (glContext, elements, state, controls, autoRenderOnLoad = true) => {
@@ -253,11 +253,13 @@ function addDisplayControls(elements, state, glContext) {
             width = Math.max(Math.round(width * factor), 1);
             height = Math.max(Math.round(height * factor), 1);
             setCanvasResolution(elements.canvas, glContext, width, height);
-            state.resolution = [width, height];
+            updateResolutionInState(state, gl);
             /*
-            TODO: must recreate framebuffers, but for that we need a short break from rendering
-            state.framebuffer.forEach(fb => {
-                recreateFramebufferWithTexture(glContext, fb);
+            // TODO: must recreate framebuffers, but for that we need a short break from rendering
+            whilePausingRendering(state, () => {
+                state.framebuffer.forEach(fb => {
+                    recreateFramebufferWithTexture(glContext, fb);
+                });
             });
              */
         };

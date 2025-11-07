@@ -1,12 +1,14 @@
 import {startRenderLoop} from "../webgl/render.js";
-import {createFramebufferWithTexture} from "../webgl/helpers.js";
+import {createFramebufferWithTexture, updateResolutionInState} from "../webgl/helpers.js";
 
+import vertexShaderSource from "../shaders/vertex.basicWithDifferentials.glsl"
 import fragmentShaderSource from "../shaders/multipassPlayground.glsl";
 import {initBasicState} from "./common.js";
 
 export default {
     title: "Multi-Pass Playground",
     init: (gl, sources = {}) => {
+        sources.vertex ??= vertexShaderSource;
         sources.fragment ??= fragmentShaderSource;
         const state = initBasicState(gl, sources);
 
@@ -15,8 +17,7 @@ export default {
         }
 
         // TODO: Resizing the canvas DOES NOT scale the framebuffers / textures yet!! MUST DO
-        state.resolution = [gl.drawingBufferWidth, gl.drawingBufferHeight];
-        const [width, height] = state.resolution;
+        const {width, height} = updateResolutionInState(state, gl);
         state.frameIndex = 0;
         state.nPasses = 3;
 
@@ -87,25 +88,6 @@ export default {
             gl.bindFramebuffer(gl.FRAMEBUFFER, null);
             gl.bindTexture(gl.TEXTURE_2D, null);
         });
-
-        state.location.iTime = gl.getUniformLocation(state.program, "iTime");
-        state.location.iResolution = gl.getUniformLocation(state.program, "iResolution");
-        state.location.prevImage = gl.getUniformLocation(state.program, "iPrevImage");
-        state.location.prevData = gl.getUniformLocation(state.program, "iPrevData");
-        state.location.passIndex = gl.getUniformLocation(state.program, "iPassIndex");
-
-        state.location.iFrame = gl.getUniformLocation(state.program, "iFrame");
-        state.location.iNoiseLevel = gl.getUniformLocation(state.program, "iNoiseLevel");
-        state.location.iNoiseFreq = gl.getUniformLocation(state.program, "iNoiseFreq");
-        state.location.iNoiseOffset = gl.getUniformLocation(state.program, "iNoiseOffset");
-        state.location.iFractionSteps = gl.getUniformLocation(state.program, "iFractionSteps");
-        state.location.iFractionScale = gl.getUniformLocation(state.program, "iFractionScale");
-        state.location.iFractionAmplitude = gl.getUniformLocation(state.program, "iFractionAmplitude");
-        state.location.iCloudMorph = gl.getUniformLocation(state.program, "iCloudMorph");
-        state.location.iCloudVelX = gl.getUniformLocation(state.program, "iCloudVelX");
-        state.location.iFree0 = gl.getUniformLocation(state.program, "iFree0");
-        state.location.iFree1 = gl.getUniformLocation(state.program, "iFree1");
-        state.location.iFree2 = gl.getUniformLocation(state.program, "iFree2");
 
         gl.useProgram(state.program);
 
@@ -201,6 +183,7 @@ export default {
 };
 
 function render(gl, state) {
+    gl.uniform2fv(state.location.texelSize, state.texelSize);
     gl.uniform1f(state.location.iTime, state.time);
     gl.uniform2fv(state.location.iResolution, state.resolution);
     gl.uniform1i(state.location.iFrame, state.frameIndex);
@@ -237,14 +220,14 @@ function render(gl, state) {
         // get the previously rendered image from the other buffer on its attachment
         gl.activeTexture(gl.TEXTURE0);
         gl.bindTexture(gl.TEXTURE_2D, read.texture);
-        gl.uniform1i(state.location.prevImage, 0);
+        gl.uniform1i(state.location.iPrevImage, 0);
 
         // that is the previously calculated extraData from the other buffer on its different attachment
         gl.activeTexture(gl.TEXTURE1);
         gl.bindTexture(gl.TEXTURE_2D, read.extraDataTexture);
-        gl.uniform1i(state.location.prevData, 1);
+        gl.uniform1i(state.location.iPrevData, 1);
 
-        gl.uniform1i(state.location.passIndex, pass);
+        gl.uniform1i(state.location.iPassIndex, pass);
         gl.drawArrays(gl.TRIANGLES, 0, 6);
     }
 

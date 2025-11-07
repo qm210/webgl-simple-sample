@@ -245,3 +245,11 @@ export function takePingPongFramebuffers(state) {
         read: state.framebuffer[pongIndex],
     }
 }
+
+export function updateResolutionInState(state, glContext) {
+    const width = glContext.drawingBufferWidth;
+    const height = glContext.drawingBufferHeight;
+    state.resolution = [width, height];
+    state.texelSize = [1/width, 1/height];
+    return {width, height};
+}

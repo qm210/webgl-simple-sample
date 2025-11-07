@@ -4,6 +4,14 @@ precision highp float;
 layout(location = 0) out vec4 fragColor;
 layout(location = 1) out vec4 outData;
 
+// wird jetzt im Vertex Shader definiert, weil prinzipiell Fragment-unabhängig
+in vec2 st;
+in vec2 stL;
+in vec2 stR;
+in vec2 stT;
+in vec2 stB;
+in float aspRatio;
+
 uniform vec2 iResolution;
 uniform float iTime;
 uniform int iFrame;
@@ -28,8 +36,6 @@ const float pi = 3.1415923;
 const float twoPi = 2. * pi;
 
 const vec4 c = vec4(1., 0., -1., .5);
-
-float aspRatio;
 
 mat2 rot2D(float angle) {
     float c = cos(angle);
@@ -445,7 +451,7 @@ const bool STUPID_SMEAR = false;
 
 void renderNoiseClouds(in vec2 uv) {
     vec2 uvTime = uv - vec2(iCloudVelX, iCloudVelY) * iTime;
-    float n = fbm(uvTime, iCloudMorph * iTime);
+    float n = fbm(uvTime, iCloudMorph * iTime + iNoiseOffset);
     n *= 4.;
     const float lowerLimit = 0.0; // 0.2
     n = smoothstep(lowerLimit, 1.0, n);
@@ -573,31 +579,99 @@ void postprocess(in vec2 uv, in vec2 st) {
     vec3 col = col0;
 }
 
+void renderSampleCircles(in vec2 uv) {
+    /*
+    // blinking circle
+    float seed = floor(iTime * 0.5);
+    if (mod(seed, 2.) > 0.) {
+        return;
+    }
+    float d = sdCircle(uv, 0.25);
+    fragColor = mix(fragColor, c.xxxx, smoothstep(0.02, 0., d));
+    return;
+    */
+
+    /*
+    float seed = floor(iTime * 0.25);
+    float time = mod(iTime, 4.);
+    if (time > 2.) {
+        return;
+    }
+    for (float i = 0.; i < 9.01; i += 1.) {
+    */
+    const float lifetime = 5.;
+    for (float dt = 0.; dt > -lifetime; dt -= 1.) {
+        float t = iTime;
+        float spawnT = floor(iTime) + dt;
+        if (spawnT < 0.) {
+            break;
+        }
+        vec2 spawn = hash22(vec2(0.22, 2.15) * spawnT);
+        t -= spawnT;
+        vec2 pos = uv - spawn;
+        float phi = atan(pos.y, pos.x);
+        float rad = 0.5 * t;
+        pos *= (1. + 0.1 * rad * rad * cos(10. * phi + 4. * t));
+        float d = sdCircle(pos, rad);
+        d = abs(d - 0.1);
+        float amp = 1.;
+        amp = clamp(0., 1., 1. - 0.15 * t);
+        amp *= amp;
+        fragColor = mix(fragColor, c.xxxx, smoothstep(0.02, 0., d) * amp);
+    }
+    fragColor = clamp(fragColor, 0., 1.);
+}
+
+void morphDynamics(vec2 uv) {
+    vec4 left = texture(iPrevImage, stL);
+    vec4 right = texture(iPrevImage, stR);
+    vec4 above = texture(iPrevImage, stT);
+    vec4 below = texture(iPrevImage, stB);
+
+}
+
 void main() {
-    aspRatio = iResolution.x / iResolution.y;
     vec2 uv = (2. * gl_FragCoord.xy) / iResolution.y - vec2(aspRatio, 1.);
 
-    vec2 st = gl_FragCoord.xy / iResolution.xy;
+    // vec2 st = gl_FragCoord.xy / iResolution.xy;
     outData = texture(iPrevData, st);
     // Note: our current setup outData read-only in the last pass
     //       we might change that, but that is a post-processing step, so... no.
 
-    if (iPassIndex > 0) {
-        fragColor = texture(iPrevImage, st);
-    } else {
-        fragColor = c.yyyy;
-    }
+    fragColor = c.yyyy;
+    vec4 prev = texture(iPrevImage, st);
 
     switch (iPassIndex) {
         case 0:
-            renderNoiseClouds(uv);
+            // renderNoiseClouds(uv);
+            renderSampleCircles(uv);
+            if (iFrame > 0) {
+                prev.a *= 0.9;
+                fragColor.rgb = prev.a * fragColor.rgb + prev.rgb;
+                fragColor.a = prev.a + fragColor.a;
+            }
             break;
         case 1:
+            // fragColor.rgb = max(fragColor.rgb, )
+            // renderSampleCircles(uv);
+            fragColor = prev;
+            // fragColor *= 0.5;
+            // prev.a *= 0.95;
+            // fragColor.rgb += image.a * image.rgb;
+            // fragColor.a = max(fragColor.a, image.a);
+            // fragColor.rgb = prev.rgb + prev.a * fragColor.rgb;
+            // fragColor.a += prev.a;
+            // morphDynamics(uv);
             // morphNoiseClouds(uv, st);
             break;
         case 2:
+            fragColor.a = 1.;
+            fragColor.rgb = ychToRgb(0.5 - 0.5 * cos(uv.x), 0.1, 0.1 + 0.4 * fract(st.y));
+            fragColor.rgb += prev.a * prev.rgb;
+            // fragColor.rgb *= fragColor.a;
+            // fragColor = mix(c.yyyx, vec4(fragColor.rgb, 1.), fragColor.a);
             // postprocess(uv, st);
-            fragColor.rb = outData.xy;
+            // fragColor.rb = outData.xy;
         break;
     }
 }

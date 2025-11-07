@@ -3,7 +3,7 @@ import {createTextureFromImage} from "../webgl/helpers.js";
 
 import fragmentShaderSource from "../shaders/texturePlayground.glsl";
 import {compile, createStaticVertexBuffer, initVertices} from "../webgl/setup.js";
-import vertexShaderSource from "../shaders/playground.vertex.glsl";
+import vertexShaderSource from "../shaders/vertex.basic.glsl";
 import image0 from "../textures/frame.png";
 import image1 from "../textures/hubble_extreme_deep_field.jpg";
 import image2 from "../textures/mysterious_capybara.png";

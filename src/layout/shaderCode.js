@@ -104,8 +104,9 @@ function writeRemovedBlock(parent, line) {
     parent.appendChild(hideButton);
     let lineNumber = line.number;
     for (const removed of line.changedBlock.removed) {
+        const content = removed.value.slice(line.changedBlock.indent);
         parent.appendChild(createDiv(lineNumber, "line-number"));
-        parent.appendChild(createDiv(removed.value));
+        parent.appendChild(createDiv(content, "code"));
         parent.appendChild(createDiv());
         lineNumber++;
     }
