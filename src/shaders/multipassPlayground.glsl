@@ -579,26 +579,7 @@ void postprocess(in vec2 uv, in vec2 st) {
     vec3 col = col0;
 }
 
-void renderSampleCircles(in vec2 uv) {
-    /*
-    // blinking circle
-    float seed = floor(iTime * 0.5);
-    if (mod(seed, 2.) > 0.) {
-        return;
-    }
-    float d = sdCircle(uv, 0.25);
-    fragColor = mix(fragColor, c.xxxx, smoothstep(0.02, 0., d));
-    return;
-    */
-
-    /*
-    float seed = floor(iTime * 0.25);
-    float time = mod(iTime, 4.);
-    if (time > 2.) {
-        return;
-    }
-    for (float i = 0.; i < 9.01; i += 1.) {
-    */
+void spawnFunnyShapes(in vec2 uv) {
     const float lifetime = 5.;
     for (float dt = 0.; dt > -lifetime; dt -= 1.) {
         float t = iTime;
@@ -641,20 +622,52 @@ void main() {
     fragColor = c.yyyy;
     vec4 prev = texture(iPrevImage, st);
 
+    bool resetSample = mod(iTime, 5.) < 0.1;
+    /*
+    if (resetSample) {
+        // initialize data again
+        if (iPassIndex > 0) {
+            fragColor.rgb = mix(c.yyy, prev.rgb, prev.a);
+            fragColor.a = 1.;
+        } else {
+            float d = sdCircle(uv, 0.4);
+            fragColor.rgb = c.yxy;
+            fragColor.a = smoothstep(0.02, 0., d);
+        }
+        return;
+    }
+    */
+
     switch (iPassIndex) {
         case 0:
+            if (resetSample) {
+                float d = sdCircle(uv, 0.4);
+                fragColor.rgb = c.yxy;
+                fragColor.a = smoothstep(0.02, 0., d);
+                return;
+            } else {
+                fragColor = prev;
+            }
             // renderNoiseClouds(uv);
-            renderSampleCircles(uv);
+
+            /*
+            spawnFunnyShapes(uv);
             if (iFrame > 0) {
-                prev.a *= 0.9;
+                // blend prev image together with some factor
+                prev.a *= 0.7;
                 fragColor.rgb = prev.a * fragColor.rgb + prev.rgb;
                 fragColor.a = prev.a + fragColor.a;
             }
+            */
+
+
+
             break;
         case 1:
             // fragColor.rgb = max(fragColor.rgb, )
             // renderSampleCircles(uv);
-            fragColor = prev;
+            fragColor.rgb = mix(c.yyy, prev.rgb, prev.a);
+            fragColor.a = 1.;
             // fragColor *= 0.5;
             // prev.a *= 0.95;
             // fragColor.rgb += image.a * image.rgb;
@@ -665,11 +678,10 @@ void main() {
             // morphNoiseClouds(uv, st);
             break;
         case 2:
+            // fragColor.rgb = ychToRgb(0.5 - 0.5 * cos(uv.x), 0.1, 0.1 + 0.4 * fract(st.y));
+            fragColor.rgb = prev.a * prev.rgb;
             fragColor.a = 1.;
-            fragColor.rgb = ychToRgb(0.5 - 0.5 * cos(uv.x), 0.1, 0.1 + 0.4 * fract(st.y));
-            fragColor.rgb += prev.a * prev.rgb;
-            // fragColor.rgb *= fragColor.a;
-            // fragColor = mix(c.yyyx, vec4(fragColor.rgb, 1.), fragColor.a);
+
             // postprocess(uv, st);
             // fragColor.rb = outData.xy;
         break;
