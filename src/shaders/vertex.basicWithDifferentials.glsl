@@ -16,7 +16,7 @@ void main() {
     stL = st - vec2(texelSize.x, 0.);
     stR = st + vec2(texelSize.x, 0.);
     stT = st + vec2(0., texelSize.y);
-    stB = st - vec2(0., texelSize.x);
+    stB = st - vec2(0., texelSize.y);
     aspRatio = texelSize.y / texelSize.x;
     gl_Position = vec4(aPosition.xy, 0., 1.);
 }

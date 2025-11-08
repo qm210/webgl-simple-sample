@@ -19,7 +19,7 @@ export default {
         // TODO: Resizing the canvas DOES NOT scale the framebuffers / textures yet!! MUST DO
         const {width, height} = updateResolutionInState(state, gl);
         state.frameIndex = 0;
-        state.nPasses = 3;
+        state.nPasses = 2;
 
         state.framebuffer = [0, 1].map((index) =>
             createFramebufferWithTexture(gl, {
@@ -203,18 +203,17 @@ function render(gl, state) {
     let pass, write, read;
     for (pass = 0; pass < state.nPasses; pass++) {
 
-        // we always do the frame-buffer ping pong...
         write = state.framebuffer[state.fbPingIndex];
         read = state.framebuffer[state.fbPongIndex];
-        [state.fbPingIndex, state.fbPongIndex] = [state.fbPongIndex, state.fbPingIndex];
 
         // ... but the last pass needs to go to the screen (framebuffer == null)
         if (pass < state.nPasses - 1) {
+            [state.fbPingIndex, state.fbPongIndex] = [state.fbPongIndex, state.fbPingIndex];
             gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo);
             gl.drawBuffers(write.attachments);
         } else {
-            gl.bindFramebuffer(gl.FRAMEBUFFER, null);
             // Note: will not render the extra output anymore, only fragColor!
+            gl.bindFramebuffer(gl.FRAMEBUFFER, null);
         }
 
         // get the previously rendered image from the other buffer on its attachment
@@ -226,6 +225,10 @@ function render(gl, state) {
         gl.activeTexture(gl.TEXTURE1);
         gl.bindTexture(gl.TEXTURE_2D, read.extraDataTexture);
         gl.uniform1i(state.location.iPrevData, 1);
+
+        if (state.frameIndex < 3) {
+            console.log("[DEBUG]", state.frameIndex, pass, write, read, "bound", gl.getParameter(gl.FRAMEBUFFER_BINDING));
+        }
 
         gl.uniform1i(state.location.iPassIndex, pass);
         gl.drawArrays(gl.TRIANGLES, 0, 6);

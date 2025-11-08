@@ -19,6 +19,7 @@ export function startRenderLoop(renderFunction, state, elements) {
     state.startTime = null;
     state.timeRunning = true;
     state.frameIndex = -1;
+    state.resetSignal = false;
     state.stopSignal = false;
     state.stopReached = false;
     state.fps = null;
@@ -45,6 +46,9 @@ export function whilePausingRendering(state, callFunction) {
 }
 
 function runLoop(renderFunction, state, elements, timestamp) {
+    if (state.resetSignal) {
+        resetLoop(state);
+    }
     if (state.startTime === null) {
         state.startTime = timestamp;
     }
@@ -71,6 +75,16 @@ function runLoop(renderFunction, state, elements, timestamp) {
 export function shiftTime(state, seconds) {
     state.time += seconds;
     state.startTime -= 1000 * seconds;
+}
+
+export function resetLoop(state) {
+    state.startTime = null;
+    state.time = 0;
+    state.frameIndex = -1;
+    state.timeRunning = true;
+    state.resetSignal = false;
+    state.stopSignal = false;
+    state.stopReached = false;
 }
 
 const fpsMeter = {

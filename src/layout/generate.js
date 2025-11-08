@@ -3,7 +3,7 @@ import {registerShaderCode} from "./shaderCode.js";
 import {appendButton, appendElement, createDiv, createElement} from "./helpers.js";
 import {createScrollStackOn, scrollToFirstInterestingLine} from "./events.js";
 import {deferExtendedAnalysis} from "../glslCode/deferredAnalysis.js";
-import {shiftTime, whilePausingRendering} from "../webgl/render.js";
+import {resetLoop, shiftTime, whilePausingRendering} from "../webgl/render.js";
 import {setCanvasResolution} from "../webgl/setup.js";
 import {recreateFramebufferWithTexture, updateResolutionInState} from "../webgl/helpers.js";
 
@@ -155,8 +155,7 @@ export const addControlsToPage = (elements, state, controls, autoRenderOnLoad) =
         // cf. render.js for how the state variables work
         switch (event.key) {
             case "Backspace":
-                state.time = 0.;
-                state.startTime = performance.now();
+                state.resetSignal = true;
                 break;
             case " ":
                 if (state.timeRunning) {
@@ -245,6 +244,7 @@ function addDisplayControls(elements, state, glContext) {
     }
     info.appendChild(elements.fps.label);
     info.appendChild(elements.fps.display);
+    info.addEventListener("click", () => console.log(state));
 
     function canvasResize(factor) {
         return () => {

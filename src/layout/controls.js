@@ -310,6 +310,7 @@ export function createResetAllButton(elements, state, controls) {
                 sessionStoreControlState(state, control);
             }
         }
+        state.resetSignal = true;
         event.target.blur();
     });
     return button;

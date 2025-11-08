@@ -11,7 +11,7 @@ in vec2 stR;
 in vec2 stT;
 in vec2 stB;
 in float aspRatio;
-uniform vec2 texelSize;
+
 uniform vec2 iResolution;
 uniform float iTime;
 uniform int iFrame;
@@ -83,26 +83,12 @@ void applyGrid(inout vec3 col, in vec2 uv, float gridStep) {
     // >> step(edge, x) vs. smootshstep(0.0025, 0.0015, dMin);
     // col *= 1. - 0.1 * (smoothstep(dMin, 0.002));
 }
-float hash(float n) {
-    return fract(sin(n) * 43758.5453123);
-}
 
 vec2 hash22(vec2 p)
 {
     p = p*mat2(127.1,311.7,269.5,183.3);
     p = -1.0 + 2.0 * fract(sin(p + .01 * iNoiseOffset)*43758.5453123);
     return sin(p*6.283);
-}
-
-float perlin1D(float x) {
-    float i = floor(x);
-    float f = fract(x);
-    float g0 = hash(i) * 2.0 - 1.0;
-    float g1 = hash(i + 1.0) * 2.0 - 1.0;
-    float d0 = g0 * f;
-    float d1 = g1 * (f - 1.0);
-    float u = smoothstep(0., 1., f);
-    return mix(d0, d1, u);
 }
 
 float perlin2D(vec2 p)
@@ -617,48 +603,12 @@ void spawnFunnyShapes(in vec2 uv) {
     fragColor = clamp(fragColor, 0., 1.);
 }
 
-float max3(vec3 vec) {
-    return max(vec.x, max(vec.y, vec.z));
-}
-
-float val4(vec4 vec) {
-    return vec.a * max3(vec.rgb);
-}
-
-vec2 calcGradient(sampler2D tex) {
-    vec4 left = texture(tex, stL);
-    vec4 right = texture(tex, stR);
-    vec4 up = texture(tex, stT);
-    vec4 down = texture(tex, stB);
-    float valL = val4(left);
-    float valR = val4(right);
-    float valU = val4(up);
-    float valD = val4(down);
-    float dx = (valR - valL) * 0.5;
-    float dy = (valU - valD) * 0.5;
-    return normalize(vec2(dx, dy));
-}
-
-vec4 withAlphaFromValue(vec4 col) {
-    float maxValue = max3(col.rgb);
-    col.rgb /= col.a;
-    col.a = maxValue;
-    return col;
-}
-
 void morphDynamics(vec2 uv) {
-    vec2 grad = calcGradient(iPrevImage);
-    if (length(grad) == 0.) {
-        return;
-    }
-    vec4 gradU = texture(iPrevImage, st + grad * texelSize);
-    vec4 gradD = texture(iPrevImage, st - grad * texelSize);
-    vec2 ortho = vec2(-grad.y, grad.x);
-    vec4 orthoL = texture(iPrevImage, st + ortho * texelSize);
-    vec4 orthoR = texture(iPrevImage, st - ortho * texelSize);
-    vec4 diffused = (gradU + gradD + orthoL + orthoR) * 0.25;
-    float rate = 0.5 + 0.7 * perlin2D(uv + 0.3 * iTime);
-    fragColor = mix(fragColor, diffused, rate);
+    vec4 left = texture(iPrevImage, stL);
+    vec4 right = texture(iPrevImage, stR);
+    vec4 above = texture(iPrevImage, stT);
+    vec4 below = texture(iPrevImage, stB);
+
 }
 
 void main() {
@@ -670,33 +620,52 @@ void main() {
     //       we might change that, but that is a post-processing step, so... no.
 
     vec4 prev = texture(iPrevImage, st);
+    fragColor = prev;
 
-    bool resetSample = mod(iTime, 4.) < 1.;
+    bool resetSample = mod(iTime, 4.) < 0.2;
+    if (resetSample) {
+        float d = sdCircle(uv, 0.4);
+        fragColor.rgb = c.yxy;
+        fragColor.a = smoothstep(0.02, 0., d);
+        return;
+    }
 
     switch (iPassIndex) {
         case 0:
-            fragColor = withAlphaFromValue(prev);
-            if (resetSample) {
-                float d = sdCircle(uv, 0.4);
-                d = smoothstep(0.02, 0., d);
-                vec4 spawn = d * c.wxyx;
-                fragColor = mix(fragColor, spawn, d);
-//                fragColor.rgb = d * c.yxy;
-//                fragColor.a = d;
-                // fragColor.a = max(fragColor.a, d);
+            fragColor.rgb = prev.a * prev.rgb;
+            fragColor.a = 1.;
+            // renderNoiseClouds(uv);
+
+            /*
+            spawnFunnyShapes(uv);
+            if (iFrame > 0) {
+                // blend prev image together with some factor
+                prev.a *= 0.7;
+                fragColor.rgb = prev.a * fragColor.rgb + prev.rgb;
+                fragColor.a = prev.a + fragColor.a;
             }
-            if (iFrame == 0) {
-                return;
-            }
-            // fragColor.rgb = mix(c.yyy, prev.rgb, prev.a);
-            morphDynamics(uv);
+            */
             break;
         case 1:
-            fragColor.rgb = mix(c.yyy, prev.rgb, prev.a);
+            fragColor.rgb = prev.a * prev.rgb;
             fragColor.a = 1.;
-            // fragColor.rgb = prev.rgb * prev.a;
-            // fragColor.a = 1.;
+            // fragColor *= 0.5;
+            // prev.a *= 0.95;
+            // fragColor.rgb += image.a * image.rgb;
+            // fragColor.a = max(fragColor.a, image.a);
+            // fragColor.rgb = prev.rgb + prev.a * fragColor.rgb;
+            // fragColor.a += prev.a;
+            // morphDynamics(uv);
+            // morphNoiseClouds(uv, st);
             break;
+        case 2: // DISABLED FOR NOW!!
+            return;
+            // fragColor.rgb = ychToRgb(0.5 - 0.5 * cos(uv.x), 0.1, 0.1 + 0.4 * fract(st.y));
+            fragColor.rgb = prev.a * prev.rgb;
+            fragColor.a = 1.;
+
+            // postprocess(uv, st);
+            // fragColor.rb = outData.xy;
+        break;
     }
 }
-
