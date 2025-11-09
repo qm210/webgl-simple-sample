@@ -135,8 +135,8 @@ export default {
             type: "floatInput",
             name: "iCurlStrength",
             defaultValue: 0,
-            min: -2,
-            max: 2,
+            min: -0.5,
+            max: 1.5,
         }, {
             type: "button",
             name: "doRenderVelocity",
@@ -154,9 +154,9 @@ export default {
         }, {
             type: "floatInput",
             name: "iSunraysWeight",
-            defaultValue: 0.0,
-            min: -1.,
-            max: 2.,
+            defaultValue: 1.,
+            min: 0.,
+            max: 20.,
         }, {
             type: "floatInput",
             name: "iSunraysIterations",
@@ -254,7 +254,7 @@ const PASS = {
 
 let write, readPrevious, readVelocity;
 let lastSpawned = -10000;
-const SPAWN_EVERY_SECONDS = 1.;
+const SPAWN_EVERY_SECONDS = 2.5;
 
 function render(gl, state) {
     gl.uniform1f(state.location.iTime, state.time);
@@ -497,4 +497,8 @@ function render(gl, state) {
     gl.bindTexture(gl.TEXTURE_2D, state.framebuffer.post.sunrays.effect.texture);
     gl.drawArrays(gl.TRIANGLES, 0, 6);
 
+    // need to cleanup this one, we got
+    //   "GL_INVALID_OPERATION: glDrawArrays: Feedback loop formed between Framebuffer and active Texture."
+    gl.activeTexture(gl.TEXTURE3);
+    gl.bindTexture(gl.TEXTURE_2D, null);
 }

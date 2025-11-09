@@ -680,6 +680,15 @@ void morphDynamics(vec2 uv) {
     fragColor = clamp(mix(fragColor, diffused, rate), 0., 1.);
 }
 
+vec3 makeSurplusWhite(vec3 color) {
+    vec3 surplus = max(c.yyy, color - 1.);
+    color = min(color, 1.);
+    color.r += surplus.g + surplus.b;
+    color.g += surplus.r + surplus.b;
+    color.b += surplus.r + surplus.g;
+    return clamp(color, 0., 1.);
+}
+
 vec4 simulateAdvection(sampler2D fieldTexture, float dissipationFactor) {
     vec2 hasMovedTo = st - deltaTime * velocity * texelSize;
     vec4 advectedValue = texture(fieldTexture, hasMovedTo);
@@ -747,13 +756,14 @@ void main() {
             if (iSpawnSeed < 0.) {
                 break;
             }
-            vec2 randomVelocity = hash22(vec2(iSpawnSeed, iSpawnSeed + 0.1)) * iMaxInitialVelocity;
-            // vec2 initialVelocity = randomVelocity * iMaxInitialVelocity;
-            // <-- would be random, but let's always go from/to the center for now:
-            vec2 initialVelocity = uv * iMaxInitialVelocity;
+            vec2 randomVelocity = hash22(vec2(iSpawnSeed, iSpawnSeed + 0.1))
+                * iMaxInitialVelocity * vec2(aspRatio, 1.);
             // <-- hash22(x) is _pseudo_random_, i.e. same x results in same "random" value
             // we want randomVelocity.x != randomVelocity.y, thus the 0.1 offset
             // but the overall randomVelocity will only differ when sampleSeed differs.
+            // vec2 initialVelocity = randomVelocity * iMaxInitialVelocity;
+            // <-- would be random, but can also direct towards / away from center
+            vec2 initialVelocity = uv * iMaxInitialVelocity;
             uv = uv - spawnCenter;
             d = sdCircle(uv, spawnSize);
             d = smoothstep(0.02, 0., d);
@@ -771,10 +781,11 @@ void main() {
             float a = smoothstep(0.02, 0., d) * exp(-dot(uv, uv) / spawnSize);
             vec4 spawn = a * c.yyxx;
             spawn.r += pow(-min(0., d), 0.5) * 1.6;
-            // spawn = clamp(spawn, 0., 1.);
-        //            fragColor = mix(previous, spawn, a);
+            // mix old stuff in:
             fragColor = vec4(previous.rgb + spawn.rgb, 1.);
-            return;
+            // just new stuff:
+            // fragColor = vec4(spawn.rgb, 1.);
+        return;
 
         case PROCESS_VELOCITY_PASS(1):
             // this just calculates the "curl" (scalar => only red) for the next pass
@@ -876,6 +887,7 @@ void main() {
 
             // 1. first, mimic the gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
             const vec3 bg = c.yyy;
+            fragColor.rgb = makeSurplusWhite(previous.rgb);
             fragColor.rgb = previous.rgb + (1. - previous.a) * bg;
             // 2. mix post-processing-sunrays in from their texture
             float sunrays = texture(texPostSunrays, st).r;
