@@ -11,8 +11,8 @@ out vec4 fragColor;
 in vec2 st;
 in vec2 stL;
 in vec2 stR;
-in vec2 stT;
-in vec2 stB;
+in vec2 stU;
+in vec2 stD;
 in float aspRatio;
 
 uniform vec2 iResolution;
@@ -21,6 +21,7 @@ uniform int iFrame;
 uniform int iPassIndex;
 uniform sampler2D texPrevious;
 uniform sampler2D texVelocity;
+uniform sampler2D texCurl;
 
 // for fluid dynamics
 uniform vec2 texelSize;
@@ -28,6 +29,7 @@ uniform float deltaTime;
 uniform float iColorDissipation;
 uniform float iVelocityDissipation;
 uniform float iMaxInitialVelocity;
+uniform float iCurlStrength;
 uniform float iSpawnSeed;
 // for debugging:
 uniform int doRenderVelocity;
@@ -44,6 +46,10 @@ uniform float iCloudVelY;
 uniform vec3 iFree0;
 uniform vec3 iFree1;
 uniform vec3 iFree2;
+
+// set these in main, but make global
+vec4 previous;
+vec2 velocity;
 
 const float pi = 3.1415923;
 const float twoPi = 2. * pi;
@@ -486,7 +492,7 @@ void renderNoiseClouds(in vec2 uv) {
 }
 
 void morphNoiseClouds(in vec2 uv, in vec2 st) {
-    fragColor = texture(texPrevious, st);
+    fragColor = previous;
 
     if (STUPID_SMEAR) { /* just as to know we are set up... |o| */
         vec3 imageClone = texture(texPrevious, st - vec2(0., 0.002)).rgb;
@@ -641,8 +647,8 @@ float val4(vec4 vec) {
 vec2 calcGradient(sampler2D tex) {
     vec4 left = texture(tex, stL);
     vec4 right = texture(tex, stR);
-    vec4 up = texture(tex, stT);
-    vec4 down = texture(tex, stB);
+    vec4 up = texture(tex, stU);
+    vec4 down = texture(tex, stD);
     float valL = val4(left);
     float valR = val4(right);
     float valU = val4(up);
@@ -674,10 +680,9 @@ vec4 blur(vec2 uv) {
     return sum;
 }
 
-vec4 simulateAdvection(sampler2D fieldTexture, sampler2D velocity, float dissipationFactor) {
-    vec2 texelVelocity = texture(velocity, st).xy * texelSize;
-    vec2 coord = st - deltaTime * texelVelocity;
-    vec4 advectedValue = texture(fieldTexture, coord);
+vec4 simulateAdvection(sampler2D fieldTexture, float dissipationFactor) {
+    vec2 hasMovedTo = st - deltaTime * velocity * texelSize;
+    vec4 advectedValue = texture(fieldTexture, hasMovedTo);
     float decay = 1.0 + dissipationFactor * deltaTime;
     return advectedValue / decay;
 }
@@ -689,9 +694,9 @@ void processImage() {
 
 #define INIT_VELOCITY_PASS 0
 #define INIT_IMAGE_PASS 1
-#define PROCESS_VELOCITY_PASS 2
-#define PROCESS_IMAGE_PASS 3
-#define RENDER_TO_SCREEN_PASS 4
+#define PROCESS_VELOCITY_PASS(x) (10+x)
+#define PROCESS_IMAGE_PASS 50
+#define RENDER_TO_SCREEN_PASS 99
 
 void main() {
     // vec2 uv = (2. * gl_FragCoord.xy) / iResolution.y - vec2(aspRatio, 1.);
@@ -700,18 +705,18 @@ void main() {
     // -> st nützlich, um Texturen zu verarbeiten
     // -> wenn Textur auf Screen soll, y-Vorzeichen und Aspect Ratio bedenken!
 
-    vec4 prevColor = texture(texPrevious, st);
+    // brauchen wir nicht für jeden Pass, aber erlauben wir uns für lesbareren Zugriff...
+    previous = texture(texPrevious, st);
+    velocity = texture(texVelocity, st).xy;
 
-    bool initSample = iSpawnSeed >= 0.;
     vec2 spawnCenter = hash22(vec2(1.2, 1.1) * iSpawnSeed);
     const float spawnSize = 0.5;
-    float d;
+    float d, velL, velR, velU, velD;
 
     switch (iPassIndex) {
         case INIT_VELOCITY_PASS:
-            if (!initSample) {
-                fragColor = prevColor;
-                return;
+            if (iSpawnSeed < 0.) {
+                break;
             }
             vec2 randomVelocity = hash22(vec2(iSpawnSeed, iSpawnSeed + 0.1)) * iMaxInitialVelocity;
             // vec2 initialVelocity = randomVelocity * iMaxInitialVelocity;
@@ -723,15 +728,14 @@ void main() {
             uv = uv - spawnCenter;
             d = sdCircle(uv, spawnSize);
             d = smoothstep(0.02, 0., d);
-            d = exp(-dot(uv, uv) / spawnSize);
+            d   = exp(-dot(uv, uv) / spawnSize);
             vec2 newValue = d * initialVelocity;
-            fragColor.xy = prevColor.xy + newValue;
+            fragColor.xy = previous.xy + newValue;
             // can ignore fragColor.zw because these will never be read
             return;
         case INIT_IMAGE_PASS:
-            if (!initSample) {
-                fragColor = prevColor;
-                return;
+            if (iSpawnSeed < 0.) {
+                break;
             }
             uv = uv - spawnCenter;
             d = sdCircle(uv, spawnSize);
@@ -739,27 +743,80 @@ void main() {
             vec4 spawn = a * c.yyxx;
             spawn.r += pow(-min(0., d), 0.5) * 1.6;
             // spawn = clamp(spawn, 0., 1.);
-        //            fragColor = mix(prevColor, spawn, a);
+        //            fragColor = mix(previous, spawn, a);
             fragColor = vec4(fragColor.rgb + spawn.rgb, 1.);
-//            fragColor.a = 1.;
             return;
-        case PROCESS_VELOCITY_PASS:
-            fragColor = simulateAdvection(texVelocity, texVelocity, iVelocityDissipation);
+        case PROCESS_VELOCITY_PASS(1):
+            // this just calculates the "curl" (scalar => only red) for the next pass
+            // understand the curl as kind of "orthogonal to the gradient": (x, y) -> (-y, x)
+            velL = +texture(texVelocity, stL).y;
+            velR = +texture(texVelocity, stR).y;
+            velU = -texture(texVelocity, stU).x;
+            velD = -texture(texVelocity, stD).x;
+            float curl = velR - velL + velU - velD;
+            fragColor = vec4(curl, 0., 0., 1.);
+            return;
+        case PROCESS_VELOCITY_PASS(2):
+            // the curl from the previous pass is here the "previous.r"
+            float curlHere = texture(texCurl, st).x;
+            float curlL = texture(texCurl, stL).x;
+            float curlR = texture(texCurl, stR).x;
+            float curlU = texture(texCurl, stU).x;
+            float curlD = texture(texCurl, stD).x;
+            vec2 force = vec2(abs(curlU) - abs(curlD), abs(curlR) - abs(curlL));
+            if (length(force) == 0.) {
+                break;
+            }
+            // TODO: check performance difference between this check and no-branching
+            // : force /(length(force) + 0.0001;
+            force *= iCurlStrength * curlHere * normalize(force) * vec2(1, -1);
+            velocity += force * deltaTime;
+            velocity = clamp(velocity, -1000., 1000.);
+            fragColor = vec4(velocity, 0., 1.);
+            return;
+        case PROCESS_VELOCITY_PASS(3):
+            // this handles divergence at the borders
+            velL = texture(texVelocity, stL).x;
+            velR = texture(texVelocity, stR).x;
+            velU = texture(texVelocity, stU).y;
+            velD = texture(texVelocity, stD).y;
+            // these are equivalent mathematically:
+            // if (a < b) { velL = c; }
+            // velL = a < b ? c : L;
+            // velL = mix(velL, c, float(a < b));
+            // velL = mix(velL, c, step(a, b));
+            // and compiler might recognize them as equal; but the last one is the most idiomatic GLSL
+            velL = mix(velL, -velocity.x, step(stL.x, 0.0));
+            velR = mix(velR, -velocity.x, step(1.0, stR.x));
+            velU = mix(velU, -velocity.y, step(1.0, stU.y));
+            velD = mix(velD, -velocity.y, step(stD.y, 0.0));
+            // the divergence texture is scalar / one-dimensional / a single value,
+            float divergence = 0.5 * (velR - velL + velU - velD);
+            // i.e. in terms of usually RGBA; this considers just "red"
+            fragColor = vec4(divergence, 0., 0., 1.);
+            return;
+        case PROCESS_VELOCITY_PASS(4):
+            fragColor = simulateAdvection(texVelocity, iVelocityDissipation);
             return;
         case PROCESS_IMAGE_PASS:
-            fragColor = prevColor;
+            fragColor = previous;
             // this does not go through right now
-            fragColor = simulateAdvection(texPrevious, texVelocity, iColorDissipation);
+            fragColor = simulateAdvection(texPrevious, iColorDissipation);
             return;
         case RENDER_TO_SCREEN_PASS:
             if (doRenderVelocity == 1) {
-                // use middle grey == 0
                 fragColor = 0.5 * texture(texVelocity, st) + 0.5;
+            } else if (doRenderVelocity == 2) {
+                fragColor = 0.5 * texture(texCurl, st) + 0.5;
             } else {
                 fragColor.a = max3(fragColor.rgb);
-                fragColor.rgb = mix(c.yyy, prevColor.rgb, prevColor.a);
+                fragColor.rgb = mix(c.yyy, previous.rgb, previous.a);
             }
             fragColor.a = 1.;
             return;
+        default:
+            break;
     }
+
+    fragColor = previous;
 }

@@ -76,7 +76,14 @@ export default {
         gl.bindFramebuffer(gl.FRAMEBUFFER, initialVelocity.fbo);
         gl.clearColor(0,0,0,0);
         gl.clear(gl.COLOR_BUFFER_BIT);
+        // also initialize the curl framebuffer texture (there is only one), while we're at it
+        gl.bindFramebuffer(gl.FRAMEBUFFER, state.framebuffer.fluid.curl.fbo);
+        gl.clearColor(1, 1, 1, 1);
+        gl.clear(gl.COLOR_BUFFER_BIT);
+        // and reset these shenanigans (is needless for us here, but good style in general.)
+        // TODO: MEASURE THAT IN MS DIFFERENCE (also, Indexed Draw)
         gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+
 
         return state;
     },
@@ -107,12 +114,23 @@ export default {
             min: 0,
             max: 100,
         }, {
+            type: "floatInput",
+            name: "iCurlStrength",
+            defaultValue: 0,
+            min: -100,
+            max: 100,
+        }, {
             type: "button",
             name: "doRenderVelocity",
             label: "Render Velocity instead of Image",
             onClick: (button) => {
-                state.doRenderVelocity = Number(!state.doRenderVelocity);
-                button.textContent = `Render Velocity instead of Image = ${state.doRenderVelocity}`;
+                state.doRenderVelocity = (state.doRenderVelocity + 1) % 3;
+                button.textContent =
+                    state.doRenderVelocity === 1
+                        ? "Rendering: Velocity Texture (.rg)"
+                        : state.doRenderVelocity === 2
+                        ? "Rendering: Curl Texture (.r)"
+                        :"Rendering Image, click to debug other textures";
                 console.log(state);
             }
         }, {
@@ -189,22 +207,28 @@ export default {
 const PASS = {
     INIT_VELOCITY: 0,
     INIT_IMAGE: 1,
-    PROCESS_VELOCITY: 2,
-    PROCESS_IMAGE: 3,
-    RENDER_TO_SCREEN: 4,
+    PROCESS_VELOCITY_1: 11,
+    PROCESS_VELOCITY_2: 12,
+    PROCESS_VELOCITY_3: 13,
+    PROCESS_VELOCITY_4: 14,
+    PROCESS_IMAGE: 50,
+    RENDER_TO_SCREEN: 99,
 };
 
+let write, readPrevious, readVelocity;
 let lastSpawned = -10000;
-let write, read;
+const SPAWN_EVERY_SECONDS = 3.;
 
 function render(gl, state) {
     gl.uniform1f(state.location.iTime, state.time);
     gl.uniform1f(state.location.deltaTime, state.deltaTime);
     gl.uniform2fv(state.location.iResolution, state.resolution);
     gl.uniform1i(state.location.iFrame, state.frameIndex);
+
     gl.uniform1f(state.location.iColorDissipation, state.iColorDissipation);
     gl.uniform1f(state.location.iVelocityDissipation, state.iVelocityDissipation);
     gl.uniform1f(state.location.iMaxInitialVelocity, state.iMaxInitialVelocity);
+    gl.uniform1f(state.location.iCurlStrength, state.iCurlStrength);
     gl.uniform1i(state.location.doRenderVelocity, state.doRenderVelocity);
 
     gl.uniform1f(state.location.iNoiseLevel, state.iNoiseLevel);
@@ -223,8 +247,8 @@ function render(gl, state) {
     // -> no gl.drawBuffers() required.
 
     state.spawnSeed = -1.;
-    if (state.time - lastSpawned > 4.) {
-        state.spawnSeed = Math.floor(state.time / 4.);
+    if (state.time - lastSpawned > SPAWN_EVERY_SECONDS) {
+        state.spawnSeed = Math.floor(state.time / SPAWN_EVERY_SECONDS);
         lastSpawned = state.time;
     }
     gl.uniform1f(state.location.iSpawnSeed, state.spawnSeed);
@@ -232,44 +256,103 @@ function render(gl, state) {
     gl.uniform1i(state.location.doRenderVelocity, state.doRenderVelocity);
 
     // also, the assignment of the two input textures stay the same:
-    gl.uniform1i(state.location.texPrevious, 0); // <-- texture unit gl.TEXTURE0
-    gl.uniform1i(state.location.texVelocity, 1); // <-- texture unit gl.TEXTURE1
+    // texPrevious @ texture unit gl.TEXTURE0
+    //  -> when a shader pass uses texPrevious, gl.activeTexture(gl.TEXTURE0) must be used before binding the texture
+    // texVelocity @ texture unit gl.TEXTURE1
+    //  -> when a shader pass uses texVelocity, gl.activeTexture(gl.TEXTURE1) must be... blah blah.
+    gl.uniform1i(state.location.texPrevious, 0);
+    gl.uniform1i(state.location.texVelocity, 1);
+    gl.uniform1i(state.location.texCurl, 2); // could also use 0 here because we will not conflict, but this is needless.
+    // and depending on what we want to write, we need to bind that corresponding Framebuffer only
+    // (so if these are part of a ping-pong-pair, swap them after drawing to make them usable for a later pass)
 
     /////////////
+
     gl.uniform1i(state.location.iPassIndex, PASS.INIT_VELOCITY);
 
-    [write, read] = state.framebuffer.fluid.velocity.currentWriteAndRead();
+    [write, readPrevious] = state.framebuffer.fluid.velocity.currentWriteAndRead();
     gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo);
     gl.viewport(0, 0, write.width, write.height);
     gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, read.texture);
+    gl.bindTexture(gl.TEXTURE_2D, readPrevious.texture);
     gl.uniform2fv(state.location.texelSize, state.fluid.texelSize);
     gl.drawArrays(gl.TRIANGLES, 0, 6);
     state.framebuffer.fluid.velocity.doPingPong();
 
     /////////////
+
     gl.uniform1i(state.location.iPassIndex, PASS.INIT_IMAGE);
 
-    [write, read] = state.framebuffer.image.currentWriteAndRead();
+    [write, readPrevious] = state.framebuffer.image.currentWriteAndRead();
     gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo);
     gl.viewport(0, 0, write.width, write.height);
     gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, read.texture);
+    gl.bindTexture(gl.TEXTURE_2D, readPrevious.texture);
     gl.uniform2fv(state.location.texelSize, state.texelSize);
     gl.drawArrays(gl.TRIANGLES, 0, 6);
     state.framebuffer.image.doPingPong();
 
     /////////////
-    gl.uniform1i(state.location.iPassIndex, PASS.PROCESS_VELOCITY);
 
-    [write, read] = state.framebuffer.fluid.velocity.currentWriteAndRead();
+    // Use Velocity to calculate a fresh Scalar: Curl
+
+    gl.uniform1i(state.location.iPassIndex, PASS.PROCESS_VELOCITY_1);
+
+    write = state.framebuffer.fluid.curl;
+    [, readVelocity] = state.framebuffer.fluid.velocity.currentWriteAndRead();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo);
+    gl.viewport(0, 0, write.width, write.height);
+    gl.activeTexture(gl.TEXTURE1);
+    gl.bindTexture(gl.TEXTURE_2D, readVelocity.texture);
+    gl.uniform2fv(state.location.texelSize, state.fluid.texelSize);
+    gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+    /////////////
+
+    // Use Curl and Velocity to calculate new Velocity
+
+    gl.uniform1i(state.location.iPassIndex, PASS.PROCESS_VELOCITY_2);
+    [write, readVelocity] = state.framebuffer.fluid.velocity.currentWriteAndRead();
+    const readCurl = state.framebuffer.fluid.curl;
+    gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo);
+    gl.viewport(0, 0, write.width, write.height);
+    gl.activeTexture(gl.TEXTURE1);
+    gl.bindTexture(gl.TEXTURE_2D, readVelocity.texture);
+    gl.activeTexture(gl.TEXTURE2);
+    gl.bindTexture(gl.TEXTURE_2D, readCurl.texture); // is the curl framebuffer here
+    gl.uniform2fv(state.location.texelSize, state.fluid.texelSize);
+    gl.drawArrays(gl.TRIANGLES, 0, 6);
+    // ! ... we did use Velocity to write Velocity, so do the ping-pong:
+    state.framebuffer.fluid.velocity.doPingPong();
+
+    /////////////
+
+    // Use Velocity to calculate a fresh Scalar: Divergence
+
+    gl.uniform1i(state.location.iPassIndex, PASS.PROCESS_VELOCITY_3);
+
+    write = state.framebuffer.fluid.divergence;
+    [, readVelocity] = state.framebuffer.fluid.velocity.currentWriteAndRead();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo);
+    gl.viewport(0, 0, write.width, write.height);
+    gl.activeTexture(gl.TEXTURE1);
+    gl.bindTexture(gl.TEXTURE_2D, readPrevious.texture);
+    gl.uniform2fv(state.location.texelSize, state.fluid.texelSize);
+    gl.drawArrays(gl.TRIANGLES, 0, 6);
+    // ! ... we did not write to anything we've read from, i.e. no swap here
+
+    /////////////
+
+    gl.uniform1i(state.location.iPassIndex, PASS.PROCESS_VELOCITY_4);
+
+    [write, readPrevious] = state.framebuffer.fluid.velocity.currentWriteAndRead();
+    readVelocity = readPrevious;
     gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo);
     gl.viewport(0, 0, write.width, write.height);
     gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, read.texture);
-    let velocityRead = read;
+    gl.bindTexture(gl.TEXTURE_2D, readPrevious.texture);
     gl.activeTexture(gl.TEXTURE1);
-    gl.bindTexture(gl.TEXTURE_2D, velocityRead.texture);
+    gl.bindTexture(gl.TEXTURE_2D, readVelocity.texture);
     gl.uniform2fv(state.location.texelSize, state.fluid.texelSize);
     gl.drawArrays(gl.TRIANGLES, 0, 6);
     state.framebuffer.fluid.velocity.doPingPong();
@@ -277,14 +360,14 @@ function render(gl, state) {
     /////////////
     gl.uniform1i(state.location.iPassIndex, PASS.PROCESS_IMAGE);
 
-    [write, read] = state.framebuffer.image.currentWriteAndRead();
+    [write, readPrevious] = state.framebuffer.image.currentWriteAndRead();
+    [, readVelocity] = state.framebuffer.fluid.velocity.currentWriteAndRead();
     gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo);
     gl.viewport(0, 0, write.width, write.height);
     gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, read.texture);
-    [, velocityRead] = state.framebuffer.fluid.velocity.currentWriteAndRead();
+    gl.bindTexture(gl.TEXTURE_2D, readPrevious.texture);
     gl.activeTexture(gl.TEXTURE1);
-    gl.bindTexture(gl.TEXTURE_2D, velocityRead.texture);
+    gl.bindTexture(gl.TEXTURE_2D, readVelocity.texture);
     gl.uniform2fv(state.location.texelSize, state.texelSize);
     gl.drawArrays(gl.TRIANGLES, 0, 6);
     state.framebuffer.image.doPingPong();

@@ -9,8 +9,8 @@ layout(location = 1) out vec4 outData;
 in vec2 st;
 in vec2 stL;
 in vec2 stR;
-in vec2 stT;
-in vec2 stB;
+in vec2 stU;
+in vec2 stD;
 in float aspRatio;
 uniform vec2 texelSize;
 uniform vec2 iResolution;
@@ -629,8 +629,8 @@ float val4(vec4 vec) {
 vec2 calcGradient(sampler2D tex) {
     vec4 left = texture(tex, stL);
     vec4 right = texture(tex, stR);
-    vec4 up = texture(tex, stT);
-    vec4 down = texture(tex, stB);
+    vec4 up = texture(tex, stU);
+    vec4 down = texture(tex, stD);
     float valL = val4(left);
     float valR = val4(right);
     float valU = val4(up);
