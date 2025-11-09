@@ -567,16 +567,23 @@ float calcSoftshadow( in vec3 ro, in vec3 rd, in float mint, in float tmax )
     float t = mint;
     for( int i=0; i<80; i++ )
     {
+        // Ray Marching von der Aufprallstelle des ersten Marchings (raymarch(...))
         float h = map( ro + rd*t ).t;
+        // Aber nicht mit Ziel, den Abstand des nächsten Materials zu finden, sondern
+        // den kleinsten Quotienten s zu finden, der uns sagt: Auf dem zweiten Strahl,
+        // ist irgendwo ein Objekt viel näher (h) als unser Strahl lang (t)?
+        // - h == 0 heißt "anderes Objekt im Weg" (dessen SDF ist an seiner Oberfläche ja 0)
+        // - kleines h/t heißt, der Schatten hatte genug Raum, sich auszubreiten.
         // Logik hinter h / t:
-        //  - t ist aktuell angenommene Länge des Strahls von Auftrittspunkt (Boden) Richtung Licht
-        //  - h ist dann minimale SDF; entspricht also dem Objekt minimalen Abstands = größten Beitrags
-        //  - h/t = Entfernung der Objektoberfläche relativ zur Strahllänge = Ausbreitung des Schattens
-        //    und macht Schatten weicher, weil Ecken "mehr Einzugsgebiet" des Schattens beziehen
-        // Aber auch hier: die genauen Zahlen sind künstlerisch / empirisch gewählt, nicht physikalisch.
+        //  - t ist aktuell beschrittene Länge des Strahls von Auftrittspunkt (Boden) Richtung Licht
+        //  - h ist dann Abstand zum nächsten Objekt (SDF eben, h == 0 wenn anderes Objekt getroffen)
+        //  - h/t klein heißt: der Schatten, den das Objekt (in Abstand h) wirft, hat relativ viel Raum
+        //    (Strahllänge t), um sich auszubreiten.
         float s = clamp(8.0*h/t,0.0,1.0);
-        // kleinsten Faktor finden:
+        // Aber auch hier: die genauen Zahlen sind künstlerisch / empirisch gewählt, nicht physikalisch.
         res = min( res, s );
+        // Und: Schrittweite begrenzen, wir wollen viele Schattenbeiträge in der Nähe sammeln,
+        //      ergibt dann weiche Schatten, nicht nur klares "irgendwas ist im Weg" vs. "nicht".
         t += clamp( h, 0.01, 0.2 );
         if( res<0.004 || t>tmax ) break;
     }

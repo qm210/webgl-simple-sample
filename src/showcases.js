@@ -10,8 +10,9 @@ import showcase6b from "./showcases/6b_RayMarchingPrimitives.js";
 import showcase7 from "./showcases/7_VariousConceptsFor3D.js";
 import showcase8 from "./showcases/8_MultiPassAndExtraData.js";
 import showcase9 from "./showcases/9_FluidSimulation.js";
+import showcase10 from "./showcases/10_RayTracing.js"
 import showcaseFbo from "./showcases/retired/9_FramebufferPingPong.js";
-import showcase10 from "./showcases/retired/10_StochasticRayTracing.js";
+import showcaseRIOW from "./showcases/retired/10_StochasticRayTracing.js";
 import showcase11 from "./showcases/retired/11_Volumetric.js";
 import showcaseX from "./showcases/X_SimulationPlayground.js";
 
@@ -52,6 +53,10 @@ export function selectShowcase() {
             return showcase10;
         case "11":
             return showcase11;
+        case "fbo":
+            return showcaseFbo;
+        case "riow":
+            return showcaseRIOW;
         case "x":
             return showcaseX;
         default:
