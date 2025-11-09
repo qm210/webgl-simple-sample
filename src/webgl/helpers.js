@@ -36,6 +36,16 @@ export function asResolution({width, height, aspectRatio}) {
     };
 }
 
+export function resolutionScaled(newHeight, oldWidth, oldHeight) {
+    const resolution = {
+        width: Math.floor(newHeight * oldWidth / oldHeight),
+        height: Math.floor(newHeight),
+    };
+    resolution.asVec2 = [resolution.width, resolution.height];
+    resolution.texelSize = [1 / resolution.width, 1 / resolution.height];
+    return resolution;
+}
+
 /**
  * @return {{width, height}}
  */
@@ -173,6 +183,27 @@ export function createFramebufferWithTexture(gl, options, fbIndex = undefined) {
             magFilter,
         },
     };
+}
+
+export function halfFloatOptions(gl, resolution, internalFormat, filter) {
+    const dataFormatFor = {
+        [gl.R16F]: gl.RED,
+        [gl.RG16F]: gl.RG,
+        [gl.RGB16F]: gl.RG,
+        [gl.RGBA16F]: gl.RGBA,
+    };
+    const result = {
+        ...resolution,
+        minFilter: filter,
+        maxFilter: filter,
+        internalFormat,
+        dataFormat: dataFormatFor[internalFormat],
+        dataType: gl.HALF_FLOAT,
+    };
+    if (!result.internalFormat) {
+        throw Error(`halfFloatOptions() helper function can not deal with internalFormat ${internalFormat}`);
+    }
+    return result;
 }
 
 export function createPingPongFramebuffersWithTexture(gl, options) {

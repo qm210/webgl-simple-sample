@@ -1,7 +1,7 @@
 import {startRenderLoop} from "../webgl/render.js";
 import {
     createFramebufferWithTexture,
-    createPingPongFramebuffersWithTexture,
+    createPingPongFramebuffersWithTexture, halfFloatOptions, resolutionScaled,
     updateResolutionInState
 } from "../webgl/helpers.js";
 
@@ -32,12 +32,10 @@ export default {
                 height,
                 colorAttachment: gl.COLOR_ATTACHMENT0,
             }),
-            fluid: {}
+            fluid: {},
+            post: {},
         };
-        state.fluid = {
-            width: Math.floor(128 * width / height),
-            height: 128
-        };
+        state.fluid = resolutionScaled(128, width, height);
         state.fluid.texelSize = [1 / state.fluid.width, 1 / state.fluid.height];
         state.fluid.scalarField = {
             width: state.fluid.width,
@@ -67,6 +65,26 @@ export default {
         // need some way of controlling when to spawn, because the input textures should then have that
         // external value _exactly_ one frame, that is quite hard to accomplish inside the shader.
         state.spawnSeed = 0.;
+
+        // analog zum scalarField oben -> Helper definiert :)
+        state.framebuffer.post.sunrays = {
+            options: halfFloatOptions(
+                gl,
+                resolutionScaled(196, width, height),
+                gl.R16F,
+                gl.LINEAR
+            ),
+            effect: undefined,
+            afterblur: undefined,
+        }
+        state.framebuffer.post.sunrays.effect =
+            createFramebufferWithTexture(gl,
+                state.framebuffer.post.sunrays.options
+            );
+        state.framebuffer.post.sunrays.tempForBlur =
+            createFramebufferWithTexture(gl,
+                state.framebuffer.post.sunrays.options
+            );
 
         gl.useProgram(state.program);
 
@@ -111,14 +129,14 @@ export default {
             type: "floatInput",
             name: "iMaxInitialVelocity",
             defaultValue: 1,
-            min: 0,
-            max: 100,
+            min: -500,
+            max: 500,
         }, {
             type: "floatInput",
             name: "iCurlStrength",
             defaultValue: 0,
-            min: -100,
-            max: 100,
+            min: -2,
+            max: 2,
         }, {
             type: "button",
             name: "doRenderVelocity",
@@ -133,6 +151,19 @@ export default {
                         :"Rendering Image, click to debug other textures";
                 console.log(state);
             }
+        }, {
+            type: "floatInput",
+            name: "iSunraysWeight",
+            defaultValue: 0.0,
+            min: -1.,
+            max: 2.,
+        }, {
+            type: "floatInput",
+            name: "iSunraysIterations",
+            defaultValue: 5,
+            min: 1,
+            max: 30,
+            step: 1,
         }, {
             type: "floatInput",
             name: "iNoiseLevel",
@@ -211,13 +242,19 @@ const PASS = {
     PROCESS_VELOCITY_2: 12,
     PROCESS_VELOCITY_3: 13,
     PROCESS_VELOCITY_4: 14,
-    PROCESS_IMAGE: 50,
+    PROCESS_VELOCITY_5: 15,
+    PROCESS_VELOCITY_6: 16,
+    PROCESS_VELOCITY_7: 17,
+    PROCESS_FLUID_COLOR: 50,
+    POST_PREPARE_SUNRAYS_MASK: 80,
+    POST_APPLY_SUNRAYS: 81,
+    POST_BLUR_SUNRAYS: 82,
     RENDER_TO_SCREEN: 99,
 };
 
 let write, readPrevious, readVelocity;
 let lastSpawned = -10000;
-const SPAWN_EVERY_SECONDS = 3.;
+const SPAWN_EVERY_SECONDS = 1.;
 
 function render(gl, state) {
     gl.uniform1f(state.location.iTime, state.time);
@@ -230,6 +267,8 @@ function render(gl, state) {
     gl.uniform1f(state.location.iMaxInitialVelocity, state.iMaxInitialVelocity);
     gl.uniform1f(state.location.iCurlStrength, state.iCurlStrength);
     gl.uniform1i(state.location.doRenderVelocity, state.doRenderVelocity);
+    gl.uniform1f(state.location.iSunraysWeight, state.iSunraysWeight);
+    gl.uniform1f(state.location.iSunraysIterations, state.iSunraysIterations);
 
     gl.uniform1f(state.location.iNoiseLevel, state.iNoiseLevel);
     gl.uniform1f(state.location.iNoiseFreq, state.iNoiseFreq);
@@ -263,13 +302,14 @@ function render(gl, state) {
     gl.uniform1i(state.location.texPrevious, 0);
     gl.uniform1i(state.location.texVelocity, 1);
     gl.uniform1i(state.location.texCurl, 2); // could also use 0 here because we will not conflict, but this is needless.
+    gl.uniform1i(state.location.texPostSunrays, 3);
+    gl.uniform1i(state.location.texPostBloom, 4);
     // and depending on what we want to write, we need to bind that corresponding Framebuffer only
     // (so if these are part of a ping-pong-pair, swap them after drawing to make them usable for a later pass)
 
     /////////////
 
     gl.uniform1i(state.location.iPassIndex, PASS.INIT_VELOCITY);
-
     [write, readPrevious] = state.framebuffer.fluid.velocity.currentWriteAndRead();
     gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo);
     gl.viewport(0, 0, write.width, write.height);
@@ -298,6 +338,12 @@ function render(gl, state) {
 
     gl.uniform1i(state.location.iPassIndex, PASS.PROCESS_VELOCITY_1);
 
+    // Note: need to unbind the curl texture itself when we want to write to its framebuffer.
+    //       we _could_ clean this up right after the next step (or avoid a third texture unit altogether)
+    //       but it _is_ convenient that we can just render the texture for debugging in the last pass.
+    gl.activeTexture(gl.TEXTURE2);
+    gl.bindTexture(gl.TEXTURE_2D, null);
+
     write = state.framebuffer.fluid.curl;
     [, readVelocity] = state.framebuffer.fluid.velocity.currentWriteAndRead();
     gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo);
@@ -319,7 +365,7 @@ function render(gl, state) {
     gl.activeTexture(gl.TEXTURE1);
     gl.bindTexture(gl.TEXTURE_2D, readVelocity.texture);
     gl.activeTexture(gl.TEXTURE2);
-    gl.bindTexture(gl.TEXTURE_2D, readCurl.texture); // is the curl framebuffer here
+    gl.bindTexture(gl.TEXTURE_2D, readCurl.texture);
     gl.uniform2fv(state.location.texelSize, state.fluid.texelSize);
     gl.drawArrays(gl.TRIANGLES, 0, 6);
     // ! ... we did use Velocity to write Velocity, so do the ping-pong:
@@ -328,7 +374,6 @@ function render(gl, state) {
     /////////////
 
     // Use Velocity to calculate a fresh Scalar: Divergence
-
     gl.uniform1i(state.location.iPassIndex, PASS.PROCESS_VELOCITY_3);
 
     write = state.framebuffer.fluid.divergence;
@@ -343,7 +388,17 @@ function render(gl, state) {
 
     /////////////
 
-    gl.uniform1i(state.location.iPassIndex, PASS.PROCESS_VELOCITY_4);
+    // MISSING PASS: init pressure
+    //               -> ein Write auf Pressure-Textur
+    // MISSING PASS: divergence and pressure -> propagate pressure
+    //               -> ein paar Iterationen auf Pressure-Textur
+    // MISSING PASS: gradien subtract (vec3 vel -> vel - nabla pressure) for incompressible flow
+    //               -> pressure und velocity schreiben auf velocity
+
+    /////////////
+
+    // Use Velocity as velocity AND as previous value to advect / dissipate Velocity
+    gl.uniform1i(state.location.iPassIndex, PASS.PROCESS_VELOCITY_7);
 
     [write, readPrevious] = state.framebuffer.fluid.velocity.currentWriteAndRead();
     readVelocity = readPrevious;
@@ -358,7 +413,10 @@ function render(gl, state) {
     state.framebuffer.fluid.velocity.doPingPong();
 
     /////////////
-    gl.uniform1i(state.location.iPassIndex, PASS.PROCESS_IMAGE);
+
+    // Use Velocity as velocity and last image color as previous value to advect / dissipate Density
+    // (Density, together with the somehow chosen start color, is what we actually see as colored cloud image)
+    gl.uniform1i(state.location.iPassIndex, PASS.PROCESS_FLUID_COLOR);
 
     [write, readPrevious] = state.framebuffer.image.currentWriteAndRead();
     [, readVelocity] = state.framebuffer.fluid.velocity.currentWriteAndRead();
@@ -373,10 +431,70 @@ function render(gl, state) {
     state.framebuffer.image.doPingPong();
 
     /////////////
-    gl.uniform1i(state.location.iPassIndex, PASS.RENDER_TO_SCREEN);
 
+    // the prepare step takes the previous image and writes to the next _image_
+
+    gl.uniform1i(state.location.iPassIndex, PASS.POST_PREPARE_SUNRAYS_MASK);
+
+    [write, readPrevious] = state.framebuffer.image.currentWriteAndRead();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo);
+    gl.viewport(0, 0, write.width, write.height);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, readPrevious.texture);
+    gl.uniform2fv(state.location.texelSize, state.texelSize);
+    gl.drawArrays(gl.TRIANGLES, 0, 6);
+    // did we write to what we read? hell yes wie did (the image itself)
+    state.framebuffer.image.doPingPong();
+
+    /////////////
+
+    // with that mask prepared (i.e. now the previous image),
+    // the main step can now write on the sunrays framebuffer itself
+
+    gl.uniform1i(state.location.iPassIndex, PASS.POST_APPLY_SUNRAYS);
+    [, readPrevious] = state.framebuffer.image.currentWriteAndRead();
+    write = state.framebuffer.post.sunrays.effect;
+    gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo);
+    gl.viewport(0, 0, write.width, write.height);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, readPrevious.texture);
+    gl.uniform2fv(state.location.texelSize, state.framebuffer.post.sunrays.options.texelSize);
+    gl.drawArrays(gl.TRIANGLES, 0, 6);
+    /////////////
+
+    // the blurring afterwards writes from sunrays.effect to sunrays.tempForBlur
+    // because it does first x, then y, and needs something to stash inbetween.
+    // (yeah, that _could_also_ be its own pass, but I couldn't say whether that would be advantageous.)
+    const [texelWidth, texelHeight] = state.framebuffer.post.sunrays.options.texelSize;
+    gl.uniform1i(state.location.iPassIndex, PASS.POST_BLUR_SUNRAYS);
+    readPrevious = state.framebuffer.post.sunrays.effect;
+    write = state.framebuffer.post.sunrays.tempForBlur;
+    gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo);
+    gl.viewport(0, 0, write.width, write.height);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, readPrevious.texture);
+    gl.uniform2f(state.location.texelSize, texelWidth, 0.);
+    gl.drawArrays(gl.TRIANGLES, 0, 6);
+    // ... consider this very similar to the other framebuffer ping pongs ...
+    [readPrevious, write] = [write, readPrevious];
+    gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo);
+    gl.viewport(0, 0, write.width, write.height);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, readPrevious.texture);
+    gl.uniform2f(state.location.texelSize, 0., texelHeight);
+    gl.drawArrays(gl.TRIANGLES, 0, 6);
+    // we could iterate this for more blur, but that's fine for now.
+
+    /////////////
+
+    gl.uniform1i(state.location.iPassIndex, PASS.RENDER_TO_SCREEN);
+    [, readPrevious] = state.framebuffer.image.currentWriteAndRead();
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, readPrevious.texture);
+    gl.activeTexture(gl.TEXTURE3); // see above, we kept that
+    gl.bindTexture(gl.TEXTURE_2D, state.framebuffer.post.sunrays.effect.texture);
     gl.drawArrays(gl.TRIANGLES, 0, 6);
 
 }
