@@ -704,6 +704,7 @@ void main() {
 
     bool initSample = iSpawnSeed >= 0.;
     vec2 spawnCenter = hash22(vec2(1.2, 1.1) * iSpawnSeed);
+    const float spawnSize = 0.5;
     float d;
 
     switch (iPassIndex) {
@@ -713,14 +714,17 @@ void main() {
                 return;
             }
             vec2 randomVelocity = hash22(vec2(iSpawnSeed, iSpawnSeed + 0.1)) * iMaxInitialVelocity;
+            // vec2 initialVelocity = randomVelocity * iMaxInitialVelocity;
+            // <-- would be random, but let's always go to the center for now:
+            vec2 initialVelocity = -uv * iMaxInitialVelocity;
             // <-- hash22(x) is _pseudo_random_, i.e. same x results in same "random" value
             // we want randomVelocity.x != randomVelocity.y, thus the 0.1 offset
             // but the overall randomVelocity will only differ when sampleSeed differs.
             uv = uv - spawnCenter;
-            d = sdCircle(uv, 0.4);
+            d = sdCircle(uv, spawnSize);
             d = smoothstep(0.02, 0., d);
-            // d *= exp(-dot(uv, uv) / 0.03);
-            vec2 newValue = d * randomVelocity;
+            d = exp(-dot(uv, uv) / spawnSize);
+            vec2 newValue = d * initialVelocity;
             fragColor.xy = prevColor.xy + newValue;
             // can ignore fragColor.zw because these will never be read
             return;
@@ -730,11 +734,11 @@ void main() {
                 return;
             }
             uv = uv - spawnCenter;
-            d = sdCircle(uv, 0.4);
-            float a = smoothstep(0.02, 0., d) * exp(-dot(uv, uv) / 0.5);
+            d = sdCircle(uv, spawnSize);
+            float a = smoothstep(0.02, 0., d) * exp(-dot(uv, uv) / spawnSize);
             vec4 spawn = a * c.yyxx;
             spawn.r += pow(-min(0., d), 0.5) * 1.6;
-            spawn = clamp(spawn, 0., 1.);
+            // spawn = clamp(spawn, 0., 1.);
         //            fragColor = mix(prevColor, spawn, a);
             fragColor = vec4(fragColor.rgb + spawn.rgb, 1.);
 //            fragColor.a = 1.;
