@@ -23,6 +23,7 @@ export function startRenderLoop(renderFunction, state, elements) {
     state.resetSignal = false;
     state.stopSignal = false;
     state.stopReached = false;
+    state.debugSignal = false;
     state.fps = null;
     state.animation = (timestamp) =>
         runLoop(renderFunction, state, elements, timestamp);
@@ -61,7 +62,17 @@ function runLoop(renderFunction, state, elements, timestamp) {
         doFpsMeasurement(state);
     }
 
+    if (state.debugSignal) {
+        console.time("render");
+    }
+
     renderFunction(state);
+
+    if (state.debugSignal) {
+        console.timeEnd("render");
+        console.info(state);
+        state.debugSignal = false;
+    }
 
     elements.iTime.value.textContent = state.time.toFixed(2) + " sec";
     elements.fps.display.textContent = state.fps;

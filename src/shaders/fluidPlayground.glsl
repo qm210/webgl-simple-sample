@@ -734,9 +734,10 @@ void main() {
             float a = smoothstep(0.02, 0., d) * exp(-dot(uv, uv) / 0.5);
             vec4 spawn = a * c.yyxx;
             spawn.r += pow(-min(0., d), 0.5) * 1.6;
-            fragColor = mix(prevColor, spawn, a);
-            fragColor.a = a;
-            fragColor = clamp(fragColor, 0., 1.);
+            spawn = clamp(spawn, 0., 1.);
+        //            fragColor = mix(prevColor, spawn, a);
+            fragColor = vec4(fragColor.rgb + spawn.rgb, 1.);
+//            fragColor.a = 1.;
             return;
         case PROCESS_VELOCITY_PASS:
             fragColor = simulateAdvection(texVelocity, texVelocity, iVelocityDissipation);
@@ -745,13 +746,13 @@ void main() {
             fragColor = prevColor;
             // this does not go through right now
             fragColor = simulateAdvection(texPrevious, texVelocity, iColorDissipation);
-            fragColor.a = max3(fragColor.rgb);
             return;
         case RENDER_TO_SCREEN_PASS:
             if (doRenderVelocity == 1) {
                 // use middle grey == 0
                 fragColor = 0.5 * texture(texVelocity, st) + 0.5;
             } else {
+                fragColor.a = max3(fragColor.rgb);
                 fragColor.rgb = mix(c.yyy, prevColor.rgb, prevColor.a);
             }
             fragColor.a = 1.;

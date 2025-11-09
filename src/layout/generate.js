@@ -246,7 +246,9 @@ function addDisplayControls(elements, state, glContext) {
     }
     info.appendChild(elements.fps.label);
     info.appendChild(elements.fps.display);
-    info.addEventListener("click", () => console.log(state));
+    info.addEventListener("click", () => {
+        state.debugSignal = true;
+    });
 
     function canvasResize(factor) {
         return () => {

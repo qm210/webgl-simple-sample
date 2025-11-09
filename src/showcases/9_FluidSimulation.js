@@ -105,7 +105,7 @@ export default {
             name: "iMaxInitialVelocity",
             defaultValue: 1,
             min: 0,
-            max: 30,
+            max: 100,
         }, {
             type: "button",
             name: "doRenderVelocity",
