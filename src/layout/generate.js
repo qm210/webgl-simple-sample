@@ -119,14 +119,16 @@ export const addControlsToPage = (elements, state, controls, autoRenderOnLoad) =
             continue;
         }
         else if (control.type === "button") {
+            elements.controlButtons[control.name] = addButton({
+                title: control.label,
+                onClick: () =>
+                    control.onClick(elements.controlButtons[control.name], control)
+            });
             elements[control.name] =
                 addFreeRow({
                     parent: elements.controls,
                     label: "outVelocity",
-                    content: addButton({
-                        title: control.label,
-                        onClick: control.onClick
-                    })
+                    content: elements.controlButtons[control.name]
                 })
             continue;
         }

@@ -157,7 +157,9 @@ export function createFramebufferWithTexture(gl, options, fbIndex = undefined) {
         // for debugging:
         index: fbIndex,
         status,
-        // stored in here because we might care about resizing the canvas one day (we don't, for now.) // TODO
+        // stored in here because we might need for resizing later
+        width,
+        height,
         params: {
             width,
             height,
@@ -171,6 +173,24 @@ export function createFramebufferWithTexture(gl, options, fbIndex = undefined) {
             magFilter,
         },
     };
+}
+
+export function createPingPongFramebuffersWithTexture(gl, options) {
+    const pp = {
+        fb: [0, 1].map((index) =>
+            createFramebufferWithTexture(gl, options, index)
+        ),
+        ping: 0,
+    };
+    pp.pong = () => 1 - pp.ping;
+    pp.currentWriteAndRead = () => [
+        pp.fb[pp.ping],
+        pp.fb[pp.pong()]
+    ];
+    pp.doPingPong = () => {
+        pp.ping = pp.pong();
+    }
+    return pp;
 }
 
 export function recreateFramebufferWithTexture(gl, framebuffer) {

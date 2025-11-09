@@ -1,6 +1,5 @@
 #version 300 es
 precision highp float;
-precision highp sampler2D;
 
 layout(location = 0) out vec4 fragColor;
 layout(location = 1) out vec4 outData;
@@ -641,12 +640,9 @@ vec2 calcGradient(sampler2D tex) {
 }
 
 vec4 withAlphaFromValue(vec4 col) {
-    if (col.a == 0.) {
-        return col;
-    }
     float maxValue = max3(col.rgb);
     col.rgb /= col.a;
-    col.a *= maxValue;
+    col.a = maxValue;
     return col;
 }
 
@@ -662,14 +658,7 @@ void morphDynamics(vec2 uv) {
     vec4 orthoR = texture(iPrevImage, st - ortho * texelSize);
     vec4 diffused = (gradU + gradD + orthoL + orthoR) * 0.25;
     float rate = 0.5 + 0.7 * perlin2D(uv + 0.3 * iTime);
-    fragColor = clamp(mix(fragColor, diffused, rate), 0., 1.);
-}
-
-vec4 blur(vec2 uv) {
-    vec4 sum = texture(iPrevImage, st) * 0.29411764;
-    sum += texture(iPrevImage, st - 1.333 * texelSize) * 0.35294117;
-    sum += texture(iPrevImage, st + 1.333 * texelSize) * 0.35294117;
-    return sum;
+    fragColor = mix(fragColor, diffused, rate);
 }
 
 void main() {
@@ -682,32 +671,25 @@ void main() {
 
     vec4 prev = texture(iPrevImage, st);
 
-    bool resetSample = mod(iTime, 5.) < 1.;
-    float spawnTime = floor(iTime / 5.);
-    vec2 center = hash22(vec2(1.2, 1.1) * spawnTime);
+    bool resetSample = mod(iTime, 4.) < 1.;
 
     switch (iPassIndex) {
         case 0:
+            fragColor = withAlphaFromValue(prev);
             if (resetSample) {
-                float d = sdCircle(uv - center, 0.4);
-                float a = smoothstep(0.02, 0., d);
-                vec4 spawn = a * c.yyxx;
-                spawn.r += pow(-min(0., d), 0.5) * 1.7;
-                fragColor = mix(fragColor, spawn, a);
-                fragColor.a = a;
+                float d = sdCircle(uv, 0.4);
+                d = smoothstep(0.02, 0., d);
+                vec4 spawn = d * c.wxyx;
+                fragColor = mix(fragColor, spawn, d);
+//                fragColor.rgb = d * c.yxy;
+//                fragColor.a = d;
                 // fragColor.a = max(fragColor.a, d);
-                fragColor = clamp(fragColor, 0., 1.);
-                return; // <-- entfernen um immer neuen Input zu addieren, nicht zurückzusetzen :D
             }
             if (iFrame == 0) {
                 return;
             }
-            // fragColor = withAlphaFromValue(prev);
-            fragColor = prev;
-            // fragColor.a *= 0.95;
-            blur(uv);
-            // morphDynamics(uv);
             // fragColor.rgb = mix(c.yyy, prev.rgb, prev.a);
+            morphDynamics(uv);
             break;
         case 1:
             fragColor.rgb = mix(c.yyy, prev.rgb, prev.a);

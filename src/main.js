@@ -13,7 +13,7 @@ const glContext = setupWebGl(elements.canvas, {aspectRatio: 16 / 9});
 
 const state = prepareShowcase(showcase, glContext);
 
-console.info("WebGL objects initialized:", state);
+console.info("WebGL objects initialized:", state, glContext);
 
 const controls = showcase.generateControls(glContext, state, elements);
 

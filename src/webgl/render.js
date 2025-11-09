@@ -18,6 +18,7 @@ export function startRenderLoop(renderFunction, state, elements) {
     cancelAnimationFrame(state.animationFrame);
     state.startTime = null;
     state.timeRunning = true;
+    state.deltaTime = 0;
     state.frameIndex = -1;
     state.resetSignal = false;
     state.stopSignal = false;
@@ -53,7 +54,9 @@ function runLoop(renderFunction, state, elements, timestamp) {
         state.startTime = timestamp;
     }
     if (state.timeRunning) {
+        const previousTime = state.time;
         state.time = 0.001 * (timestamp - state.startTime);
+        state.deltaTime = previousTime ? (state.time - previousTime) : 0;
         state.frameIndex = state.frameIndex + 1;
         doFpsMeasurement(state);
     }
