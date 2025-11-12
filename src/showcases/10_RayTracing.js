@@ -16,7 +16,7 @@ export default {
         // innerhalb initBasicState() abgehandelt, war auf Dauer zuviel zu duplizieren.
         // Hier kommt also noch, was wir darüber hinaus initialisieren müssen (Texturen, Framebuffer, Sonstiges)
 
-        state.doRenderDebugValues = 0;
+        state.modeDebugRendering = 0;
 
         return state;
     },
@@ -71,7 +71,12 @@ export default {
             min: 0.,
             max: 1.,
         }, {
-
+            type: "floatInput",
+            name: "iShadowSharpness",
+            defaultValue: 8.,
+            min: 0.,
+            max: 20.,
+        }, {
             type: "vec3Input",
             name: "vecSkyColor",
             defaultValue: [0.4, 0.6, 1],
@@ -88,14 +93,7 @@ export default {
             name: "iSubsurfaceAmount",
             defaultValue: 0.25,
             min: 0.,
-            max: 100.,
-        }, {
-            type: "floatInput",
-            name: "iAmbientOcclusionSamples",
-            defaultValue: 5,
-            min: 0.,
-            max: 100.,
-            step: 1.
+            max: 20.,
         }, {
             type: "floatInput",
             name: "iAmbientOcclusionStep",
@@ -110,6 +108,27 @@ export default {
             max: 1.,
         }, {
             type: "floatInput",
+            name: "iAmbientOcclusionIterations",
+            defaultValue: 5,
+            min: 0.,
+            max: 100.,
+            step: 1.
+        }, {
+            type: "floatInput",
+            name: "iShadowCastIterations",
+            defaultValue: 80,
+            min: 1,
+            max: 200,
+            step: 1,
+        }, {
+            type: "floatInput",
+            name: "iRayMarchingIterations",
+            defaultValue: 70,
+            min: 1,
+            max: 200,
+            step: 1,
+        }, {
+            type: "floatInput",
             name: "iRayTracingIterations",
             defaultValue: 1,
             min: 1,
@@ -117,18 +136,20 @@ export default {
             step: 1,
         }, {
             type: "button",
-            name: "doRenderDebugValues",
+            name: "modeDebugRendering",
             label: "Render Debug Values",
             onClick: (button) => {
-                state.doRenderDebugValues = (state.doRenderDebugValues + 1) % 4;
+                state.modeDebugRendering = (state.modeDebugRendering + 1) % 5;
                 button.textContent =
-                    state.doRenderDebugValues === 1
-                        ? "Rendering: #bounces / maximum"
-                        : state.doRenderDebugValues === 2
-                            ? "Rendering: Marching Distance / maximum"
-                            : state.doRenderDebugValues === 3
-                                ? "Rendering: Remaining Throughput"
-                                : "Rendering: fragColor";
+                    state.modeDebugRendering === 1
+                    ? "Rendering: #bounces / maximum"
+                    : state.modeDebugRendering === 2
+                    ? "Rendering: #steps / maximum (last marching)"
+                    : state.modeDebugRendering === 3
+                    ? "Rendering: Marching Distance / maximum"
+                    : state.modeDebugRendering === 4
+                    ? "Rendering: Remaining Throughput"
+                    : "Rendering: fragColor";
             }
         }, {
             type: "floatInput",
@@ -136,6 +157,12 @@ export default {
             defaultValue: 0.8,
             min: 0.,
             max: 1.,
+        }, {
+            type: "floatInput",
+            name: "iEtaGlassRefraction",
+            defaultValue: 1.5,
+            min: 0.01,
+            max: 10.,
         }, {
             type: "floatInput",
             name: "iGammaCorrection",
@@ -220,19 +247,23 @@ function render(gl, state) {
     gl.uniform4fv(state.location.iMouse, state.iMouse);
     gl.uniform1f(state.location.iFieldOfViewDegrees, state.iFieldOfViewDegrees);
     gl.uniform1f(state.location.iSceneRotation, state.iSceneRotation);
-    gl.uniform1i(state.location.iRayTracingIterations, state.iRayTracingIterations)
+    gl.uniform1i(state.location.iRayTracingIterations, state.iRayTracingIterations);
+    gl.uniform1i(state.location.iRayMarchingIterations, state.iRayMarchingIterations);
     gl.uniform3fv(state.location.vecDirectionalLight, state.vecDirectionalLight);
     gl.uniform1f(state.location.iDiffuseAmount, state.iDiffuseAmount);
     gl.uniform1f(state.location.iSpecularAmount, state.iSpecularAmount);
     gl.uniform1f(state.location.iSpecularExponent, state.iSpecularExponent);
     gl.uniform1f(state.location.iHalfwaySpecularMixing, state.iHalfwaySpecularMixing);
+    gl.uniform1f(state.location.iShadowSharpness, state.iShadowSharpness);
     gl.uniform1f(state.location.iBacklightAmount, state.iBacklightAmount);
     gl.uniform3fv(state.location.vecSkyColor, state.vecSkyColor);
     gl.uniform1f(state.location.iSubsurfaceAmount, state.iSubsurfaceAmount);
     gl.uniform1f(state.location.iAmbientOcclusionScale, state.iAmbientOcclusionScale);
     gl.uniform1f(state.location.iAmbientOcclusionStep, state.iAmbientOcclusionStep);
-    gl.uniform1f(state.location.iAmbientOcclusionSamples, state.iAmbientOcclusionSamples);
+    gl.uniform1f(state.location.iAmbientOcclusionIterations, state.iAmbientOcclusionIterations);
+    gl.uniform1i(state.location.iShadowCastIterations, state.iShadowCastIterations);
     gl.uniform1f(state.location.iMetalReflectance, state.iMetalReflectance);
+    gl.uniform1f(state.location.iEtaGlassRefraction, state.iEtaGlassRefraction);
     gl.uniform1f(state.location.iGammaCorrection, state.iGammaCorrection);
     gl.uniform1f(state.location.iNoiseLevel, state.iNoiseLevel);
     gl.uniform1f(state.location.iNoiseFreq, state.iNoiseFreq);
@@ -240,7 +271,7 @@ function render(gl, state) {
     gl.uniform1i(state.location.iFractionSteps, Math.floor(state.iFractionSteps));
     gl.uniform1f(state.location.iFractionScale, state.iFractionScale);
     gl.uniform1f(state.location.iFractionAmplitude, state.iFractionAmplitude);
-    gl.uniform1i(state.location.doRenderDebugValues, state.doRenderDebugValues);
+    gl.uniform1i(state.location.modeDebugRendering, state.modeDebugRendering);
     gl.uniform1f(state.location.iFree0, state.iFree0);
     gl.uniform1f(state.location.iFree1, state.iFree1);
     gl.uniform1f(state.location.iFree2, state.iFree2);

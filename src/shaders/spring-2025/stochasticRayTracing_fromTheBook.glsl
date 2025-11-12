@@ -110,6 +110,7 @@ float schlick(float cosine, float ior) {
 
 bool modified_refract(const in vec3 v, const in vec3 n, const in float ni_over_nt,
 out vec3 refracted) {
+    // called as: modified_refract(r_in.direction, outward_normal, ni_over_nt, refracted)
     float dt = dot(v, n);
     float discriminant = 1. - ni_over_nt*ni_over_nt*(1.-dt*dt);
     if (discriminant > 0.) {
@@ -287,7 +288,7 @@ const in float t_max, out hit_record rec) {
 
     if (hitable_hit(hitable(vec3( 2,1,2),1.),r,t_min,rec.t,rec))        hit=true,rec.mat=material(DIELECTRIC,vec3(0.5,0.,0.),1.5);
     if (hitable_hit(hitable(vec3(-4,1,0),1.),r,t_min,rec.t,rec))        hit=true,rec.mat=material(LAMBERTIAN,vec3(.4,.2,.1),0.);
-    if (hitable_hit(hitable(vec3( 4.,1.,-0.5),1.),r,t_min,rec.t,rec))   hit=true,rec.mat=material(METAL     ,vec3(.0,.6,.0),0.);
+    if (hitable_hit(hitable(vec3( 4.,1.,-0.5),1.),r,t_min,rec.t,rec))   hit=true,rec.mat=material(METAL     ,vec3(1.,1.,1.),0.);
 
     int NO_UNROLL = min(0,iFrame);
     for (int a = -11; a < 11+NO_UNROLL; a++) {

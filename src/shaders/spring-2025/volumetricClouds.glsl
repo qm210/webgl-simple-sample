@@ -258,12 +258,7 @@ float PlaneIntersection(vec3 rayOrigin, vec3 rayDirection, vec3 planeOrigin, vec
     return t;
 }
 
-float SphereIntersection(
-in vec3 rayOrigin,
-in vec3 rayDirection,
-in vec3 sphereCenter,
-in float sphereRadius,
-out vec3 normal)
+float SphereIntersection(in vec3 rayOrigin, in vec3 rayDirection, in vec3 sphereCenter, in float sphereRadius, out vec3 normal)
 {
     vec3 eMinusC = rayOrigin - sphereCenter;
     float dDotD = dot(rayDirection, rayDirection);
