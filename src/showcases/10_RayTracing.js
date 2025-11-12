@@ -13,7 +13,10 @@ export default {
         }
 
         // Anmerkung: das ganze Sammeln der Uniform-Locations wird inzwischen
-        // innerhalb initBasicState() abgehandelt, war auf Dauer zuviel zu duplizieren...
+        // innerhalb initBasicState() abgehandelt, war auf Dauer zuviel zu duplizieren.
+        // Hier kommt also noch, was wir darüber hinaus initialisieren müssen (Texturen, Framebuffer, Sonstiges)
+
+        state.doRenderDebugValues = 0;
 
         return state;
     },
@@ -27,34 +30,16 @@ export default {
         },
         uniforms: [{
             type: "floatInput",
-            name: "iFree0",
-            defaultValue: 0,
-            min: -9.99,
-            max: +9.99,
+            name: "iFieldOfViewDegrees",
+            defaultValue: 20,
+            min: 0.01,
+            max: 180,
         }, {
             type: "floatInput",
-            name: "iFree1",
+            name: "iSceneRotation",
             defaultValue: 0,
-            min: -9.99,
-            max: +9.99,
-        }, {
-            type: "floatInput",
-            name: "iFree2",
-            defaultValue: 0,
-            min: -9.99,
-            max: +9.99,
-        }, {
-            type: "floatInput",
-            name: "iFree3",
-            defaultValue: 0,
-            min: -9.99,
-            max: +9.99,
-        }, {
-            type: "floatInput",
-            name: "iFree4",
-            defaultValue: 0,
-            min: -9.99,
-            max: +9.99,
+            min: 0.,
+            max: 6.28,
         }, {
             type: "vec3Input",
             name: "vecDirectionalLight",
@@ -63,34 +48,35 @@ export default {
             max: 10,
         }, {
             type: "floatInput",
-            name: "iLightSourceMix",
-            defaultValue: 0,
-            min: -2,
-            max: 3,
-        }, {
-            type: "floatInput",
-            name: "iLightPointPaletteColor",
-            defaultValue: 0,
-            min: 0.,
-            max: 10.,
-        }, {
-            type: "floatInput",
             name: "iDiffuseAmount",
-            defaultValue: 1,
+            defaultValue: 2.2,
             min: 0.,
             max: 10.,
         }, {
             type: "floatInput",
             name: "iSpecularAmount",
-            defaultValue: 1,
+            defaultValue: 3.,
             min: 0.,
             max: 10.,
         }, {
             type: "floatInput",
             name: "iSpecularExponent",
             defaultValue: 21,
-            min: -10.,
+            min: 0.01,
             max: 100.,
+        }, {
+            type: "floatInput",
+            name: "iHalfwaySpecularMixing",
+            defaultValue: 0,
+            min: 0.,
+            max: 1.,
+        }, {
+
+            type: "vec3Input",
+            name: "vecSkyColor",
+            defaultValue: [0.4, 0.6, 1],
+            min: 0,
+            max: 1,
         }, {
             type: "floatInput",
             name: "iBacklightAmount",
@@ -122,6 +108,108 @@ export default {
             defaultValue: 0.95,
             min: 0.,
             max: 1.,
+        }, {
+            type: "floatInput",
+            name: "iRayTracingIterations",
+            defaultValue: 1,
+            min: 1,
+            max: 20,
+            step: 1,
+        }, {
+            type: "button",
+            name: "doRenderDebugValues",
+            label: "Render Debug Values",
+            onClick: (button) => {
+                state.doRenderDebugValues = (state.doRenderDebugValues + 1) % 4;
+                button.textContent =
+                    state.doRenderDebugValues === 1
+                        ? "Rendering: #bounces / maximum"
+                        : state.doRenderDebugValues === 2
+                            ? "Rendering: Marching Distance / maximum"
+                            : state.doRenderDebugValues === 3
+                                ? "Rendering: Remaining Throughput"
+                                : "Rendering: fragColor";
+            }
+        }, {
+            type: "floatInput",
+            name: "iMetalReflectance",
+            defaultValue: 0.8,
+            min: 0.,
+            max: 1.,
+        }, {
+            type: "floatInput",
+            name: "iGammaCorrection",
+            defaultValue: 2.2,
+            min: 0.,
+            max: 4.,
+        }, {
+            type: "floatInput",
+            name: "iNoiseLevel",
+            defaultValue: 0.,
+            min: 0.,
+            max: 0.5,
+        }, {
+            type: "floatInput",
+            name: "iNoiseFreq",
+            defaultValue: 1,
+            min: 0.001,
+            max: 0.5,
+            step: 0.001,
+        }, {
+            type: "floatInput",
+            name: "iNoiseOffset",
+            defaultValue: 0,
+            min: -1,
+            max: 1,
+        }, {
+            type: "floatInput",
+            name: "iFractionSteps",
+            defaultValue: 1,
+            min: 1,
+            max: 20.,
+            step: 1,
+        }, {
+            type: "floatInput",
+            name: "iFractionScale",
+            defaultValue: 2.,
+            min: 0.01,
+            max: 10.,
+        }, {
+            type: "floatInput",
+            name: "iFractionAmplitude",
+            defaultValue: 0.5,
+            min: 0.01,
+            max: 2.,
+        }, {
+            type: "floatInput",
+            name: "iFree0",
+            defaultValue: 0,
+            min: -9.99,
+            max: +9.99,
+        }, {
+            type: "floatInput",
+            name: "iFree1",
+            defaultValue: 0,
+            min: -9.99,
+            max: +9.99,
+        }, {
+            type: "floatInput",
+            name: "iFree2",
+            defaultValue: 0,
+            min: -9.99,
+            max: +9.99,
+        }, {
+            type: "floatInput",
+            name: "iFree3",
+            defaultValue: 0,
+            min: -9.99,
+            max: +9.99,
+        }, {
+            type: "floatInput",
+            name: "iFree4",
+            defaultValue: 0,
+            min: -9.99,
+            max: +9.99,
         }]
     })
 };
@@ -130,9 +218,29 @@ function render(gl, state) {
     gl.uniform1f(state.location.iTime, state.time);
     gl.uniform2fv(state.location.iResolution, state.resolution);
     gl.uniform4fv(state.location.iMouse, state.iMouse);
-
-    gl.uniform1f(state.location.iLightDirection, state.iLightDirection);
-
+    gl.uniform1f(state.location.iFieldOfViewDegrees, state.iFieldOfViewDegrees);
+    gl.uniform1f(state.location.iSceneRotation, state.iSceneRotation);
+    gl.uniform1i(state.location.iRayTracingIterations, state.iRayTracingIterations)
+    gl.uniform3fv(state.location.vecDirectionalLight, state.vecDirectionalLight);
+    gl.uniform1f(state.location.iDiffuseAmount, state.iDiffuseAmount);
+    gl.uniform1f(state.location.iSpecularAmount, state.iSpecularAmount);
+    gl.uniform1f(state.location.iSpecularExponent, state.iSpecularExponent);
+    gl.uniform1f(state.location.iHalfwaySpecularMixing, state.iHalfwaySpecularMixing);
+    gl.uniform1f(state.location.iBacklightAmount, state.iBacklightAmount);
+    gl.uniform3fv(state.location.vecSkyColor, state.vecSkyColor);
+    gl.uniform1f(state.location.iSubsurfaceAmount, state.iSubsurfaceAmount);
+    gl.uniform1f(state.location.iAmbientOcclusionScale, state.iAmbientOcclusionScale);
+    gl.uniform1f(state.location.iAmbientOcclusionStep, state.iAmbientOcclusionStep);
+    gl.uniform1f(state.location.iAmbientOcclusionSamples, state.iAmbientOcclusionSamples);
+    gl.uniform1f(state.location.iMetalReflectance, state.iMetalReflectance);
+    gl.uniform1f(state.location.iGammaCorrection, state.iGammaCorrection);
+    gl.uniform1f(state.location.iNoiseLevel, state.iNoiseLevel);
+    gl.uniform1f(state.location.iNoiseFreq, state.iNoiseFreq);
+    gl.uniform1f(state.location.iNoiseOffset, state.iNoiseOffset);
+    gl.uniform1i(state.location.iFractionSteps, Math.floor(state.iFractionSteps));
+    gl.uniform1f(state.location.iFractionScale, state.iFractionScale);
+    gl.uniform1f(state.location.iFractionAmplitude, state.iFractionAmplitude);
+    gl.uniform1i(state.location.doRenderDebugValues, state.doRenderDebugValues);
     gl.uniform1f(state.location.iFree0, state.iFree0);
     gl.uniform1f(state.location.iFree1, state.iFree1);
     gl.uniform1f(state.location.iFree2, state.iFree2);

@@ -1,8 +1,10 @@
-import { defineConfig } from 'vite';
-import glslImport from './plugin/glslImport.js';
+import { defineConfig } from "vite";
+import glslImport from "vite-plugin-glsl";
 
 export default defineConfig({
-    plugins: [glslImport()],
+    plugins: [glslImport({
+        minify: false
+    })],
     test: {
         globals: true,
         environment: "happy-dom"

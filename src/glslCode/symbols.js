@@ -31,7 +31,7 @@ export const REGEX = {
     DIRECTIVE:
         /^\s*#(?<keyword>\w+)\s*(?<expression>.*?)\s*$/mg,
     DIRECTIVE_KEYWORD:
-        /\b(defined|optimize|debug)\b/g,
+        /(?=#)\s*\b(defined|optimize|debug)\b/g,
     BLOCK_DELIMITER:
         /(?<braceOpen>\{)|(?<braceClose>})|(?<commentOpen>\/\*)|(?<commentClose>\*\/)/g,
     LEADING_SPACES:

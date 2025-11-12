@@ -610,7 +610,7 @@ void main()
 {
     vec2 uv = (2.0 * gl_FragCoord.xy - iResolution.xy) / iResolution.y;
 
-    vec2 mo = iMouse.xy/iResolution.xy; // kann man fürs Verständnis erstmal als vec2(0) ignorieren
+    vec2 mo = iMouse.xy/iResolution.xy;
     float time = 32.0 + iTime*1.5;
 
     // camera

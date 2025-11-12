@@ -13,33 +13,52 @@ out vec4 fragColor;
 uniform vec2 iResolution;
 uniform float iTime;
 uniform vec4 iMouse;
-// uniform float iFocalLength;
+uniform float iFieldOfViewDegrees;
+uniform float iSceneRotation;
+uniform vec3 vecDirectionalLight;
+uniform float iDiffuseAmount;
+uniform float iSpecularAmount;
+uniform float iSpecularExponent;
+uniform float iHalfwaySpecularMixing;
+uniform vec3 vecSkyColor;
+uniform float iBacklightAmount;
+uniform float iSubsurfaceAmount;
+uniform float iAmbientOcclusionScale;
+uniform float iAmbientOcclusionStep;
+uniform float iAmbientOcclusionSamples;
+uniform int iRayTracingIterations;
+uniform float iMetalReflectance;
+uniform float iGammaCorrection;
+uniform float iNoiseLevel;
+uniform float iNoiseFreq;
+uniform float iNoiseOffset;
+uniform int iFractionSteps;
+uniform float iFractionScale;
+uniform float iFractionAmplitude;
+uniform int doRenderDebugValues;
+
 // for you to play around with, put 'em wherever you want:
 uniform float iFree0;
 uniform float iFree1;
 uniform float iFree2;
 uniform float iFree3;
 uniform float iFree4;
-uniform vec3 vecDirectionalLight;
-uniform float iDiffuseAmount;
-uniform float iSpecularAmount;
-uniform float iSpecularExponent;
-uniform float iBacklightAmount;
-uniform float iSubsurfaceAmount;
-uniform float iAmbientOcclusionScale;
-uniform float iAmbientOcclusionStep;
-uniform float iAmbientOcclusionSamples;
 
 const float pi = 3.141593;
 const float twoPi = 2. * pi;
 const vec4 c = vec4(1., 0. , -1., .5);
 
-const float GLASS_MATERIAL = 100.;
+// Das "material"-float berechnet einerseits ja die Farbe aus der Palettenfunktion,
+// aber ein paar spezielle Werte definieren wir hier mal vorweg:
 const float FLOOR_MATERIAL = 1.0;
-const float UNKNOWN_MATERIAL = 0.;
 const float NOTHING_HIT = -1.;
-// weil das material als float ja auch in die Palette eingeht,
-// definieren wir hier nur die speziellen Materialien. Darf sich halt nicht überschneiden.
+const float STANDARD_OPAQUE_MATERIAL = 2.0;
+const float GLASS_MATERIAL = 3.;
+const float METAL_MATERIAL = 4.;
+const float PLAIN_DEBUGGING_MATERIAL = 0.5;
+
+const float indexOfRefractionAir = 1.0;
+const float indexOfRefractionGlass = 1.5;
 
 mat3 rotX(float angle) {
     float c = cos(angle);
@@ -94,196 +113,11 @@ float sdBox( vec3 p, vec3 b )
     return min(max(d.x,max(d.y,d.z)),0.0) + length(max(d,0.0));
 }
 
-float sdBoxFrame( vec3 p, vec3 b, float e )
-{
-    p = abs(p  )-b;
-    vec3 q = abs(p+e)-e;
-
-    return min(min(
-    length(max(vec3(p.x,q.y,q.z),0.0))+min(max(p.x,max(q.y,q.z)),0.0),
-    length(max(vec3(q.x,p.y,q.z),0.0))+min(max(q.x,max(p.y,q.z)),0.0)),
-    length(max(vec3(q.x,q.y,p.z),0.0))+min(max(q.x,max(q.y,p.z)),0.0));
-}
-float sdEllipsoid( in vec3 p, in vec3 r ) // approximated
-{
-    float k0 = length(p/r);
-    float k1 = length(p/(r*r));
-    return k0*(k0-1.0)/k1;
-}
-
 float sdTorus( vec3 p, vec2 t )
 {
     return length( vec2(length(p.xz)-t.x,p.y) )-t.y;
 }
 
-float sdCappedTorus(in vec3 p, in vec2 sc, in float ra, in float rb)
-{
-    p.x = abs(p.x);
-    float k = (sc.y*p.x>sc.x*p.y) ? dot(p.xy,sc) : length(p.xy);
-    return sqrt( dot(p,p) + ra*ra - 2.0*ra*k ) - rb;
-}
-
-float sdHexPrism( vec3 p, vec2 h )
-{
-    vec3 q = abs(p);
-
-    const vec3 k = vec3(-0.8660254, 0.5, 0.57735);
-    p = abs(p);
-    p.xy -= 2.0*min(dot(k.xy, p.xy), 0.0)*k.xy;
-    vec2 d = vec2(
-    length(p.xy - vec2(clamp(p.x, -k.z*h.x, k.z*h.x), h.x))*sign(p.y - h.x),
-    p.z-h.y );
-    return min(max(d.x,d.y),0.0) + length(max(d,0.0));
-}
-
-float sdOctogonPrism( in vec3 p, in float r, float h )
-{
-    const vec3 k = vec3(-0.9238795325,   // sqrt(2+sqrt(2))/2
-    0.3826834323,   // sqrt(2-sqrt(2))/2
-    0.4142135623 ); // sqrt(2)-1
-    // reflections
-    p = abs(p);
-    p.xy -= 2.0*min(dot(vec2( k.x,k.y),p.xy),0.0)*vec2( k.x,k.y);
-    p.xy -= 2.0*min(dot(vec2(-k.x,k.y),p.xy),0.0)*vec2(-k.x,k.y);
-    // polygon side
-    p.xy -= vec2(clamp(p.x, -k.z*r, k.z*r), r);
-    vec2 d = vec2( length(p.xy)*sign(p.y), p.z-h );
-    return min(max(d.x,d.y),0.0) + length(max(d,0.0));
-}
-
-float sdCapsule( vec3 p, vec3 a, vec3 b, float r )
-{
-    vec3 pa = p-a, ba = b-a;
-    float h = clamp( dot(pa,ba)/dot(ba,ba), 0.0, 1.0 );
-    return length( pa - ba*h ) - r;
-}
-
-float sdRoundCone( in vec3 p, in float r1, float r2, float h )
-{
-    vec2 q = vec2( length(p.xz), p.y );
-
-    float b = (r1-r2)/h;
-    float a = sqrt(1.0-b*b);
-    float k = dot(q,vec2(-b,a));
-
-    if( k < 0.0 ) return length(q) - r1;
-    if( k > a*h ) return length(q-vec2(0.0,h)) - r2;
-
-    return dot(q, vec2(a,b) ) - r1;
-}
-
-float sdRoundCone(vec3 p, vec3 a, vec3 b, float r1, float r2)
-{
-    // sampling independent computations (only depend on shape)
-    vec3  ba = b - a;
-    float l2 = dot(ba,ba);
-    float rr = r1 - r2;
-    float a2 = l2 - rr*rr;
-    float il2 = 1.0/l2;
-
-    // sampling dependant computations
-    vec3 pa = p - a;
-    float y = dot(pa,ba);
-    float z = y - l2;
-    float x2 = dot2( pa*l2 - ba*y );
-    float y2 = y*y*l2;
-    float z2 = z*z*l2;
-
-    // single square root!
-    float k = sign(rr)*rr*rr*x2;
-    if( sign(z)*a2*z2 > k ) return  sqrt(x2 + z2)        *il2 - r2;
-    if( sign(y)*a2*y2 < k ) return  sqrt(x2 + y2)        *il2 - r1;
-    return (sqrt(x2*a2*il2)+y*rr)*il2 - r1;
-}
-
-float sdTriPrism( vec3 p, vec2 h )
-{
-    const float k = sqrt(3.0);
-    h.x *= 0.5*k;
-    p.xy /= h.x;
-    p.x = abs(p.x) - 1.0;
-    p.y = p.y + 1.0/k;
-    if( p.x+k*p.y>0.0 ) p.xy=vec2(p.x-k*p.y,-k*p.x-p.y)/2.0;
-    p.x -= clamp( p.x, -2.0, 0.0 );
-    float d1 = length(p.xy)*sign(-p.y)*h.x;
-    float d2 = abs(p.z)-h.y;
-    return length(max(vec2(d1,d2),0.0)) + min(max(d1,d2), 0.);
-}
-
-// vertical
-float sdCylinder( vec3 p, vec2 h )
-{
-    vec2 d = abs(vec2(length(p.xz),p.y)) - h;
-    return min(max(d.x,d.y),0.0) + length(max(d,0.0));
-}
-
-// arbitrary orientation
-float sdCylinder(vec3 p, vec3 a, vec3 b, float r)
-{
-    vec3 pa = p - a;
-    vec3 ba = b - a;
-    float baba = dot(ba,ba);
-    float paba = dot(pa,ba);
-
-    float x = length(pa*baba-ba*paba) - r*baba;
-    float y = abs(paba-baba*0.5)-baba*0.5;
-    float x2 = x*x;
-    float y2 = y*y*baba;
-    float d = (max(x,y)<0.0)?-min(x2,y2):(((x>0.0)?x2:0.0)+((y>0.0)?y2:0.0));
-    return sign(d)*sqrt(abs(d))/baba;
-}
-
-// vertical
-float sdCone( in vec3 p, in vec2 c, float h )
-{
-    vec2 q = h*vec2(c.x,-c.y)/c.y;
-    vec2 w = vec2( length(p.xz), p.y );
-
-    vec2 a = w - q*clamp( dot(w,q)/dot(q,q), 0.0, 1.0 );
-    vec2 b = w - q*vec2( clamp( w.x/q.x, 0.0, 1.0 ), 1.0 );
-    float k = sign( q.y );
-    float d = min(dot( a, a ),dot(b, b));
-    float s = max( k*(w.x*q.y-w.y*q.x),k*(w.y-q.y)  );
-    return sqrt(d)*sign(s);
-}
-
-float sdCappedCone( in vec3 p, in float h, in float r1, in float r2 )
-{
-    vec2 q = vec2( length(p.xz), p.y );
-
-    vec2 k1 = vec2(r2,h);
-    vec2 k2 = vec2(r2-r1,2.0*h);
-    vec2 ca = vec2(q.x-min(q.x,(q.y < 0.0)?r1:r2), abs(q.y)-h);
-    vec2 cb = q - k1 + k2*clamp( dot(k1-q,k2)/dot2(k2), 0.0, 1.0 );
-    float s = (cb.x < 0.0 && ca.y < 0.0) ? -1.0 : 1.0;
-    return s*sqrt( min(dot2(ca),dot2(cb)) );
-}
-
-float sdCappedCone(vec3 p, vec3 a, vec3 b, float ra, float rb)
-{
-    float rba  = rb-ra;
-    float baba = dot(b-a,b-a);
-    float papa = dot(p-a,p-a);
-    float paba = dot(p-a,b-a)/baba;
-
-    float x = sqrt( papa - paba*paba*baba );
-
-    float cax = max(0.0,x-((paba<0.5)?ra:rb));
-    float cay = abs(paba-0.5)-0.5;
-
-    float k = rba*rba + baba;
-    float f = clamp( (rba*(x-ra)+paba*baba)/k, 0.0, 1.0 );
-
-    float cbx = x-ra - f*rba;
-    float cby = paba - f;
-
-    float s = (cbx < 0.0 && cay < 0.0) ? -1.0 : 1.0;
-
-    return s*sqrt( min(cax*cax + cay*cay*baba,
-    cbx*cbx + cby*cby*baba) );
-}
-
-// c is the sin/cos of the desired cone angle
 float sdSolidAngle(vec3 pos, vec2 c, float ra)
 {
     vec2 p = vec2( length(pos.xz), pos.y );
@@ -292,95 +126,56 @@ float sdSolidAngle(vec3 pos, vec2 c, float ra)
     return max(l,m*sign(c.y*p.x-c.x*p.y));
 }
 
-float sdOctahedron(vec3 p, float s)
-{
-    p = abs(p);
-    float m = p.x + p.y + p.z - s;
+//////////// für die Noise-Berge
 
-    // exact distance
-    #if 0
-    vec3 o = min(3.0*p - m, 0.0);
-    o = max(6.0*p - m*2.0 - o*3.0 + (o.x+o.y+o.z), 0.0);
-    return length(p - s*o/(o.x+o.y+o.z));
-    #endif
-
-    // exact distance
-    #if 1
-    vec3 q;
-    if( 3.0*p.x < m ) q = p.xyz;
-    else if( 3.0*p.y < m ) q = p.yzx;
-    else if( 3.0*p.z < m ) q = p.zxy;
-    else return m*0.57735027;
-    float k = clamp(0.5*(q.z-q.y+s),0.0,s);
-    return length(vec3(q.x,q.y-s+k,q.z-k));
-    #endif
-
-    // bound, not exact
-    #if 0
-    return m*0.57735027;
-    #endif
+vec2 hash22(vec2 p) {
+    // this is a pseudorandom generator with 2d input -> 2d output
+    float n = sin(dot(p, vec2(127.1, 311.7))) * 43758.5453;
+    // iNoiseOffset: braucht man nicht, ist nur eine Chance auf mehr Abwechslung
+    n += iNoiseOffset;
+    return fract(vec2(n, n * 1.2154));
 }
 
-float sdPyramid( in vec3 p, in float h )
+float perlin2D(vec2 p)
 {
-    float m2 = h*h + 0.25;
+    vec2 pi = floor(p);
+    vec2 pf = p - pi;
+    vec2 w = pf * pf * (3.-2.*pf);
 
-    // symmetry
-    p.xz = abs(p.xz);
-    p.xz = (p.z>p.x) ? p.zx : p.xz;
-    p.xz -= 0.5;
+    float f00 = dot(hash22(pi+vec2(.0,.0)),pf-vec2(.0,.0));
+    float f01 = dot(hash22(pi+vec2(.0,1.)),pf-vec2(.0,1.));
+    float f10 = dot(hash22(pi+vec2(1.0,0.)),pf-vec2(1.0,0.));
+    float f11 = dot(hash22(pi+vec2(1.0,1.)),pf-vec2(1.0,1.));
 
-    // project into face plane (2D)
-    vec3 q = vec3( p.z, h*p.y - 0.5*p.x, h*p.x + 0.5*p.y);
-
-    float s = max(-q.x,0.0);
-    float t = clamp( (q.y-0.5*p.z)/(m2+0.25), 0.0, 1.0 );
-
-    float a = m2*(q.x+s)*(q.x+s) + q.y*q.y;
-    float b = m2*(q.x+0.5*t)*(q.x+0.5*t) + (q.y-m2*t)*(q.y-m2*t);
-
-    float d2 = min(q.y,-q.x*m2-q.y*0.5) > 0.0 ? 0.0 : min(a,b);
-
-    // recover 3D and scale, and add sign
-    return sqrt( (d2+q.z*q.z)/m2 ) * sign(max(q.z,-p.y));;
+    float xm1 = mix(f00,f10,w.x);
+    float xm2 = mix(f01,f11,w.x);
+    float ym = mix(xm1,xm2,w.y);
+    return ym;
 }
 
-// la,lb=semi axis, h=height, ra=corner
-float sdRhombus(vec3 p, float la, float lb, float h, float ra)
-{
-    p = abs(p);
-    vec2 b = vec2(la,lb);
-    float f = clamp( (ndot(b,b-2.0*p.xz))/dot(b,b), -1.0, 1.0 );
-    vec2 q = vec2(length(p.xz-0.5*b*vec2(1.0-f,1.0+f))*sign(p.x*b.y+p.z*b.x-b.x*b.y)-ra, p.y-h);
-    return min(max(q.x,q.y),0.0) + length(max(q,0.0));
+float fractalBrownianMotion(vec2 p) {
+    float v = 0.;
+    float a = 1.;
+    float s = 0.;
+    for (int i = 0; i < iFractionSteps; i++) {
+        v += a * perlin2D(p);
+        s += a;
+        p = p * iFractionScale;
+        a *= iFractionAmplitude;
+    }
+    // return v;
+    // <-- ist das eigentliche fbm(), aber führt hier schnell zu zu starken Werten
+    return v / s;
 }
 
-float sdHorseshoe( in vec3 p, in vec2 c, in float r, in float le, vec2 w )
-{
-    p.x = abs(p.x);
-    float l = length(p.xy);
-    p.xy = mat2(-c.x, c.y,
-    c.y, c.x)*p.xy;
-    p.xy = vec2((p.y>0.0 || p.x>0.0)?p.x:l*sign(-c.x),
-    (p.x>0.0)?p.y:l );
-    p.xy = vec2(p.x,abs(p.y-r))-vec2(le,0.0);
-
-    vec2 q = vec2(length(max(p.xy,0.0)) + min(0.0,max(p.x,p.y)),p.z);
-    vec2 d = abs(q) - w;
-    return min(max(d.x,d.y),0.0) + length(max(d,0.0));
+float sdNoiseMountains(vec3 p) {
+    float height = max(0., length(p.xz) - 3.);
+    // <-- -3. damit mittlere Arena ungestört bleibt
+    height *= iNoiseLevel * (1. + fractalBrownianMotion(p.xz * iNoiseFreq));
+    return p.y - height;
 }
 
-float sdU( in vec3 p, in float r, in float le, vec2 w )
-{
-    p.x = (p.y>0.0) ? abs(p.x) : length(p.xy);
-    p.x = abs(p.x-r);
-    p.y = p.y - le;
-    float k = max(p.x,p.y);
-    vec2 q = vec2( (k<0.0) ? -k : length(max(p.xy,0.0)), abs(p.z) ) - w;
-    return length(max(q,0.0)) + min(max(q.x,q.y),0.0);
-}
-
-//-- Sinnvolle structs machen auf Dauer wirklich mehr Freude. Is echt so. ------
+//-- Sinnvolle structs machen auf Dauer mehr Freude. Is echt so. ------
 
 struct Ray {
     vec3 origin;
@@ -390,14 +185,28 @@ struct Ray {
 struct Hit {
     float t;
     float material;
+    // vec2 surfaceCoord;
+    //  <-- wir lassen heute Texturen weg, also das hier unnötig
+    vec3 baseColor;
+    //  <-- dafür schreiben wir eine Oberflächenfarbe direkt mit,
+    //      "float material" beschreibt dann allein die _Art_ Material
 };
 
-struct SurfaceHit {
-    Ray ray;
-    Hit hit;
-    vec3 pos;
-    vec3 normal;
+struct TracingDebug {
+    float bouncesVsMaximum;
+    Hit firstHit;
+    vec3 throughput;
 };
+
+////
+
+// zum debuggen,
+#define N_DEBUG_MARKERS 3
+vec3 debuggingMarkers[N_DEBUG_MARKERS] = vec3[N_DEBUG_MARKERS](
+    c.xyy,
+    c.wyy,
+    c.yyy
+);
 
 //------------------------------------------------------------------------------
 
@@ -414,34 +223,70 @@ Hit takeCloser(Hit d1, Hit d2)
     return d2;
 }
 
-Hit takeCloser( Hit d1, float d2, float material2)
+Hit takeCloser( Hit d1, float d2, float material2, vec3 intrinsicColor)
 {
     if (d1.t < d2) return d1;
-    return Hit(d2, material2);
+    return Hit(d2, material2, intrinsicColor);
+}
+
+vec3 materialPalette(float parameter) {
+    return 0.2 + 0.2 * sin(parameter * 2.0 + vec3(0.0,1.0,2.0));
 }
 
 Hit map( in vec3 pos )
 {
-    Hit res = Hit(pos.y, FLOOR_MATERIAL);
-    // Hier war ursprünglich 0.0 == UNKNOWN_MATERIAL initialisiert.
-    // Wir kennen aber unsere Szene genug, so dass der Boden einfach default sein darf.
+    Hit res = Hit(pos.y, FLOOR_MATERIAL, c.xxx);
+    // Hier war ursprünglich 0.0 initialisiert, also ein "UNKNOWN_MATERIAL" o.Ä.
+    // Uns bringt diese Unterscheidung aber nichts, wir kennen unsere Szene ausreichend.
+
+    float noiseY = sdNoiseMountains(pos - vec3(0.8,0.0,-1.6));
+    res = takeCloser(res,
+        Hit(noiseY, FLOOR_MATERIAL, c.xxx)
+    );
+
+    // Primitives
 
     res = takeCloser(res,
-        sdTorus((pos-vec3( 1.0,0.30, 1.0)).xzy, vec2(0.25,0.05) ),
-        7.1
+        sdTorus((pos-vec3( .4 + 1.4 * sin(twoPi * 0.5 * iTime), 0.30, 0.5)).xzy, vec2(0.25,0.05) ),
+        STANDARD_OPAQUE_MATERIAL,
+        materialPalette(7.1)
     );
     res = takeCloser(res,
-        sdBox(pos-vec3( 1.0,0.25, 0.0), vec3(0.3,0.25,0.3) ),
-        3.0
+        sdSphere(pos-vec3( 0.25,0.33, 1.0), 0.33 ),
+        STANDARD_OPAQUE_MATERIAL,
+        materialPalette(26.9)
     );
     res = takeCloser(res,
-        sdSphere(pos-vec3( 0.25,0.2, 0.0), 0.25 ),
-        26.9
+        sdSphere(pos-vec3( 1.0, 0.25, 0.15), 0.25 ),
+        GLASS_MATERIAL,
+        c.xxx
     );
     res = takeCloser(res,
-        sdSphere(pos-vec3( 1.0,0.2,-1.0), 0.25 ),
-        GLASS_MATERIAL
+        sdBox((pos - vec3( -0.5,0.5, 2.)), 0.5 * c.xxx),
+        GLASS_MATERIAL,
+        vec3(0.5, 0.8, 1.)
     );
+    res = takeCloser(res,
+        sdBox(rotY(0.73) * (pos - vec3( 1.,0.34, 2.)), 0.34 * c.xxx),
+        METAL_MATERIAL,
+        c.xxx
+    );
+    res = takeCloser(res,
+        sdSolidAngle(rotX(0.1)*rotZ(0.2)*(pos-vec3(0.,-6.,-4.7)), vec2(1,4)/sqrt(17.), 10. ),
+        METAL_MATERIAL,
+        vec3(0.88, 0.67, 1.0)
+    );
+
+
+    // Als Hilfe für die Entwicklung (z.B. Geometrien positionieren oder Kamera ausrichten):
+
+    for (int m = 0; m < N_DEBUG_MARKERS; m++) {
+        res = takeCloser(res,
+            sdSphere(pos - debuggingMarkers[m], 0.03),
+            PLAIN_DEBUGGING_MATERIAL,
+            c.yyy
+        );
+    }
 
     return res;
 }
@@ -458,45 +303,45 @@ vec2 iBox( in vec3 ro, in vec3 rd, in vec3 rad )
     min( min( t2.x, t2.y ), t2.z ) );
 }
 
+const float MARCHING_MIN_DISTANCE = 0.1;
+const float MARCHING_MAX_DISTANCE = 20.;
+
 // Funktion umbenannt, sie hieß bisher raycast(), das fand ich aber nicht so gut.
 Hit raymarch(in Ray ray)
 {
-    Hit res = Hit(-1.0, NOTHING_HIT);
+    Hit res = Hit(-1.0, NOTHING_HIT, c.yyy);
 
-    float tmin = 1.0;
-    float tmax = 20.0;
+    float tmin = MARCHING_MIN_DISTANCE;
+    float tmax = MARCHING_MAX_DISTANCE;
 
     // trace floor plane analytically
     float tp1 = (0.0-ray.origin.y)/ray.dir.y;
     if( tp1>0.0 )
     {
         tmax = min( tmax, tp1 );
-        res = Hit(tp1, FLOOR_MATERIAL);
+        res = Hit(tp1, FLOOR_MATERIAL, c.xxx);
     }
 
-    // raymarch primitives
-    vec2 tb = iBox( ray.origin-vec3(0.0,0.4,-0.5), ray.dir, vec3(2.5,0.41,3.0) );
-    if( tb.x<tb.y && tb.y>0.0 && tb.x<tmax)
+    // Hier habe ich die "Bounding Box" entfernt, da der Performance-Gewinn
+    // die Extra-Komplexität / Lesbarkeit nicht rechtfertigt hat (bei mir zumindest).
+    // Wenn insgesamt zu langsam -> wieder einführen :)
+
+    float t = tmin;
+    for( int i=0; i<70 && t<tmax; i++ )
     {
-        //return vec2(tb.x,2.0);
-        tmin = max(tb.x,tmin);
-        tmax = min(tb.y,tmax);
+        ///////////// HIER: map() ///////////////
+        Hit h = map( ray.origin + ray.dir * t );
+        /////////////////////////////////////////
 
-        float t = tmin;
-        for( int i=0; i<70 && t<tmax; i++ )
+        if(abs(h.t)<(0.0001*t) )
         {
-            ///////////// HIER: map() ///////////////
-            Hit h = map( ray.origin + ray.dir * t );
-            /////////////////////////&///////////////
-
-            if(abs(h.t)<(0.0001*t) )
-            {
-                res = Hit(t, h.material);
-                break;
-            }
-            t += h.t;
+            res = h;
+            res.t = t;
+            break;
         }
+        t += h.t;
     }
+
     return res;
 }
 
@@ -559,6 +404,8 @@ float calcAmbientOcclusion(in vec3 pos, in vec3 normal)
         // wenn aber so ein Strahl parallel zu und nahe an einer anderen Fläche vorbeigeht,
         // ist d klein, während h immer größer wird -> viel Ambient Occlusion
         occlusion += (h-d) * scale;
+        // außerdem werden weiter entfernte Punkte weniger stark gewichtet:
+        // 1 -> 0.95 -> 0.91 -> 0.86 -> 0.82
         scale *= iAmbientOcclusionScale;
         if( occlusion>0.35 ) break;
     }
@@ -575,51 +422,168 @@ vec3 calcNormal( in vec3 pos )
     e.xxx*map( pos + e.xxx ).t );
 }
 
-vec3 materialPalette(Hit hit) {
-    return 0.2 + 0.2*sin( hit.material*2.0 + vec3(0.0,1.0,2.0) );
-}
-
-#define MAX_BOUNCES 5
-
-const float indexOfRefractionAir = 1.0;
-const float indexOfRefractionGlass = 1.5;
-
-vec3 render(in Ray ray)
+void render(in Ray ray, out vec3 col, out TracingDebug debug)
 {
-    // background
-    vec3 bgCol = vec3(0.0, 0., 0.0) - max(ray.dir.y,0.0)*0.3;
+    // Sowohl Pixelfarbe als auch "verbleibende Lichtstärke des Strahls" werden akkumuliert.
+    // Farbe fängt bei Schwarz an und wird immer weiter beleuchtet:
+    col = c.yyy;
+    // throughput fängt mit weißer Farbe an und wird dann durchs Tracing sukzessive verringert,
+    // also "wie viel Licht ist noch verfügbar pro Farbkanal?"
+    vec3 throughput = c.xxx;
+
+    vec3 bgCol = vecSkyColor;
 
     Hit hit;
-    vec3 col = c.yyy;
-    vec3 throughput = c.xxx;
-    // <-- throughput fängt mit 1 an und wird dann pro Interaktion sukzessive verringert
-    //     (wie letztes Mal eben die Schatten auch, nur hier für jeden Farbkanal)
-
-    for (int bounce = 0; bounce < MAX_BOUNCES; bounce++) {
+    int bounce;
+    for (bounce = 0; bounce < iRayTracingIterations; bounce++) {
         // Erste Mission: Ersten Strahlabstand finden, d.h. wie gehabt:
         // Marching durch map() und bei minimaler SDF das Material merken.
         hit = raymarch(ray);
+
+        if (bounce == 0) {
+            debug.firstHit = hit;
+        }
 
         if (hit.material == NOTHING_HIT) {
             col += throughput * bgCol;
             break;
         }
 
-        vec3 baseColor = materialPalette(hit);
-        // bool isFloor = hit.material < 1.5; // <-- ursprünglicher Check (zur Referenz)
-        bool isFloor = hit.material == FLOOR_MATERIAL;
+        // Wir variieren hier ein bisschen:
+        // vec3 baseColor = materialPalette(hit.material);
+        // -> mehr Flexibilität, dem "struct Hit" ein Feld seiner Grundfarbe zu geben.
+        //    Das wird dann je nach Art Material (hit.material) und dem
+        //    hier unten definierten Beleuchtungsmodell weiterverarbeitet,
+        //    so kann aber z.B. auch METAL oder GLASS eine bunte Tönung bekommen.
+        vec3 baseColor = hit.baseColor * throughput;
+        // Anteil des Specular-Lichts (könnte man z.B. auch nach einer Formel von hit.material wählen)
         float specularCoeff = 1.;
-        vec3 shade = c.yyy;
-        // <-- shade erfüllt für matte Materialien denselben Zweck wie oben throughput,
-        //     nur ist es eben additiv, fängt bei 0 an und sammelt Beleuchtungsstärken zusammen
+
+        bool isFloor = hit.material == FLOOR_MATERIAL;
 
         vec3 rayPos = ray.origin + hit.t * ray.dir;
+
         vec3 normal = isFloor ? vec3(0., 1. , 0.) : calcNormal(rayPos);
 
         if (isFloor) {
-            float f = 1. - abs(step(0.5, fract(1.5*rayPos.x)) - step(0.5, fract(1.5*rayPos.z)));
-            col = 0.15 + f*vec3(0.05);
+            // der Boden ist ein einfaches Beispiel, dass wir hier nach Laune jedes Material
+            // noch in ihrer Grundbeschaffenheit (z.B. Farbe nach einem Muster) ändern können
+            // -> sowas gehört eher selten in map(), sondern hier vor unser Beleuchtungsmodell.
+            float f = 1. - abs(step(0.5, fract(2.*rayPos.x)) - step(0.5, fract(2.*rayPos.z)));
+            baseColor *= 0.1 + f * vec3(0.04);
             specularCoeff = 0.4;
+        }
+
+        if (hit.material == STANDARD_OPAQUE_MATERIAL || isFloor) {
+            // Hier das alte Beleuchtungsmodell -- opak == blickdichtes Material.
+            // Grob modelliert nach Blinn-Phong mit etwas Freiheit + Ambient Occlusion.
+            // Manche Beleuchtungsteile starten noch ihr Shadow-Ray-Casting,
+            // aber die äußere Ray-Tracing-Schleife (bounce) ist danach zuende.
+
+            vec3 lightDirection = normalize(-vecDirectionalLight);
+            // Vorzeichenkonvention: lightDirection in den Beleuchtungsmodellen ist ZUM Licht
+            // (im Uniform vecDirectionalLight fand ich die andere Richtung aber geeigneter)
+
+            // Ambient Occlusion - Faktor für die Verdecktheit / Verwinkelung an einer Stelle
+            //                     (1 = quasi freie Fläche, 0 =
+            float occlusion = calcAmbientOcclusion(rayPos, normal);
+
+            // Akkumuliert alle Beiträge des Beleuchtungsmodells, die wir uns so ausdenken
+            vec3 shade = c.yyy;
+
+            {
+                // 1. Effekt: Richtungslicht z.B. der Sonne bzw. einer weit entfernten Lichtquelle.
+                //            (-> Alle Lichtstrahlen sind parallel.)
+                //            In VL5 wurden auch Punktquellen demonstriert.
+
+                const vec3 lightColor = vec3(1.30, 1.00, 0.70);
+                // PS: RGB-Werte größer 1 sind für eine Lichtquelle geduldet, ist dann halt stärker.
+
+                // Diffuser Teil: geht ~ dot(normal, lightSource)
+                float diffuse = clamp(dot(normal, lightDirection), 0.0, 1.0);
+                diffuse *= calcSoftshadow(rayPos, lightDirection, 0.02, 2.5);
+                shade += iDiffuseAmount * diffuse * lightColor * baseColor;
+
+                // Specular: hat einen Term ~ dot(normal, refl) oder dot(normal, halfway)
+                // Halfway wird (z.B. Blinn-Phong) anstatt echtem Reflektionsvektor verwendet.
+                // Ist etwas schneller berechnet und macht oft weicheres Licht / breitere Verläufe.
+                vec3 halfway = normalize(lightDirection - ray.dir);
+                vec3 refl = reflect(-lightDirection, normal);
+                // Können wir mal direkt vergleichen, indem wir zwischen beiden Vektoren interpolieren
+                // d.h. iHalfwaySpecularMixing == 0 -> Phong
+                //      iHalfwaySpecularMixing == 1 -> Blinn-Phong
+                refl = mix(refl, halfway, iHalfwaySpecularMixing);
+
+                float specular = pow(clamp(dot(normal, refl), 0.0, 1.0), iSpecularExponent);
+                shade += iSpecularAmount * specular * lightColor * specularCoeff;
+            }
+
+            {
+                // 2. Effekt: Himmel - Auch Richtungslicht, direkt von oben aber anders gewichtet.
+                //            (hatte ich bisher entfernt, könnt ihr aber mal versuchen zu interpretieren)
+                float diffuse = sqrt(clamp(0.5+0.5*normal.y, 0.0, 1.0));
+                // <-- hier steht quasi dot(normal, lightDirection) mit lightDirection == (0,1,0)
+                // das sqrt() ist m.E. eine willkürliche Graduierung, aber der Effekt ist,
+                // dass die Übergänge zwischen verschiedenen Winkeln sanfter ist.
+                // (sqrt(x) entspricht pow(x, 0.5) und ist also auch eine Art Gammakorrektur)
+                diffuse *= occlusion;
+                shade += 0.60 * diffuse * vecSkyColor * baseColor;
+
+                vec3 refl = reflect(ray.dir, normal);
+                float specular = smoothstep(-0.2, 0.2, refl.y);
+                specular *= diffuse;
+                specular *= 0.04+0.96*pow(clamp(1.0+dot(normal, ray.dir), 0.0, 1.0), 5.0);
+                // <-- Nochmal eine modifizierte Form des Phong-Speculars (Glanzlichts).
+                //     pow(..., 5.) deutet auf "Fresnel-Korrektur" hin, dem Verlauf
+                //     etwas realistischerer Lichtbrechnung an der Grenzfläche.
+                //     (d.h. ein Stück näher an der Physik als das rein empirische Phong).
+                //     "Physikalischer motiviert" muss aber nicht "überzeugender" aussehen.
+                specular *= calcSoftshadow(rayPos, refl, 0.02, 2.5);
+                shade += 2.00 * specular * vecSkyColor * specularCoeff;
+            }
+
+            {
+                // 3. Effekt:
+                // "Backlight / Ambient Illumination", Idee ist, in eher verdeckten Bereichen
+                // durch irgendwelche Spiegelungen am Boden (für unseren festen Fall y == 0)
+                // die Schatten wieder etwas vermindert werden
+
+                // vec3 lightFloorReflection = normalize(vec3(-lightDirection.x, 0., -lightDirection.z));
+                vec3 lightFloorReflection = cross(lightDirection, vec3(0,1,0));
+
+                float backlightIllumination = occlusion
+                    * clamp(dot(normal, lightFloorReflection), 0.0, 1.0)
+                    * clamp(1.0 - rayPos.y, 0.0, 1.0);
+                shade += baseColor * iBacklightAmount * backlightIllumination * vec3(0.25, 0.25, 0.25);
+            }
+
+            {
+                // 4. Effekt:
+                // "Sub-Surface Scattering"-Nachahmung nach, i.e. Lichtstrahlen, die das Material nach etwas
+                // Verweilzeit  wieder verlassen (man stelle sich seine Finger hinter einer Taschenlampe vor)
+                // Das ist physikalisch ein Diffusionseffekt und sieht generell weich aus, oder wachs-artig.
+                // Das hängt am Ambient-Occlusion-Faktor aufgrund der Annahme, dass die Lichtstrahlen, die
+                // in diesen Ecken bzw. Materialien etc. "verdeckt" werden, ja irgendwo hin müssen.
+                // Hat dann einen specular-artigen Beitrag wie dot(normal, rayDir), weil das Licht das Material
+                // am ehesten senkrecht verlässt und dann also entlang der Blickrichtung liegen muss.
+                float subsurfaceScattering = occlusion * pow(clamp(1.0+dot(normal, ray.dir), 0.0, 1.0), 2.0);
+                shade += iSubsurfaceAmount * subsurfaceScattering * baseColor;
+            }
+
+            col += throughput * shade;
+
+            // Man könnte sich hier noch weitere Effekte bzw. Kombinationen ausdenken,
+            // und die Werte sind jedesmal andere (es sind empirische Modelle);
+            // man sollte aber diese Begriffe zuordnen können und was sie jeweils ausmacht.
+
+            // in der Praxis:
+            // im Wesentlichen ist es legitim, sich grob zu überlegen welche Vektoren
+            // für das vorliegende Szenario wohl relevant sein könnten und dann
+            // entsprechende Terme zu konstruieren wie oben.
+            // Und wenn irgendwas sowohl optisch gut als auch die Formel plausibel wirkt...
+            // -> Glückwunsch :)
+
+            break;
         }
         else if (hit.material == GLASS_MATERIAL) {
 
@@ -663,98 +627,19 @@ vec3 render(in Ray ray)
                 throughput *= baseColor * (1.0 - fresnel);
                 continue;
             }
-        } else {
-            // Hier das alte Beleuchtungsmodell -- undurchlässiges, diffuses Material
-            // grob modelliert nach Blinn-Phong (mit etwas Freiheit).
-            // Wir können danach also die Schleife abbrechen, der Strahl ist am Ende.
-
-            vec3  lightDirection = normalize(-vecDirectionalLight);
-            // Vorzeichenkonvention: lightDirection in den Beleuchtungsmodellen ist ZUM Licht
-            // (im Uniform vecDirectionalLight fand ich die andere Richtung aber geeigneter)
-
-            // Ambient Occlusion - Maß für die Verdecktheit / Verwinkelung an einer Stelle
-            float occ = calcAmbientOcclusion(rayPos, normal);
-
-            {
-                // 1. Effekt: Richtungslicht z.B. der Sonne bzw. einer weit entfernten Lichtquelle.
-                //            (-> Alle Lichtstrahlen sind parallel.)
-                //            In VL5 wurden auch Punktquellen demonstriert.
-
-                // Halfway wird (z.B. Blinn-Phong) anstatt echtem Reflektionsvektor verwendet.
-                // Ist etwas schneller berechnet und macht oft weicheres Licht / breitere Verläufe.
-                // Sollte man aber durchaus mal direkt vergleichen.
-                vec3  halfway = normalize(lightDirection - ray.dir);
-                // Diffuser Teil: dot(normal, lightSource)
-                float diffuse = clamp(dot(normal, lightDirection), 0.0, 1.0);
-                diffuse *= calcSoftshadow(rayPos, lightDirection, 0.02, 2.5);
-                float specular = pow(clamp(dot(normal, halfway), 0.0, 1.0), 20.0);
-                const vec3 sourceCol = vec3(1.30, 1.00, 0.70);
-                shade += col * 2.20 * sourceCol * diffuse;
-                shade +=       3.00 * sourceCol * specular * specularCoeff;
-            }
-
-            {
-                // 2. Effekt: Himmel - Auch Richtungslicht, direkt von oben aber anders gewichtet.
-                //            (hatte ich bisher entfernt, könnt ihr aber mal versuchen zu interpretieren)
-                float diffuse = sqrt(clamp(0.5+0.5*normal.y, 0.0, 1.0));
-                // <-- hier steht quasi dot(normal, lightDirection) mit lightDirection == (0,1,0)
-                // das sqrt() ist m.E. eine willkürliche Graduierung, aber der Effekt ist,
-                // dass die Übergänge zwischen verschiedenen Winkeln sanfter ist.
-                // (sqrt(x) entspricht pow(x, 0.5) und ist also auch eine Art Gammakorrektur)
-                diffuse *= occ;
-                vec3 refl = reflect(ray.dir, normal);
-                float specular = smoothstep(-0.2, 0.2, refl.y);
-                specular *= diffuse;
-                specular *= 0.04+0.96*pow(clamp(1.0+dot(normal, ray.dir), 0.0, 1.0), 5.0);
-                // <-- Nochmal eine modifizierte Form des Phong-Speculars (Glanzlichts).
-                //     So ein pow(..., 5.) ist meist eine Fresnel-Korrektur, soll etwas
-                //     realistischere Lichtbrechnung an der Grenzfläche beschreiben.
-                //     (d.h. ein Stück näher an der Physik als das rein empirische Phong).
-                //     Letztendlich probiert man aus, was im konkreten Fall am besten wirkt.
-
-                //if( spe>0.001 )
-                specular *= calcSoftshadow(rayPos, refl, 0.02, 2.5);
-                shade += col*0.60*diffuse*vec3(0.40, 0.60, 1.15);
-                shade +=     2.00*specular*vec3(0.40, 0.60, 1.30)*specularCoeff;
-            }
-
-            {
-                // 3. Effekt:
-                // "Backlight / Ambient Illumination", Idee ist dass in eher verdeckten Bereichen
-                // zusätzliche Beiträge durch irgendwelche Spiegelungen am Boden (für unseren festen Fall y == 0)
-                // die Schatten leicht aufweichen
-                vec3 lightFloorReflection = normalize(vec3(-lightDirection.x, 0., -lightDirection.z));
-                float backlightIllumination = occ
-                * clamp(dot(normal, lightFloorReflection), 0.0, 1.0)
-                * clamp(1.0 - rayPos.y, 0.0, 1.0);
-                shade += col * iBacklightAmount * backlightIllumination * vec3(0.25, 0.25, 0.25);
-            }
-
-            {
-                // 4. Effekt:
-                // "Sub-Surface Scattering"-Nachahmung nach, i.e. Lichtstrahlen, die das Material nach etwas
-                // Verweilzeit  wieder verlassen (man stelle sich seine Finger hinter einer Taschenlampe vor)
-                // Das ist physikalisch ein Diffusionseffekt und sieht generell weich aus, oder wachs-artig.
-                // Das hängt am Ambient-Occlusion-Faktor aufgrund der Annahme, dass die Lichtstrahlen, die
-                // in diesen Ecken bzw. Materialien etc. "verdeckt" werden, ja irgendwo hin müssen.
-                // Hat dann einen specular-artigen Beitrag wie dot(normal, rayDir), weil das Licht das Material
-                // am ehesten senkrecht verlässt und dann also entlang der Blickrichtung liegen muss.
-                float subsurfaceScattering = occ * pow(clamp(1.0+dot(normal, ray.dir), 0.0, 1.0), 2.0);
-                shade += col * iSubsurfaceAmount * subsurfaceScattering * c.xxx;
-            }
-
-            // Man könnte sich hier noch weitere Effekte bzw. Kombinationen ausdenken,
-            // und die Werte sind jedesmal andere (es sind empirische Modelle);
-            // man sollte aber diese Begriffe zuordnen können und was sie jeweils ausmacht.
-
-            // in der Praxis:
-            // im Wesentlichen ist es legitim, sich grob zu überlegen welche Vektoren
-            // für das vorliegende Szenario wohl relevant sein könnten und dann
-            // entsprechende Terme zu konstruieren wie oben.
-            // Und wenn irgendwas sowohl optisch gut wirkt als auch die Formel plausibel ist
-            // -> Glückwunsch :)
-
-            col = shade;
+        } else if (hit.material == METAL_MATERIAL) {
+            // Neuer Strahl geht jetzt vom Auftrittspunkt in die reflect()–Richtung.
+            // "+ 0.01 * normal" dient der numerischen Entzerrung, um nicht in Grenzfällen
+            // versehentlich nochmal am selben Punkt zu interagieren ("Self-Interactions")
+            ray.origin = rayPos + 0.01 * normal;
+            ray.dir = reflect(ray.dir, normal);
+            // die Reflektanz gibt an, wie viel schwächter das Licht wird (z.B. Faktor 0.8)
+            // und das Metall könnte (wenn baseColor != c.xxx) Farben verschieden abschwächen.
+            throughput *= iMetalReflectance * baseColor;
+            continue;
+        }
+        else if (hit.material == PLAIN_DEBUGGING_MATERIAL) {
+            col = baseColor;
             break;
         }
     }
@@ -765,12 +650,13 @@ vec3 render(in Ray ray)
     const float fogDensity = 0.0001;
     const float fogGrowth = 3.0;
     float fogOpacity = 1.0 - exp( -fogDensity * pow(hit.t, fogGrowth));
-    col = mix(col, colFog, fogOpacity);
+    col = mix(col, vecSkyColor, fogOpacity);
 
-    // anderes Tone Mapping, Gamma, etc. könnten auch hier noch passieren.
-    // könnte aber auch in der aufrufenden Funktion stehen. Unwichtig, wo genau.
+    col = pow(col, vec3(1./iGammaCorrection));
+    col = clamp(col, 0.0, 1.0);
 
-    return clamp(col, 0.0, 1.0);
+    debug.bouncesVsMaximum = float(bounce) / float(iRayTracingIterations);
+    debug.throughput = throughput;
 }
 
 mat3 setCamera( in vec3 origin, in vec3 target, float rollAngle )
@@ -784,26 +670,58 @@ mat3 setCamera( in vec3 origin, in vec3 target, float rollAngle )
 
 void main()
 {
+    // uv normiert auf x in [-aspRatio, aspRatio], y in [-1, 1]
     vec2 uv = (2.0 * gl_FragCoord.xy - iResolution.xy) / iResolution.y;
-    vec2 mo = iMouse.zw / iResolution.y;
-    float rot = 0.2;
+    // pan normiert auf x und y je [-0.5, 0.5]
+    vec2 pan = iMouse.xy / iResolution.xy - 0.5;
+    // aber nur wenn Maus gedrückt.
+    if (iMouse.xy == c.yy) {
+        pan = c.yy;
+    }
 
-    // camera
-    vec3 cameraTarget = vec3( 0.5 + iFree0, -0.25 + iFree1, 1. + iFree2);
-    vec3 rayOrigin = cameraTarget + vec3( 4.5 * cos(twoPi * rot), 1.2, 4.5 * sin(-twoPi * rot));
-    // camera-to-world transformation
-    mat3 ca = setCamera( rayOrigin, cameraTarget, 0.0 );
-    // ray direction
-    const float focalLength = 3.5;
-    vec3 rayDirection = ca * normalize( vec3(uv, focalLength) );
+    vec3 cameraTarget = vec3(0.4, 0.4, 1.);
 
-    // render (s. neue "struct Ray" da oben - ist komfortabler)
+    // _Zusätzliche_ Kamera-Drehung per Maus über Pitch-Eulerwinkel (Neigung):
+    float pitch = -pan.y * pi/3.;
+    //
+    cameraTarget.y -= 2. * pan.y;
+
+    mat3 rotationAroundTarget = rotY(iSceneRotation + pan.x * twoPi);
+    vec3 rayOrigin = cameraTarget + rotationAroundTarget * vec3(1.3, 0.9, -4.3);
+
+    // Welt-zu-Kamera-Transformation:
+    // (camera matrix) * (vec3 in world coordinates) = (vec3 in camera coordinates)
+    mat3 cameraMatrix = setCamera( rayOrigin, cameraTarget, 0.0 );
+
+    // Verkettete Rotationen per Eulerwinkel können Probleme mit sich bringen.
+    // (Gimbal Lock = Achsen überlagern sich / Verlust einer Drehrichtung)
+    // Wir nehmen das hier in Kauf, weil wir keine richtigen Kamerapfade brauchen.
+    cameraMatrix = cameraMatrix * rotX(pitch);
+
+    // Zusammenhang "Brennweite / Focal Length" vs. Field-of-View-Winkel:
+    float fovRadians = iFieldOfViewDegrees * pi / 180.;
+    float focalLength = 0.5 / tan(0.5 * fovRadians);
+    // focalLength = 2.5; // <-- Ursprungswert
+    vec3 rayDirection = cameraMatrix * normalize(vec3(uv, focalLength));
+
     Ray ray = Ray(rayOrigin, rayDirection);
-    vec3 col = render(ray);
+    vec3 col;
+    TracingDebug debug;
 
-    // gamma
-    const float gamma = 2.2;
-    col = pow( col, vec3(1./gamma) );
+    render(ray, col, debug);
 
-    fragColor = vec4(col, 1.0);
+    fragColor.rgb = col;
+    fragColor.a = 1.;
+
+    switch (doRenderDebugValues) {
+        case 1:
+            fragColor.rgb = vec3(debug.bouncesVsMaximum);
+            break;
+        case 2:
+            fragColor.rgb = vec3(debug.firstHit.t / MARCHING_MAX_DISTANCE);
+            break;
+        case 3:
+            fragColor.rgb = debug.throughput;
+            break;
+    }
 }

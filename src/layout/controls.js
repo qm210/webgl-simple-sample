@@ -142,7 +142,7 @@ export const asFloatInput = (elements, state, control) => {
 
 function asSlider(inputElement, control) {
     control.step ??=
-        control.min > 0 && control.min <= 0.01 ? 0.001
+        control.min > 0 && control.min < 0.01 ? 0.001
         : 0.01;
     inputElement.type = "range";
     inputElement.step = control.step;
@@ -310,6 +310,7 @@ export function createResetAllButton(elements, state, controls) {
                 sessionStoreControlState(state, control);
             }
         }
+        state.iMouse = [0, 0, 0, 0];
         state.resetSignal = true;
         event.target.blur();
     });

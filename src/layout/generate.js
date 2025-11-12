@@ -101,7 +101,7 @@ export const addControlsToPage = (elements, state, controls, autoRenderOnLoad) =
     elements.iTime.container.appendChild(
         createResetAllButton(elements, state, controls)
     );
-
+    console.log(controls.uniforms);
     for (const control of controls.uniforms ?? []) {
 
         if (control.type === "label") {
@@ -127,7 +127,7 @@ export const addControlsToPage = (elements, state, controls, autoRenderOnLoad) =
             elements[control.name] =
                 addFreeRow({
                     parent: elements.controls,
-                    label: "outVelocity",
+                    label: "",
                     content: elements.controlButtons[control.name]
                 })
             continue;

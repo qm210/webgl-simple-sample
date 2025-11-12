@@ -146,7 +146,7 @@ button.render-button {
     padding-left: 0.25rem;
     padding-right: 0.5rem;
     white-space: nowrap;
-    font-size: var(--font-size-large);
+    font-size: calc(0.95 * var(--font-size-large));
 }
 
 #shader-controls > div > label {

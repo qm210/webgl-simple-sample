@@ -11,8 +11,8 @@ import showcase7 from "./showcases/7_VariousConceptsFor3D.js";
 import showcase8 from "./showcases/8_MultiPassAndExtraData.js";
 import showcase9 from "./showcases/9_FluidSimulation.js";
 import showcase10 from "./showcases/10_RayTracing.js"
-import showcaseFbo from "./showcases/retired/9_FramebufferPingPong.js";
 import showcaseRIOW from "./showcases/retired/10_StochasticRayTracing.js";
+import showcaseFbo from "./showcases/retired/9_FramebufferPingPong.js";
 import showcase11 from "./showcases/retired/11_Volumetric.js";
 import showcaseX from "./showcases/X_SimulationPlayground.js";
 
@@ -41,6 +41,7 @@ export function selectShowcase() {
         case "6":
         case "6a":
             return showcase6a;
+        case "iq":
         case "6b":
             return showcase6b;
         case "7":
