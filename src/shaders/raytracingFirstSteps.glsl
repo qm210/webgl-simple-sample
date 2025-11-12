@@ -381,10 +381,10 @@ Hit map(in vec3 pos)
         vec3(0.7, 0.9, 1.)
     );
 
+    // Volumetric Clouds: Bounding Box not correct yet, skip for now :)
     /*
-    // Bounding Box not correct yet, skip for now :)
     float cloudsBoundingBox = sdBox(pos - vec3(-2., 10., 9.), vec3(6., 8., 3.));
-    res = takeCloser(res, cloudsBoundingBox, CLOUD_MATERIAL, c.xxx);
+    res = takeCloser(res, cloudsBoundingBox, CLOUD_MATERIAL, c.xxy);
     */
 
     #if SHOW_DEBUG_MARKERS

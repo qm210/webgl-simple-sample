@@ -174,21 +174,21 @@ export default {
         }, {
             type: "floatInput",
             name: "iCloudsMaxDensity",
-            defaultValue: 1.,
+            defaultValue: 0.,
             min: 0.0,
-            max: 10.,
+            max: 2.,
         }, {
             type: "floatInput",
             name: "iCloudsScaleFactor",
-            defaultValue: 0.166,
-            min: 0.01,
-            max: 10.,
+            defaultValue: 0.17,
+            min: 0.001,
+            max: 2.,
         }, {
             type: "floatInput",
             name: "iCloudsAbsorptionCoeff",
             defaultValue: 0.5,
-            min: 0.0,
-            max: 10.,
+            min: -1.,
+            max: 1.,
         }, {
             type: "floatInput",
             name: "iVolumetricStepIterations",
