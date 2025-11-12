@@ -41,6 +41,12 @@ export default {
             min: 0.,
             max: 6.28,
         }, {
+            type: "floatInput",
+            name: "iScenePitch",
+            defaultValue: 0,
+            min: -0.5,
+            max: 0.5,
+        }, {
             type: "vec3Input",
             name: "vecDirectionalLight",
             defaultValue: [0.2, -0.4, 0.2],
@@ -139,7 +145,7 @@ export default {
             name: "modeDebugRendering",
             label: "Render Debug Values",
             onClick: (button) => {
-                state.modeDebugRendering = (state.modeDebugRendering + 1) % 5;
+                state.modeDebugRendering = (state.modeDebugRendering + 1) % 6;
                 button.textContent =
                     state.modeDebugRendering === 1
                     ? "Rendering: #bounces / maximum"
@@ -149,6 +155,8 @@ export default {
                     ? "Rendering: Marching Distance / maximum"
                     : state.modeDebugRendering === 4
                     ? "Rendering: Remaining Throughput"
+                    : state.modeDebugRendering === 5
+                    ? "Rendering: #steps volumetric / maximum"
                     : "Rendering: fragColor";
             }
         }, {
@@ -163,6 +171,43 @@ export default {
             defaultValue: 1.5,
             min: 0.01,
             max: 10.,
+        }, {
+            type: "floatInput",
+            name: "iCloudsMaxDensity",
+            defaultValue: 1.,
+            min: 0.0,
+            max: 10.,
+        }, {
+            type: "floatInput",
+            name: "iCloudsScaleFactor",
+            defaultValue: 0.166,
+            min: 0.01,
+            max: 10.,
+        }, {
+            type: "floatInput",
+            name: "iCloudsAbsorptionCoeff",
+            defaultValue: 0.5,
+            min: 0.0,
+            max: 10.,
+        }, {
+            type: "floatInput",
+            name: "iVolumetricStepIterations",
+            defaultValue: 128,
+            min: 1,
+            max: 1000,
+            step: 1
+        }, {
+            type: "floatInput",
+            name: "iVolumetricMarchStep",
+            defaultValue: 0.1,
+            min: 0.001,
+            max: 1,
+        }, {
+            type: "floatInput",
+            name: "iVolumetricAlphaThreshold",
+            defaultValue: 0.95,
+            min: 0.01,
+            max: 1.,
         }, {
             type: "floatInput",
             name: "iGammaCorrection",
@@ -209,6 +254,13 @@ export default {
             max: 2.,
         }, {
             type: "floatInput",
+            name: "iCalcNormalEpsilon",
+            defaultValue: 0.0005,
+            min: 0.00001,
+            max: 0.1,
+            step: 0.00001,
+        }, {
+            type: "floatInput",
             name: "iFree0",
             defaultValue: 0,
             min: -9.99,
@@ -245,10 +297,15 @@ function render(gl, state) {
     gl.uniform1f(state.location.iTime, state.time);
     gl.uniform2fv(state.location.iResolution, state.resolution);
     gl.uniform4fv(state.location.iMouse, state.iMouse);
+    gl.uniform2fv(state.location.iMouseDrop, state.iMouseDrop);
     gl.uniform1f(state.location.iFieldOfViewDegrees, state.iFieldOfViewDegrees);
     gl.uniform1f(state.location.iSceneRotation, state.iSceneRotation);
+    gl.uniform1f(state.location.iScenePitch, state.iScenePitch);
     gl.uniform1i(state.location.iRayTracingIterations, state.iRayTracingIterations);
     gl.uniform1i(state.location.iRayMarchingIterations, state.iRayMarchingIterations);
+    gl.uniform1i(state.location.iVolumetricStepIterations, state.iVolumetricStepIterations);
+    gl.uniform1f(state.location.iVolumetricMarchStep, state.iVolumetricMarchStep);
+    gl.uniform1f(state.location.iVolumetricAlphaThreshold, state.iVolumetricAlphaThreshold);
     gl.uniform3fv(state.location.vecDirectionalLight, state.vecDirectionalLight);
     gl.uniform1f(state.location.iDiffuseAmount, state.iDiffuseAmount);
     gl.uniform1f(state.location.iSpecularAmount, state.iSpecularAmount);
@@ -264,13 +321,17 @@ function render(gl, state) {
     gl.uniform1i(state.location.iShadowCastIterations, state.iShadowCastIterations);
     gl.uniform1f(state.location.iMetalReflectance, state.iMetalReflectance);
     gl.uniform1f(state.location.iEtaGlassRefraction, state.iEtaGlassRefraction);
+    gl.uniform1f(state.location.iCloudsMaxDensity, state.iCloudsMaxDensity);
+    gl.uniform1f(state.location.iCloudsScaleFactor, state.iCloudsScaleFactor);
+    gl.uniform1f(state.location.iCloudsAbsorptionCoeff, state.iCloudsAbsorptionCoeff);
     gl.uniform1f(state.location.iGammaCorrection, state.iGammaCorrection);
     gl.uniform1f(state.location.iNoiseLevel, state.iNoiseLevel);
     gl.uniform1f(state.location.iNoiseFreq, state.iNoiseFreq);
     gl.uniform1f(state.location.iNoiseOffset, state.iNoiseOffset);
-    gl.uniform1i(state.location.iFractionSteps, Math.floor(state.iFractionSteps));
+    gl.uniform1i(state.location.iFractionSteps, state.iFractionSteps);
     gl.uniform1f(state.location.iFractionScale, state.iFractionScale);
     gl.uniform1f(state.location.iFractionAmplitude, state.iFractionAmplitude);
+    gl.uniform1f(state.location.iCalcNormalEpsilon, state.iCalcNormalEpsilon);
     gl.uniform1i(state.location.modeDebugRendering, state.modeDebugRendering);
     gl.uniform1f(state.location.iFree0, state.iFree0);
     gl.uniform1f(state.location.iFree1, state.iFree1);

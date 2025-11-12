@@ -101,7 +101,7 @@ export const addControlsToPage = (elements, state, controls, autoRenderOnLoad) =
     elements.iTime.container.appendChild(
         createResetAllButton(elements, state, controls)
     );
-    console.log(controls.uniforms);
+
     for (const control of controls.uniforms ?? []) {
 
         if (control.type === "label") {
@@ -290,6 +290,8 @@ function addCanvasMouseInteraction(elements, state) {
     //   iMouse.xy = the current mouse position when some button is pressed (i.e. dragged to) -> [0, 0] if not pressed
     //   iMouse.zw = the last mouse position where there button was pressed (i.e. dragged from)
     state.iMouse = [0, 0, 0, 0];
+    // And I prefer to also have the last position where the drag was dropped:
+    state.iMouseDrop = [0, 0];
 
     elements.canvas.addEventListener("mousedown", event => {
         isPressed = true;
@@ -306,6 +308,8 @@ function addCanvasMouseInteraction(elements, state) {
     });
     elements.canvas.addEventListener("mouseup", event => {
         isPressed = false;
+        state.iMouseDrop[0] = state.iMouse[0];
+        state.iMouseDrop[1] = state.iMouse[1];
         state.iMouse[0] = 0;
         state.iMouse[1] = 0;
     });

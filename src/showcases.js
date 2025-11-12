@@ -16,7 +16,7 @@ import showcaseFbo from "./showcases/retired/9_FramebufferPingPong.js";
 import showcase11 from "./showcases/retired/11_Volumetric.js";
 import showcaseX from "./showcases/X_SimulationPlayground.js";
 
-const defaultShowcase = showcase9;
+const defaultShowcase = showcase10;
 
 export function selectShowcase() {
 
