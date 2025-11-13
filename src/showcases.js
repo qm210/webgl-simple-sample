@@ -9,14 +9,16 @@ import showcase6a from "./showcases/6a_RayMarchingPrimitivesSimplified.js";
 import showcase6b from "./showcases/6b_RayMarchingPrimitives.js";
 import showcase7 from "./showcases/7_VariousConceptsFor3D.js";
 import showcase8 from "./showcases/8_MultiPassAndExtraData.js";
-import showcase9 from "./showcases/9_FluidSimulation.js";
-import showcase10 from "./showcases/10_RayTracing.js"
+import showcase9 from "./showcases/9_FramebufferPingPong.js";
+import showcase10a from "./showcases/10_RayTracing.js"
+import showcase10b from "./showcases/10b_RayTracingPlusVolumetric.js"
+import showcase11 from "./showcases/11_FluidSimulation.js";
 import showcaseRIOW from "./showcases/retired/10_StochasticRayTracing.js";
-import showcaseFbo from "./showcases/retired/9_FramebufferPingPong.js";
-import showcase11 from "./showcases/retired/11_Volumetric.js";
+import showcaseOld8 from "./showcases/retired/8_Multipass.js";
+import showcaseOld11 from "./showcases/retired/11_Volumetric.js";
 import showcaseX from "./showcases/X_SimulationPlayground.js";
 
-const defaultShowcase = showcase10;
+const defaultShowcase = showcase10b;
 
 export function selectShowcase() {
 
@@ -51,14 +53,19 @@ export function selectShowcase() {
         case "9":
             return showcase9;
         case "10":
-            return showcase10;
+        case "10a":
+            return showcase10a;
+        case "10b":
+            return showcase10b;
         case "11":
             return showcase11;
-        case "fbo":
-            return showcaseFbo;
         case "riow":
             return showcaseRIOW;
-        case "x":
+        case "old8":
+            return showcaseOld8;
+        case "old11":
+            return showcaseOld11;
+        case "210":
             return showcaseX;
         default:
             return defaultShowcase;

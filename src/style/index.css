@@ -16,6 +16,7 @@
   --font-size-base: 1.25em;
   --font-size-factor: 1;
   --font-size-large: calc(var(--font-size-base) * var(--font-size-factor));
+  --font-size-label: calc(0.88 * var(--font-size-base) * var(--font-size-factor));
 
   @media (max-width: 400px) {
     font-size: 8pt;
@@ -96,7 +97,7 @@ pre {
 label {
   font-family: monospace;
   margin: 4px 0;
-  font-size: var(--font-size-large);
+  font-size: var(--font-size-label);
 }
 
 kbd {

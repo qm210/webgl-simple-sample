@@ -288,7 +288,7 @@ const in float t_max, out hit_record rec) {
 
     if (hitable_hit(hitable(vec3( 2,1,2),1.),r,t_min,rec.t,rec))        hit=true,rec.mat=material(DIELECTRIC,vec3(0.5,0.,0.),1.5);
     if (hitable_hit(hitable(vec3(-4,1,0),1.),r,t_min,rec.t,rec))        hit=true,rec.mat=material(LAMBERTIAN,vec3(.4,.2,.1),0.);
-    if (hitable_hit(hitable(vec3( 4.,1.,-0.5),1.),r,t_min,rec.t,rec))   hit=true,rec.mat=material(METAL     ,vec3(1.,1.,1.),0.);
+    if (hitable_hit(hitable(vec3( 4. + 1. * sin(0.1 * iTime),1.,-0.5),1.),r,t_min,rec.t,rec))   hit=true,rec.mat=material(METAL     ,vec3(1.,1.,1.),0.);
 
     int NO_UNROLL = min(0,iFrame);
     for (int a = -11; a < 11+NO_UNROLL; a++) {
@@ -356,11 +356,13 @@ void main() {
 
     vec2 st = gl_FragCoord.xy / iResolution.xy;
     vec4 image = texture(iChannel0, st);
-    // manchmal sieht da so aus - hat genau denselben Zweck, Hauptunterschied sind: Integerkoordinaten statt normiert.
+    // Alternative - hat genau denselben Zweck, Hauptunterschied sind: Integerkoordinaten statt normiert.
     // vec4 image = texelFetch(iChannel0, ivec2(gl_FragCoord.xy), 0);
 
-
-    g_seed = float(base_hash(floatBitsToUint(gl_FragCoord.xy)))/float(0xffffffffU)+iTime;
+    // Seed für Pseudorandom -- überall wo das eingeht, wird stochastisch variiert.
+    g_seed = float(base_hash(floatBitsToUint(gl_FragCoord.xy)))/float(0xffffffffU);
+    // g_seed nicht nur pro Pixel, sondern auch pro Zeit / Frame variieren:
+    g_seed += iTime;
     // Demo: Abschalten der stochastischen Variation:
     // g_seed = 0.;
 

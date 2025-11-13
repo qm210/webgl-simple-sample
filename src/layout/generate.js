@@ -286,30 +286,32 @@ function addDisplayControls(elements, state, glContext) {
 
 function addCanvasMouseInteraction(elements, state) {
     let isPressed = false;
-    // Convention for iMouse is (e.g. shadertoy)
+    // Shadertoy convention for iMouse is
     //   iMouse.xy = the current mouse position when some button is pressed (i.e. dragged to) -> [0, 0] if not pressed
     //   iMouse.zw = the last mouse position where there button was pressed (i.e. dragged from)
     state.iMouse = [0, 0, 0, 0];
-    // And I prefer to also have the last position where the drag was dropped:
-    state.iMouseDrop = [0, 0];
+    // And I prefer to also have the last position where the drag was dropped,
+    // in a similar struct as .zw where .xy are the current mouse-down-coordinates
+    state.iMouseDrag = [0, 0, 0, 0];
 
     elements.canvas.addEventListener("mousedown", event => {
         isPressed = true;
         const pressed = correctedCoordinates(event);
         state.iMouse = [pressed.x, pressed.y, pressed.x, pressed.y];
+        state.iMouseDrag[0] = state.iMouse[0];
+        state.iMouseDrag[1] = state.iMouse[1];
     });
     elements.canvas.addEventListener("mousemove", event => {
-       if (!isPressed) {
-           return;
-       }
-       const dragged = correctedCoordinates(event);
-       state.iMouse[0] = dragged.x;
-       state.iMouse[1] = dragged.y;
+        if (!isPressed) {
+            return;
+        }
+        const dragged = correctedCoordinates(event);
+        state.iMouseDrag[0] = state.iMouse[0] = dragged.x;
+        state.iMouseDrag[1] = state.iMouse[1] = dragged.y;
     });
     elements.canvas.addEventListener("mouseup", event => {
         isPressed = false;
-        state.iMouseDrop[0] = state.iMouse[0];
-        state.iMouseDrop[1] = state.iMouse[1];
+        state.iMouseDrag = [0, 0, state.iMouse[0], state.iMouse[1]];
         state.iMouse[0] = 0;
         state.iMouse[1] = 0;
     });

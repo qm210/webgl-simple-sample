@@ -26,7 +26,7 @@ const vec2 iMouse = vec2(0., 0.);
 #define LARGE_NUMBER 1e20
 #define EPSILON 0.0001
 #define MAX_SDF_SPHERE_STEPS 15
-#define ABSORPTION_COEFFICIENT 0.5
+#define ABSORPTION_COEFFICIENT 0.75
 #define CAST_VOLUME_SHADOW_ON_OPAQUES 1
 
 #if PERFORMANCE_MODE
@@ -45,7 +45,7 @@ const vec2 iMouse = vec2(0., 0.);
 #define MAX_OPAQUE_SHADOW_MARCH_STEPS 25
 #endif
 
-#define UNIFORM_FOG_DENSITY 0
+#define UNIFORM_FOG_DENSITY 1
 #define UNIFORM_LIGHT_SPEED 0
 
 struct CameraDescription

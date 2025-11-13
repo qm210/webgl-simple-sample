@@ -1,6 +1,6 @@
 import {startRenderLoop} from "../webgl/render.js";
 import {initBasicState} from "./common.js";
-import fragmentShaderSource from "../shaders/raytracingFirstSteps.glsl";
+import fragmentShaderSource from "../shaders/raytracingPlusVolumetricMarching.glsl";
 
 export default {
     title: "Ray Tracing: First Steps",

@@ -64,8 +64,12 @@ export function createInputElements(state, control) {
     switch (control.type) {
         case "floatInput":
             return asFloatInput(input, state, control);
+        case "vec2Input":
+            return asVecInput(2, input, state, control);
         case "vec3Input":
-            return asVec3Input(input, state, control);
+            return asVecInput(3, input, state, control);
+        case "vec4Input":
+            return asVecInput(4, input, state, control);
         case "cursorInput":
             return asCursorInput(input, state, control);
         default:
@@ -152,7 +156,7 @@ function asSlider(inputElement, control) {
     if (control.max !== undefined) {
         inputElement.max = control.max;
     }
-    inputElement.style.flex = "3";
+    inputElement.style.flex = "1";
 }
 
 function round(value, control) {
@@ -172,8 +176,8 @@ function updateSlider(elements, state, control, full = false, value = undefined)
             value === 0 ? +1
             : value < 0 ? 0
             : 2 * value;
-        elements.control.min = control.min ?? round(defaultMin);
-        elements.control.max = control.max ?? round(defaultMax);
+        elements.control.min = control.min ?? round(defaultMin, control);
+        elements.control.max = control.max ?? round(defaultMax, control);
         elements.min.textContent = (+elements.control.min).toFixed(digits);
         elements.max.textContent = (+elements.control.max).toFixed(digits);
     }
@@ -182,12 +186,12 @@ function updateSlider(elements, state, control, full = false, value = undefined)
     return elements.control.value;
 }
 
-export const asVec3Input = (elements, state, control) => {
+export const asVecInput = (dim, elements, state, control) => {
     elements.control = document.createElement("div");
     elements.control.style.gap = "0.5rem";
 
     const sliders = [];
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < dim; i++) {
         const componentInput = document.createElement("input");
         sliders.push(componentInput);
         elements.control.appendChild(componentInput);
@@ -220,7 +224,7 @@ export const asVec3Input = (elements, state, control) => {
 
     function updateAll() {
         state[control.name] = sliders.map(i => +i.value);
-        updateVec3Label(elements.value, state, control);
+        updateVecLabel(elements.value, state, control);
     }
 };
 
@@ -274,7 +278,7 @@ const asCursorInput = (elements, state, control) => {
     return elements;
 
     function update() {
-        updateVec3Label(elements.value, state, control)
+        updateVecLabel(elements.value, state, control)
     }
 
     function shiftComponent(index, shift) {
@@ -285,14 +289,14 @@ const asCursorInput = (elements, state, control) => {
     }
 }
 
-function updateVec3Label(labelElement, state, control) {
+function updateVecLabel(labelElement, state, control) {
     let value = state[control.name];
     if (value instanceof Array) {
         value = value
             .map(i => i.toFixed(2))
-            .join(", ");
+            .join(",");
     }
-    labelElement.textContent = `= vec3(${value})`;
+    labelElement.textContent = `= (${value})`;
 }
 
 export function createResetAllButton(elements, state, controls) {
@@ -306,7 +310,7 @@ export function createResetAllButton(elements, state, controls) {
             if (control.type === "cursorInput") {
                 state[control.name] = control.defaultValue;
                 const label = elements.uniformLabels[control.name];
-                updateVec3Label(label, state, control);
+                updateVecLabel(label, state, control);
                 sessionStoreControlState(state, control);
             }
         }

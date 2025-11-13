@@ -1,9 +1,9 @@
-import standardSetup from "./3_SimpleGeometry.js";
-import {startRenderLoop} from "../../webgl/render.js";
-import {createFramebufferWithTexture, createTextureFromImage, takePingPongFramebuffers} from "../../webgl/helpers.js";
+import standardSetup from "./retired/3_SimpleGeometry.js";
+import {startRenderLoop} from "../webgl/render.js";
+import {createFramebufferWithTexture, createTextureFromImage, takePingPongFramebuffers} from "../webgl/helpers.js";
 
-import fragmentShaderSource from "../../shaders/spring-2025/framebufferPingPong.glsl";
-import someSampleImage from "../../textures/mysterious_capybara.png";
+import fragmentShaderSource from "../shaders/spring-2025/framebufferPingPong.glsl";
+import someSampleImage from "../textures/mysterious_capybara.png";
 
 export default {
     title: "Stochastic Ray Tracing",
