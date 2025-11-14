@@ -328,8 +328,16 @@ Hit map(in vec3 pos)
         METAL_MATERIAL,
         vec3(0.88, 0.67, 1.0)
     );
+    // fun squeeze
+    float squeeze = 1. + 0.2 * sin(twoPi * 0.5 * iTime);
+    float sq0 = sqrt(squeeze);
+    mat3 squeezer = mat3(
+        sq0, 0., 0.,
+        0., 1./squeeze, 0.,
+        0., 0., sq0
+    );
     res = takeCloser(res,
-        sdSphere(pos-vec3(1.0, 0.3, 0.15), 0.3),
+        sdSphere(squeezer*(pos-vec3(1.0, squeeze*0.3, 0.15)), 0.3),
         GLASS_MATERIAL,
         c.xxx
     );
@@ -841,9 +849,11 @@ void performRayTracing(in Ray ray, out vec3 color, out DebugValues debug)
 
             // Wir können aber zumindest mal (neu seit VL6) noch ein Glanzlicht versuchen,
             // also genauso modelliert wie die speculars in shadeForOpaqueMaterial():
-            vec3 lightDirection = normalize(-vecDirectionalLight);
-            float specular = pow(clamp(dot(reflected, lightDirection), 0.0, 1.0), iSpecularExponent);
+            float specular = clamp(dot(reflected, -vecDirectionalLight), 0.0, 1.0);
+            specular = 0.8 * pow(specular, 4.5);
+            vec3 shade = specular * directionalLightColor;
 
+            color += attenuation * specular * shade;
 
             continue;
         }
