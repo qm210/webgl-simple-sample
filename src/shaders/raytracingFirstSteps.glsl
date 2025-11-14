@@ -5,6 +5,7 @@ out vec4 fragColor;
 uniform vec2 iResolution;
 uniform float iTime;
 uniform vec4 iMouse;
+uniform vec4 iMouseDrag;
 uniform float iSceneRotation;
 uniform float iScenePitch;
 uniform float iFieldOfViewDegrees;
@@ -22,6 +23,8 @@ uniform float iAmbientOcclusionIterations;
 uniform int iShadowCastIterations;
 uniform float iShadowSharpness;
 uniform int iRayMarchingIterations;
+uniform float iMarchingMinDistance;
+uniform float iMarchingMaxDistance;
 uniform int iRayTracingIterations;
 uniform float iMetalReflectance;
 uniform float iEtaGlassRefraction;
@@ -32,7 +35,6 @@ uniform float iNoiseOffset;
 uniform int iFractionSteps;
 uniform float iFractionScale;
 uniform float iFractionAmplitude;
-uniform float iCalcNormalEpsilon;
 uniform int modeDebugRendering;
 
 // for you to play around with, put 'em wherever you want:
@@ -56,9 +58,6 @@ const int STANDARD_OPAQUE_MATERIAL = 2;
 const int GLASS_MATERIAL = 3;
 const int METAL_MATERIAL = 4;
 const int PLAIN_DEBUGGING_MATERIAL = 99;
-
-const float MARCHING_MIN_DISTANCE = 0.1;
-const float MARCHING_MAX_DISTANCE = 20.;
 
 const vec3 directionalLightColor = vec3(1.30, 1.00, 0.70);
 
@@ -308,6 +307,7 @@ Hit map(in vec3 pos)
     // Primitives ( = Geometrien, die zumindest mathematisch "einfach" beschrieben sind)
 
     float torusOffset = 1.1 * sin(twoPi * 0.13 * iTime);
+    torusOffset = -0.3;
     res = takeCloser(res,
         sdTorus((pos-vec3(.5 + torusOffset, 0.30, 0.5)).xzy, vec2(0.25, 0.05)),
         STANDARD_OPAQUE_MATERIAL,
@@ -334,7 +334,7 @@ Hit map(in vec3 pos)
         c.xxx
     );
     res = takeCloser(res,
-        sdBox(pos - vec3(-0.5, 0.6, 2.), 0.6 * c.xxx),
+        sdBox(pos - vec3(-0.5, 0.6 + 0.01 * iFree1, 2.), 0.6 * c.xxx),
         GLASS_MATERIAL,
         vec3(0.7, 0.9, 1.)
     );
@@ -358,8 +358,10 @@ void raymarch(in Ray ray, out Hit result, inout DebugValues debug)
 {
     result = Hit(-1.0, NO_MATERIAL, c.yyy);
 
-    float tmin = MARCHING_MIN_DISTANCE;
-    float tmax = MARCHING_MAX_DISTANCE;
+    // iMarchingMinDistance war 0.1, war zu grob
+    // iMarchingMaxDistance war 20.
+    float tmin = iMarchingMinDistance;
+    float tmax = iMarchingMaxDistance;
 
     // trace floor plane analytically
     float tp1 = (0.0-ray.origin.y)/ray.dir.y;
@@ -506,8 +508,7 @@ vec3 calcNormal( in vec3 pos )
     // Bildet finite Differenzen um pos,
     // also den Normalenvektor aus dem 3D-Gradienten.
     // ( 0.5773 == 1/sqrt(3) ),
-    // iCalcNormalEpsilon ~ 0.0005 aber ändert doch mal :P
-    vec2 e = vec2(1.0, -1.0) * 0.5773 * iCalcNormalEpsilon;
+    vec2 e = vec2(1.0, -1.0) * 0.5773 * 0.0005;
     return normalize(
         e.xyy*map( pos + e.xyy ).t +
         e.yyx*map( pos + e.yyx ).t +
@@ -761,18 +762,24 @@ void performRayTracing(in Ray ray, out vec3 color, out DebugValues debug)
             break;
         }
         else if (hit.material == GLASS_MATERIAL) {
-            // Lichtbrechung: Übergang von I(ncoming) nach T(ransmitted)
-            float cosIncoming = dot(ray.dir, normal);
-            // eta: "Permittivitätskonstante" an Grenzfläche als Quotient
-            // (Wellenlänge im Material kürzer als außen, Brechungsindex von Luft == 1.)
-            float eta = 1. / iEtaGlassRefraction;
-            // Muss Richtung des Übergangs beachten und ggf. tauschen,
-            // dabei auch den Normalenvektor in die andere Richtung spiegeln,
-            // weil der nach außen zeigen muss.
-            if (cosIncoming > 0.0) {
-                eta = iEtaGlassRefraction;
+            // Lichtbrechung:
+            // Senkrechte Komponente der Wellenlänge im Material kürzer als außen.
+            // "eta" = Quotient von Durchgangs-Brechungsindex / Einfalls-Brechungsindex,
+            // Ist ~ 1 in Luft / Vakuum, je weiter weg von 1, desto stärker die Brechung.
+            float eta = 1.;
+            // Es ist zu unterscheiden, ob wir rein- oder rausbrechen, weil
+            // - der bisher bestimmte Normalenvektor immer nach AUßEN zeigt,
+            //   in den Brechungsformeln aber immer entgegen der Strahlrichtung.
+            // - eta > 1 für Brechung von innen (optisch dichter) nach außen
+            // - eta < 1 für Brechung von außen (optisch dünner) nach innen
+            float cosIncident = dot(ray.dir, normal);
+            if (cosIncident > 0.0) {
+                // d.h. wir sind innen und bechen aus
+                eta *= iEtaGlassRefraction;
                 normal = -normal;
-                cosIncoming = -cosIncoming;
+            } else {
+                // d.h. wir sind außen und brechen ein
+                eta /= iEtaGlassRefraction;
             }
             // Es gibt dann eigentlich den Gebrochenen UND den Reflektierten Strahl.
             // -> Funktionen werden uns ja beide von GLSL geschenkt.
@@ -801,8 +808,8 @@ void performRayTracing(in Ray ray, out vec3 color, out DebugValues debug)
 
             // Totalreflexion passiert bei flachen Winkeln und ausreichenden eta,
             // (lässt sich alles aus dem Snell-Gesetz ableiten), relevant hier ist,
-            // dass dann also refracted === vec3(0.) ist.
-            if (length(refracted) < epsilon) {
+            // dass dann also auch exakt refracted == vec3(0.) zurückgegeben wird.
+            if (refracted == c.yyy) {
                 ray.dir = reflected;
                 ray.origin = rayHit + epsilon * ray.dir;
                 // <-- Vorsorge gegen numerische Float-Fluktuationen auch hier
@@ -810,7 +817,8 @@ void performRayTracing(in Ray ray, out vec3 color, out DebugValues debug)
                 continue;
             }
 
-            // Falls also nicht Totalreflexion, gehen wir nur mit refracted weiter:
+            // Falls also nicht Totalreflexion, gehen wir nur mit refracted weiter.
+            // (man hätte reflected dann nicht berechnen müssen, aber so war's einheitlicher.)
             ray.dir = refracted;
             ray.origin = rayHit + epsilon * ray.dir;
 
@@ -818,14 +826,25 @@ void performRayTracing(in Ray ray, out vec3 color, out DebugValues debug)
             // (folgt auch aus den physikalischen Grundlagen)
             float r0 = (1. - eta) / (1. + eta);
             r0 = r0 * r0;
-            float cosRefr = -dot(refracted, normal);
+            float cosRefr = dot(refracted, -normal);
             float reflectance = r0 + (1. - r0) * pow((1. - cosRefr), 5.);
+
+            attenuation *= baseColor;
+            color += attenuation * reflectance;
 
             // Diese gesamte Mathematik kann man manuell optimieren,
             // aber stellt sich heraus, dass das für heute nicht nötig ist :)
 
-            attenuation *= baseColor;
-            color += attenuation * reflectance;
+            // PS: Zur Diskussion, ob man da mehrere Abzweigungen führen könnte:
+            // Dieser Shader hier implementiert so einen vermuteten Stack an Rays:
+            // https://www.shadertoy.com/view/Xf3cRS
+
+            // Wir können aber zumindest mal (neu seit VL6) noch ein Glanzlicht versuchen,
+            // also genauso modelliert wie die speculars in shadeForOpaqueMaterial():
+            vec3 lightDirection = normalize(-vecDirectionalLight);
+            float specular = pow(clamp(dot(reflected, lightDirection), 0.0, 1.0), iSpecularExponent);
+
+
             continue;
         }
         else if (hit.material == METAL_MATERIAL) {
@@ -872,12 +891,12 @@ void main()
 {
     // uv normiert auf x in [-aspRatio, aspRatio], y in [-1, 1]
     vec2 uv = (2.0 * gl_FragCoord.xy - iResolution.xy) / iResolution.y;
-    // pan normiert auf x und y je [-0.5, 0.5]
-    vec2 pan = iMouse.xy / iResolution.xy - 0.5;
-    // aber nur wenn Maus gedrückt.
-    if (iMouse.xy == c.yy) {
-        pan = c.yy;
-    }
+
+    // iMouseDrag habe ich mal anwendungsseitig neu konstruiert, nämlich:
+    // - iMouseDrag.xy = Spanne des aktuellen Mouse-Drag = Cursorposition - Anfangsposition
+    // - iMouseDrag.zw = Spanne über alle bisherigen Mouse-Drags zusammengezählt
+    // das macht dieses Panning per Maus dann doch angenehmer, wie ich meine:
+    vec2 pan = iMouseDrag.zw / iResolution.xy;
 
     vec3 cameraTarget = vec3(0.4, 0.4, 1.);
 
@@ -926,15 +945,11 @@ void main()
             );
             break;
         case 3:
-            fragColor.rgb = vec3(debug.firstHit.t / MARCHING_MAX_DISTANCE);
+            fragColor.rgb = vec3(debug.firstHit.t / iMarchingMaxDistance);
             break;
         case 4:
             fragColor.rgb = debug.attenuation;
             break;
-        case 5:
-//            fragColor.rgb = vec3(
-//                float(debug.volumetricSteps) / float(iVolumetricStepIterations)
-//            );
             break;
     }
 }

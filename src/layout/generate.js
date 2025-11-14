@@ -3,9 +3,9 @@ import {registerShaderCode} from "./shaderCode.js";
 import {appendButton, appendElement, createDiv, createElement} from "./helpers.js";
 import {createScrollStackOn, scrollToFirstInterestingLine} from "./events.js";
 import {deferExtendedAnalysis} from "../glslCode/deferredAnalysis.js";
-import {resetLoop, shiftTime, whilePausingRendering} from "../webgl/render.js";
+import {shiftTime} from "../webgl/render.js";
 import {setCanvasResolution} from "../webgl/setup.js";
-import {recreateFramebufferWithTexture, updateResolutionInState} from "../webgl/helpers.js";
+import {updateResolutionInState} from "../webgl/helpers.js";
 
 
 const generatePage = (glContext, elements, state, controls, autoRenderOnLoad = true) => {
@@ -285,33 +285,47 @@ function addDisplayControls(elements, state, glContext) {
 }
 
 function addCanvasMouseInteraction(elements, state) {
-    let isPressed = false;
+    const mouse = {
+        pressed: false,
+        total: {dx: 0, dy: 0},
+    };
+    loadTotalDragged();
+
     // Shadertoy convention for iMouse is
-    //   iMouse.xy = the current mouse position when some button is pressed (i.e. dragged to) -> [0, 0] if not pressed
-    //   iMouse.zw = the last mouse position where there button was pressed (i.e. dragged from)
+    //   .xy = the current mouse position when some button is pressed (i.e. dragged to)
+    //         and [0, 0] if not pressed
+    //   .zw = the last mouse position where the button was pressed (i.e. dragged from)
     state.iMouse = [0, 0, 0, 0];
-    // And I prefer to also have the last position where the drag was dropped,
-    // in a similar struct as .zw where .xy are the current mouse-down-coordinates
-    state.iMouseDrag = [0, 0, 0, 0];
+    // And I prefer to also have the last position where the drag was dropped, or better
+    //   .xy = the currently dragged distance (iMouse.xy - iMouse.zw when dragging)
+    //   .zw = the total dragged distance up to now
+    state.iMouseDrag = [0, 0, mouse.total.dx, mouse.total.dy];
 
     elements.canvas.addEventListener("mousedown", event => {
-        isPressed = true;
+        mouse.pressed = true;
         const pressed = correctedCoordinates(event);
         state.iMouse = [pressed.x, pressed.y, pressed.x, pressed.y];
-        state.iMouseDrag[0] = state.iMouse[0];
-        state.iMouseDrag[1] = state.iMouse[1];
     });
     elements.canvas.addEventListener("mousemove", event => {
-        if (!isPressed) {
+        if (!mouse.pressed) {
             return;
         }
         const dragged = correctedCoordinates(event);
-        state.iMouseDrag[0] = state.iMouse[0] = dragged.x;
-        state.iMouseDrag[1] = state.iMouse[1] = dragged.y;
+        state.iMouse[0] = dragged.x;
+        state.iMouse[1] = dragged.y;
+        state.iMouseDrag[0] = state.iMouse[0] - state.iMouse[2];
+        state.iMouseDrag[1] = state.iMouse[1] - state.iMouse[3];
+        state.iMouseDrag[2] = mouse.total.dx + state.iMouseDrag[0];
+        state.iMouseDrag[3] = mouse.total.dy +  state.iMouseDrag[1];
     });
-    elements.canvas.addEventListener("mouseup", event => {
-        isPressed = false;
-        state.iMouseDrag = [0, 0, state.iMouse[0], state.iMouse[1]];
+    document.addEventListener("mouseup", event => {
+        if (!mouse.pressed) {
+            return;
+        }
+        mouse.pressed = false;
+        storeTotalDragged();
+        state.iMouseDrag[0] = 0;
+        state.iMouseDrag[1] = 0;
         state.iMouse[0] = 0;
         state.iMouse[1] = 0;
     });
@@ -322,5 +336,21 @@ function addCanvasMouseInteraction(elements, state) {
             x: event.offsetX,
             y: elements.canvas.height - event.offsetY
         };
+    }
+
+    function storeTotalDragged() {
+        mouse.total = {
+            dx: state.iMouseDrag[2],
+            dy: state.iMouseDrag[3],
+        };
+        sessionStorage.setItem("qm.mouse", JSON.stringify(mouse.total));
+    }
+
+    function loadTotalDragged() {
+        const stored = sessionStorage.getItem("qm.mouse");
+        if (!stored) {
+            return;
+        }
+        mouse.total = JSON.parse(stored);
     }
 }

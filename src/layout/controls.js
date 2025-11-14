@@ -126,11 +126,11 @@ export const asFloatInput = (elements, state, control) => {
     updateSlider(elements, state, control, true);
 
     elements.control.addEventListener("input", event => {
-        state[control.name] = event.target.value;
+        state[control.name] = valueFrom(event, control);
         updateSlider(elements, state, control, false);
     });
     elements.control.addEventListener("change", event => {
-        state[control.name] = event.target.value;
+        state[control.name] = valueFrom(event, control);
         updateSlider(elements, state, control, true);
         sessionStoreControlState(state, control);
     });
@@ -142,30 +142,41 @@ export const asFloatInput = (elements, state, control) => {
     });
 
     return elements;
+
+    function valueFrom(event, control) {
+        let value = parseFloat(event.target.value);
+        if (control.log) {
+            value = Math.pow(10, value);
+        }
+        return value;
+    }
 };
 
 function asSlider(inputElement, control) {
     control.step ??=
-        control.min > 0 && control.min < 0.01 ? 0.001
-        : 0.01;
-    inputElement.type = "range";
-    inputElement.step = control.step;
+        control.min > 0 && control.min < 0.01
+            ? 0.001 : 0.01;
+    if (control.log && control.min > 0 && control.max > control.min) {
+        control.step = Math.min(control.min, control.step);
+        control.min = Math.log10(control.min);
+        control.max = Math.log10(control.max);
+    }
     if (control.min !== undefined) {
         inputElement.min = control.min;
     }
     if (control.max !== undefined) {
         inputElement.max = control.max;
     }
+    inputElement.type = "range";
+    inputElement.step = control.step;
     inputElement.style.flex = "1";
 }
 
-function round(value, control) {
-    return Math.round(parseFloat(value) / control.step) * control.step;
-}
-
-function updateSlider(elements, state, control, full = false, value = undefined) {
-    value ??= state[control.name];
-    value = round(value, control);
+function updateSlider(elements, state, control, full = false, givenValue = undefined) {
+    let value = round(givenValue ?? state[control.name]);
+    if (control.log) {
+        value = Math.log10(value);
+    }
     const digits = -Math.log10(control.step);
     if (full) {
         const defaultMin =
@@ -176,19 +187,39 @@ function updateSlider(elements, state, control, full = false, value = undefined)
             value === 0 ? +1
             : value < 0 ? 0
             : 2 * value;
-        elements.control.min = control.min ?? round(defaultMin, control);
-        elements.control.max = control.max ?? round(defaultMax, control);
-        elements.min.textContent = (+elements.control.min).toFixed(digits);
-        elements.max.textContent = (+elements.control.max).toFixed(digits);
+        elements.control.min = round(control.min ?? defaultMin);
+        elements.control.max = round(control.max ?? defaultMax);
+        elements.min.textContent = toDigits(elements.control.min);
+        elements.max.textContent = toDigits(elements.control.max);
     }
-    elements.control.value = value.toFixed(digits);
-    elements.value.textContent = ` = ${value.toFixed(digits)}`;
-    return elements.control.value;
+    elements.control.value = value;
+    value = toDigits(value);
+    elements.value.textContent = ` = ${value}`;
+    return value;
+
+    function round(value) {
+        return Math.round(value / control.step) * control.step;
+    }
+
+    function toDigits(value) {
+        value = +value;
+        if (control.log) {
+            value = Math.pow(10, value);
+        }
+        return value.toFixed(digits);
+    }
 }
 
 export const asVecInput = (dim, elements, state, control) => {
     elements.control = document.createElement("div");
     elements.control.style.gap = "0.5rem";
+
+    let normFactor = 1;
+    if (control.normalize) {
+        control.min = control.log ? 1e-6 : -1;
+        control.max = 1;
+        normFactor = 1 / (squareNorm(state[control.name]) || 1);
+    }
 
     const sliders = [];
     for (let i = 0; i < dim; i++) {
@@ -196,6 +227,7 @@ export const asVecInput = (dim, elements, state, control) => {
         sliders.push(componentInput);
         elements.control.appendChild(componentInput);
         asSlider(componentInput, control);
+        state[control.name][i] *= normFactor;
         componentInput.value =
             updateSlider(elements, state, control, true, state[control.name][i]);
         componentInput.addEventListener("input", event => {
@@ -223,10 +255,28 @@ export const asVecInput = (dim, elements, state, control) => {
     return elements;
 
     function updateAll() {
-        state[control.name] = sliders.map(i => +i.value);
+        if (control.normalize) {
+            const norm = Math.sqrt(
+                sliders.reduce((sum, slider) =>
+                        sum + (slider.value * slider.value),
+                    0
+                )
+            );
+            sliders.forEach(slider => {
+                slider.value /= norm;
+            });
+        }
+        state[control.name] = sliders.map(s => +s.value);
         updateVecLabel(elements.value, state, control);
     }
 };
+
+function squareNorm(vec) {
+    return Math.sqrt(vec.reduce(
+        (sum, comp) => sum + comp * comp,
+        0
+    ));
+}
 
 const asCursorInput = (elements, state, control) => {
     // control.keys needs 7 keydown event names like ["W", "A", "S", "D", "R", "F", "Q"]
@@ -315,6 +365,7 @@ export function createResetAllButton(elements, state, controls) {
             }
         }
         state.iMouse = [0, 0, 0, 0];
+        state.iMouseDrag = [0, 0, 0, 0];
         state.resetSignal = true;
         event.target.blur();
     });
