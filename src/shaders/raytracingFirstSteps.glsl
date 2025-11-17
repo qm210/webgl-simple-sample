@@ -328,21 +328,13 @@ Hit map(in vec3 pos)
         METAL_MATERIAL,
         vec3(0.88, 0.67, 1.0)
     );
-    // fun squeeze
-    float squeeze = 1. + 0.2 * sin(twoPi * 0.5 * iTime);
-    float sq0 = sqrt(squeeze);
-    mat3 squeezer = mat3(
-        sq0, 0., 0.,
-        0., 1./squeeze, 0.,
-        0., 0., sq0
-    );
     res = takeCloser(res,
-        sdSphere(squeezer*(pos-vec3(1.0, squeeze*0.3, 0.15)), 0.3),
+        sdSphere(pos-vec3(1.0, 0.3, 0.15), 0.3),
         GLASS_MATERIAL,
         c.xxx
     );
     res = takeCloser(res,
-        sdBox(pos - vec3(-0.5, 0.6 + 0.01 * iFree1, 2.), 0.6 * c.xxx),
+        sdBox(pos - vec3(-0.5, 0.6 + 0.01, 2.), 0.6 * c.xxx),
         GLASS_MATERIAL,
         vec3(0.7, 0.9, 1.)
     );
@@ -391,10 +383,6 @@ void raymarch(in Ray ray, out Hit result, inout DebugValues debug)
         // map(...) lesen = Szene-SDF auswerten
         Hit h = map( ray.origin + ray.dir * t );
 
-        // Anmerkung: Check ... < epsilon * t statt  ... < epsilon ist "adaptiv"
-        //            -> weiter entfernte Ziele (t groß) müssen nicht so genau getroffen werden
-        //            -> nähere Ziele (t klein) müssen genauer getroffen werden
-        //            -> Float-Ungenauigkeit fällt zudem vergleichsweise geringer ins Gewicht
         if (abs(h.t) < epsilon * t)
         {
             result = h;
@@ -846,14 +834,6 @@ void performRayTracing(in Ray ray, out vec3 color, out DebugValues debug)
             // PS: Zur Diskussion, ob man da mehrere Abzweigungen führen könnte:
             // Dieser Shader hier implementiert so einen vermuteten Stack an Rays:
             // https://www.shadertoy.com/view/Xf3cRS
-
-            // Wir können aber zumindest mal (neu seit VL6) noch ein Glanzlicht versuchen,
-            // also genauso modelliert wie die speculars in shadeForOpaqueMaterial():
-            float specular = clamp(dot(reflected, -vecDirectionalLight), 0.0, 1.0);
-            specular = 0.8 * pow(specular, 4.5);
-            vec3 shade = specular * directionalLightColor;
-
-            color += attenuation * specular * shade;
 
             continue;
         }

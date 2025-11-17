@@ -3,7 +3,7 @@ import {initBasicState} from "./common.js";
 import fragmentShaderSource from "../shaders/raytracingPlusVolumetricMarching.glsl";
 
 export default {
-    title: "Ray Tracing: First Steps",
+    title: "Ray Tracing + Volumetric Marching",
     init: (gl, sources = {}) => {
         sources.fragment ??= fragmentShaderSource;
         const state = initBasicState(gl, sources);
@@ -50,8 +50,9 @@ export default {
             type: "vec3Input",
             name: "vecDirectionalLight",
             defaultValue: [0.2, -0.4, 0.2],
-            min: -10,
-            max: 10,
+            min: -1,
+            max: 1,
+            normalize: true,
         }, {
             type: "floatInput",
             name: "iDiffuseAmount",
@@ -99,7 +100,7 @@ export default {
             name: "iSubsurfaceAmount",
             defaultValue: 0.25,
             min: 0.,
-            max: 20.,
+            max: 40.,
         }, {
             type: "floatInput",
             name: "iAmbientOcclusionStep",
@@ -135,8 +136,22 @@ export default {
             step: 1,
         }, {
             type: "floatInput",
+            name: "iMarchingMinDistance",
+            defaultValue: 0.01,
+            min: 0.0001,
+            max: 2.,
+            step: 0.001,
+            log: true,
+        }, {
+            type: "floatInput",
+            name: "iMarchingMaxDistance",
+            defaultValue: 20,
+            min: 1,
+            max: 20,
+        }, {
+            type: "floatInput",
             name: "iRayTracingIterations",
-            defaultValue: 1,
+            defaultValue: 5,
             min: 1,
             max: 20,
             step: 1,
@@ -165,6 +180,13 @@ export default {
             defaultValue: 0.8,
             min: 0.,
             max: 1.,
+        }, {
+            type: "floatInput",
+            name: "iMetalNoisiness",
+            defaultValue: 0.0,
+            min: 0.,
+            max: 0.1,
+            step: 0.001,
         }, {
             type: "floatInput",
             name: "iEtaGlassRefraction",
@@ -297,12 +319,14 @@ function render(gl, state) {
     gl.uniform1f(state.location.iTime, state.time);
     gl.uniform2fv(state.location.iResolution, state.resolution);
     gl.uniform4fv(state.location.iMouse, state.iMouse);
-    gl.uniform2fv(state.location.iMouseDrag, state.iMouseDrag);
+    gl.uniform4fv(state.location.iMouseDrag, state.iMouseDrag);
     gl.uniform1f(state.location.iFieldOfViewDegrees, state.iFieldOfViewDegrees);
     gl.uniform1f(state.location.iSceneRotation, state.iSceneRotation);
     gl.uniform1f(state.location.iScenePitch, state.iScenePitch);
     gl.uniform1i(state.location.iRayTracingIterations, state.iRayTracingIterations);
     gl.uniform1i(state.location.iRayMarchingIterations, state.iRayMarchingIterations);
+    gl.uniform1f(state.location.iMarchingMinDistance, state.iMarchingMinDistance);
+    gl.uniform1f(state.location.iMarchingMaxDistance, state.iMarchingMaxDistance);
     gl.uniform1i(state.location.iVolumetricStepIterations, state.iVolumetricStepIterations);
     gl.uniform1f(state.location.iVolumetricMarchStep, state.iVolumetricMarchStep);
     gl.uniform1f(state.location.iVolumetricAlphaThreshold, state.iVolumetricAlphaThreshold);
@@ -320,6 +344,7 @@ function render(gl, state) {
     gl.uniform1f(state.location.iAmbientOcclusionIterations, state.iAmbientOcclusionIterations);
     gl.uniform1i(state.location.iShadowCastIterations, state.iShadowCastIterations);
     gl.uniform1f(state.location.iMetalReflectance, state.iMetalReflectance);
+    gl.uniform1f(state.location.iMetalNoisiness, state.iMetalNoisiness);
     gl.uniform1f(state.location.iEtaGlassRefraction, state.iEtaGlassRefraction);
     gl.uniform1f(state.location.iCloudsMaxDensity, state.iCloudsMaxDensity);
     gl.uniform1f(state.location.iCloudsScaleFactor, state.iCloudsScaleFactor);

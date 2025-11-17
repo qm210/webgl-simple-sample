@@ -418,6 +418,10 @@ vec2 iBox( in vec3 ro, in vec3 rd, in vec3 rad )
     min( min( t2.x, t2.y ), t2.z ) );
 }
 
+// this is a trick to keep the shader compiler from unwinding for loops,
+// which it does to improve runtime, but at the cost of compilation time
+#define ZERO (min(iFrame,0))
+
 vec2 raycast( in vec3 ro, in vec3 rd )
 {
     vec2 res = vec2(-1.0,-1.0);
@@ -443,7 +447,7 @@ vec2 raycast( in vec3 ro, in vec3 rd )
         tmax = min(tb.y,tmax);
 
         float t = tmin;
-        for( int i=0; i<70 && t<tmax; i++ )
+        for( int i=ZERO; i<70 && t<tmax; i++ )
         {
             vec2 h = map( ro+rd*t );
             if( abs(h.x)<(0.0001*t) )
@@ -466,7 +470,7 @@ float calcSoftshadow( in vec3 ro, in vec3 rd, in float mint, in float tmax )
 
     float res = 1.0;
     float t = mint;
-    for( int i=0; i<24; i++ )
+    for( int i=ZERO; i<24; i++ )
     {
         float h = map( ro + rd*t ).x;
         float s = clamp(8.0*h/t,0.0,1.0);
@@ -478,14 +482,27 @@ float calcSoftshadow( in vec3 ro, in vec3 rd, in float mint, in float tmax )
     return res*res*(3.0-2.0*res);
 }
 
+// in the loop of calcNormal(): prevent inlining map() 4 times (inspired by tdhooper and klems)
+#define REDUCE_INLINING 1
+
 // https://iquilezles.org/articles/normalsSDF
 vec3 calcNormal( in vec3 pos )
 {
+#if REDUCE_INLINING == 0
     vec2 e = vec2(1.0,-1.0)*0.5773*0.0005;
     return normalize( e.xyy*map( pos + e.xyy ).x +
     e.yyx*map( pos + e.yyx ).x +
     e.yxy*map( pos + e.yxy ).x +
     e.xxx*map( pos + e.xxx ).x );
+#else
+    vec3 n = vec3(0.0);
+    for( int i=ZERO; i<4; i++ )
+    {
+        vec3 e = 0.5773*(2.0*vec3((((i+3)>>1)&1),((i>>1)&1),(i&1))-1.0);
+        n += e*map(pos+0.0005*e).x;
+    }
+    return normalize(n);
+#endif
 }
 
 // https://iquilezles.org/articles/nvscene2008/rwwtt.pdf
@@ -493,7 +510,7 @@ float calcAO( in vec3 pos, in vec3 nor )
 {
     float occ = 0.0;
     float sca = 1.0;
-    for( int i=0; i<5; i++ )
+    for( int i=ZERO; i<5; i++ )
     {
         float h = 0.01 + 0.12*float(i)/4.0;
         float d = map( pos + h*nor ).x;
