@@ -1,4 +1,5 @@
 import {createDiv, createElement} from "./helpers.js";
+import {initMouseState} from "./mouse.js";
 
 export function addButton({parent, onClick, onRightClick, title = "", className = ""}) {
     const button = document.createElement("button");
@@ -364,8 +365,7 @@ export function createResetAllButton(elements, state, controls) {
                 sessionStoreControlState(state, control);
             }
         }
-        state.iMouse = [0, 0, 0, 0];
-        state.iMouseDrag = [0, 0, 0, 0];
+        initMouseState(state);
         state.resetSignal = true;
         event.target.blur();
     });

@@ -6,6 +6,7 @@ import {deferExtendedAnalysis} from "../glslCode/deferredAnalysis.js";
 import {shiftTime} from "../webgl/render.js";
 import {setCanvasResolution} from "../webgl/setup.js";
 import {updateResolutionInState} from "../webgl/helpers.js";
+import {addCanvasMouseInteraction} from "./mouse.js";
 
 
 const generatePage = (glContext, elements, state, controls, autoRenderOnLoad = true) => {
@@ -281,76 +282,5 @@ function addDisplayControls(elements, state, glContext) {
     function pageFontInitialize() {
         const currentFactor = JSON.parse(localStorage.getItem(PAGE_FONT.storageKey) ?? "1");
         document.documentElement.style.setProperty(PAGE_FONT.cssProperty, currentFactor);
-    }
-}
-
-function addCanvasMouseInteraction(elements, state) {
-    const mouse = {
-        pressed: false,
-        total: {dx: 0, dy: 0},
-    };
-    loadTotalDragged();
-
-    // Shadertoy convention for iMouse is
-    //   .xy = the current mouse position when some button is pressed (i.e. dragged to)
-    //         and [0, 0] if not pressed
-    //   .zw = the last mouse position where the button was pressed (i.e. dragged from)
-    state.iMouse = [0, 0, 0, 0];
-    // And I prefer to also have the last position where the drag was dropped, or better
-    //   .xy = the currently dragged distance (iMouse.xy - iMouse.zw when dragging)
-    //   .zw = the total dragged distance up to now
-    state.iMouseDrag = [0, 0, mouse.total.dx, mouse.total.dy];
-
-    elements.canvas.addEventListener("mousedown", event => {
-        mouse.pressed = true;
-        const pressed = correctedCoordinates(event);
-        state.iMouse = [pressed.x, pressed.y, pressed.x, pressed.y];
-    });
-    elements.canvas.addEventListener("mousemove", event => {
-        if (!mouse.pressed) {
-            return;
-        }
-        const dragged = correctedCoordinates(event);
-        state.iMouse[0] = dragged.x;
-        state.iMouse[1] = dragged.y;
-        state.iMouseDrag[0] = state.iMouse[0] - state.iMouse[2];
-        state.iMouseDrag[1] = state.iMouse[1] - state.iMouse[3];
-        state.iMouseDrag[2] = mouse.total.dx + state.iMouseDrag[0];
-        state.iMouseDrag[3] = mouse.total.dy +  state.iMouseDrag[1];
-    });
-    document.addEventListener("mouseup", event => {
-        if (!mouse.pressed) {
-            return;
-        }
-        mouse.pressed = false;
-        storeTotalDragged();
-        state.iMouseDrag[0] = 0;
-        state.iMouseDrag[1] = 0;
-        state.iMouse[0] = 0;
-        state.iMouse[1] = 0;
-    });
-
-    function correctedCoordinates(event) {
-        // the y convention in GLSL is opposed to the HTML convention.
-        return {
-            x: event.offsetX,
-            y: elements.canvas.height - event.offsetY
-        };
-    }
-
-    function storeTotalDragged() {
-        mouse.total = {
-            dx: state.iMouseDrag[2],
-            dy: state.iMouseDrag[3],
-        };
-        sessionStorage.setItem("qm.mouse", JSON.stringify(mouse.total));
-    }
-
-    function loadTotalDragged() {
-        const stored = sessionStorage.getItem("qm.mouse");
-        if (!stored) {
-            return;
-        }
-        mouse.total = JSON.parse(stored);
     }
 }

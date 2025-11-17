@@ -1,0 +1,77 @@
+
+export function addCanvasMouseInteraction(elements, state) {
+    // Shadertoy convention for iMouse is
+    //   .xy = the current mouse position when some button is pressed (i.e. dragged to)
+    //         and [0, 0] if not pressed
+    //   .zw = the last mouse position where the button was pressed (i.e. dragged from)
+    // And I prefer to also have the last position where the drag was dropped, or better
+    //   .xy = the currently dragged distance (iMouse.xy - iMouse.zw when dragging)
+    //   .zw = the total dragged distance up to now
+    initMouseState(state);
+    loadTotalDragged(state);
+
+    elements.canvas.addEventListener("mousedown", event => {
+        state.drag.pressed = true;
+        const pressed = correctedCoordinates(event);
+        state.iMouse = [pressed.x, pressed.y, pressed.x, pressed.y];
+    });
+    elements.canvas.addEventListener("mousemove", event => {
+        if (!state.drag.pressed) {
+            return;
+        }
+        const dragged = correctedCoordinates(event);
+        state.iMouse[0] = dragged.x;
+        state.iMouse[1] = dragged.y;
+        state.iMouseDrag[0] = state.iMouse[0] - state.iMouse[2];
+        state.iMouseDrag[1] = state.iMouse[1] - state.iMouse[3];
+        state.iMouseDrag[2] = state.drag.total.dx + state.iMouseDrag[0];
+        state.iMouseDrag[3] = state.drag.total.dy +  state.iMouseDrag[1];
+    });
+    document.addEventListener("mouseup", event => {
+        if (!state.drag.pressed) {
+            return;
+        }
+        state.drag.pressed = false;
+        storeTotalDragged(state);
+        state.iMouseDrag[0] = 0;
+        state.iMouseDrag[1] = 0;
+        state.iMouse[0] = 0;
+        state.iMouse[1] = 0;
+    });
+
+    function correctedCoordinates(event) {
+        // the y convention in GLSL is opposed to the HTML convention.
+        return {
+            x: event.offsetX,
+            y: elements.canvas.height - event.offsetY
+        };
+    }
+
+}
+
+export function initMouseState(state) {
+    state.iMouse = [0, 0, 0, 0];
+    state.iMouseDrag = [0, 0, 0, 0];
+    state.drag = {
+        pressed: false,
+        total: {dx: 0, dy: 0},
+    };
+}
+
+function storeTotalDragged(state) {
+    state.drag.total = {
+        dx: state.iMouseDrag[2],
+        dy: state.iMouseDrag[3],
+    };
+    sessionStorage.setItem("qm.mouse", JSON.stringify(state.drag.total));
+}
+
+function loadTotalDragged(state) {
+    const stored = sessionStorage.getItem("qm.mouse");
+    if (!stored) {
+        return;
+    }
+    state.drag.total = JSON.parse(stored);
+    state.iMouseDrag[2] = state.drag.total.dx;
+    state.iMouseDrag[3] = state.drag.total.dy;
+}
