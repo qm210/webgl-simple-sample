@@ -47,10 +47,22 @@ export function analyzeShader(source, errorLog, shaderKey) {
             continue;
         }
 
+        const fullOriginal = diff.value;
+        const [preVisibleComment, visibleComment] = fullOriginal.split("///");
+        const [preHiddenComment, hiddenComment] = preVisibleComment.split("//");
+        const original = [preHiddenComment, visibleComment]
+            .filter(o => o).join("///");
         const code = {
-            trimmed: diff.value.trim(),
-            original: diff.value,
-            length: diff.value.length,
+            original,
+            trimmed: original.trim(),
+            length: fullOriginal.length,
+            fullOriginal,
+            onlyDebug: {
+                hiddenComment,
+                visibleComment,
+                preVisibleComment,
+                preHiddenComment,
+            }
         };
         code.empty = !code.trimmed;
         cursor.consecutiveEmpty = code.empty

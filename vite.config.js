@@ -1,9 +1,10 @@
 import { defineConfig } from "vite";
-import glslImport from "vite-plugin-glsl";
+import glslImport from "./plugin/vite-plugin-glsl";
 
 export default defineConfig({
     plugins: [glslImport({
-        minify: false
+        minify: false,
+        keepAllComments: true,
     })],
     test: {
         globals: true,
