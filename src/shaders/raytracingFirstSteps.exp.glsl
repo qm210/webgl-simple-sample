@@ -529,9 +529,9 @@ vec3 calcNormal( in vec3 pos )
 void performVolumetricRayMarching(in Ray ray, inout Hit hit, inout vec4 clouds, inout DebugValues debug) {
     // Wir gehen hiermit den bestehenden Ray weiter, aber in festen Schritten,
     // fügen also quasi ein etwas andersgeartetes Ray Marching in diesen Strahl ein.
-    // iVolumetricMarchStep ~ 0.1
+    // iVolumetricMarchingStep ~ 0.1
     // iVolumetricAlphaThreshold ~ 0.95
-    float stepSize = iVolumetricMarchStep;
+    float stepSize = iVolumetricMarchingStep;
 
     // Lichtrichtung dupliziert vom Standard-Opak-Material, könnte schöner sein.
     // Ist ja aber immerhin reines Richtungslicht, kann also vor der Schleife stehen.
@@ -549,7 +549,7 @@ void performVolumetricRayMarching(in Ray ray, inout Hit hit, inout vec4 clouds, 
     Hit step;
     int i;
 
-    for (i = 0; i < iVolumetricStepIterations; i++) {
+    for (i = 0; i < iVolumetricMarchingIterations; i++) {
 
         // Aha! Schon wieder ein Ray Casting ...
         vec3 pos = ray.origin + rayLength * ray.dir;

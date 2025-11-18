@@ -8,7 +8,7 @@ export function addCanvasMouseInteraction(elements, state) {
     //   .xy = the currently dragged distance (iMouse.xy - iMouse.zw when dragging)
     //   .zw = the total dragged distance up to now
     initMouseState(state);
-    loadTotalDragged(state);
+    loadMouseTotals(state);
 
     elements.canvas.addEventListener("mousedown", event => {
         state.drag.pressed = true;
@@ -32,11 +32,15 @@ export function addCanvasMouseInteraction(elements, state) {
             return;
         }
         state.drag.pressed = false;
-        storeTotalDragged(state);
+        storeMouseTotals(state);
         state.iMouseDrag[0] = 0;
         state.iMouseDrag[1] = 0;
         state.iMouse[0] = 0;
         state.iMouse[1] = 0;
+    });
+    elements.canvas.addEventListener("wheel", event => {
+        state.iMouseWheel -= event.deltaY / 100.
+        storeMouseTotals(state);
     });
 
     function correctedCoordinates(event) {
@@ -52,26 +56,33 @@ export function addCanvasMouseInteraction(elements, state) {
 export function initMouseState(state) {
     state.iMouse = [0, 0, 0, 0];
     state.iMouseDrag = [0, 0, 0, 0];
+    state.iMouseWheel = 0;
     state.drag = {
         pressed: false,
-        total: {dx: 0, dy: 0},
+        total: {
+            dx: 0,
+            dy: 0,
+            wheel: 0,
+        }
     };
 }
 
-function storeTotalDragged(state) {
+function storeMouseTotals(state) {
     state.drag.total = {
         dx: state.iMouseDrag[2],
         dy: state.iMouseDrag[3],
+        wheel: state.iMouseWheel,
     };
     sessionStorage.setItem("qm.mouse", JSON.stringify(state.drag.total));
 }
 
-function loadTotalDragged(state) {
+function loadMouseTotals(state) {
     const stored = sessionStorage.getItem("qm.mouse");
     if (!stored) {
         return;
     }
     state.drag.total = JSON.parse(stored);
-    state.iMouseDrag[2] = state.drag.total.dx;
-    state.iMouseDrag[3] = state.drag.total.dy;
+    state.iMouseDrag[2] = state.drag.total.dx ?? 0;
+    state.iMouseDrag[3] = state.drag.total.dy ?? 0;
+    state.iMouseWheel = state.drag.total.wheel ?? 0;
 }
