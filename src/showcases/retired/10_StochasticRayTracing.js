@@ -30,7 +30,6 @@ export default {
         state.location.previousRender = gl.getUniformLocation(state.program, "iChannel0");
         state.location.passIndex = gl.getUniformLocation(state.program, "iPassIndex");
         state.location.iFrame = gl.getUniformLocation(state.program, "iFrame");
-        state.frameIndex = 0;
 
         gl.useProgram(state.program);
 

@@ -63,12 +63,20 @@ export function createInputElements(state, control) {
 
     const input = createInputControlElements(control);
     switch (control.type) {
+        case "int":
+        case "intInput":
+            control.integer = true;
+            return asFloatInput(input, state, control);
+        case "float":
         case "floatInput":
             return asFloatInput(input, state, control);
+        case "vec2":
         case "vec2Input":
             return asVecInput(2, input, state, control);
+        case "vec3":
         case "vec3Input":
             return asVecInput(3, input, state, control);
+        case "vec4":
         case "vec4Input":
             return asVecInput(4, input, state, control);
         case "cursorInput":
@@ -119,7 +127,7 @@ const createInputControlElements = (control) => {
 };
 
 export const asFloatInput = (elements, state, control) => {
-    control.defaultValue ??= 0;
+    control.defaultValue ??= control.log ? 1 : 0;
 
     elements.reset.textContent = `reset: ${control.defaultValue}`;
     asSlider(elements.control, control);
@@ -149,6 +157,9 @@ export const asFloatInput = (elements, state, control) => {
         if (control.log) {
             value = Math.pow(10, value);
         }
+        if (control.integer) {
+            value = Math.round(value);
+        }
         return value;
     }
 };
@@ -158,7 +169,7 @@ function asSlider(inputElement, control) {
         control.min > 0 && control.min < 0.01
             ? 0.001 : 0.01;
     if (control.log && control.min > 0 && control.max > control.min) {
-        control.step = Math.min(control.min, control.step);
+        control.step = Math.min(control.min, 0.001);
         control.min = Math.log10(control.min);
         control.max = Math.log10(control.max);
     }
@@ -178,7 +189,7 @@ function updateSlider(elements, state, control, full = false, givenValue = undef
     if (control.log) {
         value = Math.log10(value);
     }
-    const digits = -Math.log10(control.step);
+    const digits = control.integer ? 0 : -Math.log10(control.step);
     if (full) {
         const defaultMin =
             value === 0 ? -1

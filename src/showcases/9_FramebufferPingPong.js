@@ -29,7 +29,6 @@ export default {
         state.location.previousRender = gl.getUniformLocation(state.program, "iPreviousRender");
         state.location.passIndex = gl.getUniformLocation(state.program, "iPassIndex");
         state.location.iFrame = gl.getUniformLocation(state.program, "iFrame");
-        state.frameIndex = 0;
 
         // Hinweis: useProgram muss nur in der Renderschleife stehen, wenn es mehrere Shaderprogram gibt
         //          Es ist aber effizienter, beim selben zu bleiben.

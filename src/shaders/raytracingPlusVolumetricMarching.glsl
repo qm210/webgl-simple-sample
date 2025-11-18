@@ -462,16 +462,16 @@ float cloudDensity(in vec3 pos) {
     // anders als map() gibt das hier einfach die Dichteverteilung normiert auf [0, 1] zurück.
     // -> geht dann sowohl in die Schattenbestimmung als auch die Summierung über Wolkenmaterial ein.
     // float density = generalizedFBMforTheClouds(pos * iCloudsScaleFactor + iNoiseOffset);
-    float f = fbm(pos - vec3(0.7, 0.5, 1) * iTime * iCloudMorphSpeed * iCloudsScaleFactor + iNoiseOffset);
     float radialDistance = 1./sqrt(2.) * iCloudDistance.x;
     vec3 cloudPos = rotY(iCloudVisitingFrequency * iTime) * vec3(-radialDistance, iCloudDistance.y, radialDistance);
+    float f = fbm((pos - cloudPos) * iCloudsScaleFactor - vec3(0.7, 0.5, 1) * iTime * iCloudMorphSpeed + iNoiseOffset);
     float ellipsoid = 1.0 - length((pos - cloudPos) / iCloudDimensions * sqrt(1. + 2. * iCloudNoisiness));
     float density = ellipsoid + iCloudNoisiness * f;
     return clamp(density, 0., 1.);
 }
 
-// #define ZERO (min(iFrame,0))
-#define ZERO 0
+#define ZERO (min(iFrame,0))
+// #define ZERO 0
 
 void performVolumetricRayMarching(inout Ray ray, inout DebugValues debug) {
     float jitter = iVolumetricJitterAmount * hash(ray.pos.x + ray.pos.y * 57.0 + iVolumetricJitterSpeed * iTime);

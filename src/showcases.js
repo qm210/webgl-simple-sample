@@ -13,12 +13,14 @@ import showcase9 from "./showcases/9_FramebufferPingPong.js";
 import showcase10a from "./showcases/10_RayTracing.js"
 import showcase10b from "./showcases/10b_RayTracingPlusVolumetric.js"
 import showcase11 from "./showcases/11_FluidSimulation.js";
+import showcase12 from "./showcases/12_PerformancePlayground.js";
 import showcaseRIOW from "./showcases/retired/10_StochasticRayTracing.js";
 import showcaseOld8 from "./showcases/retired/8_Multipass.js";
 import showcaseOld11 from "./showcases/retired/11_Volumetric.js";
 import showcaseX from "./showcases/X_SimulationPlayground.js";
+import showcaseZClouds from "./showcases/Z_NR4_Clouds.js";
 
-const defaultShowcase = showcase10b;
+const defaultShowcase = showcase12;
 
 export function selectShowcase() {
 
@@ -59,6 +61,8 @@ export function selectShowcase() {
             return showcase10b;
         case "11":
             return showcase11;
+        case "12":
+            return showcase11;
         case "riow":
             return showcaseRIOW;
         case "old8":
@@ -67,6 +71,8 @@ export function selectShowcase() {
             return showcaseOld11;
         case "210":
             return showcaseX;
+        case "nr4":
+            return showcaseZClouds;
         default:
             return defaultShowcase;
     }

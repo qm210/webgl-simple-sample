@@ -17,7 +17,6 @@ export default {
 
         // TODO: Resizing the canvas DOES NOT scale the framebuffers / textures yet!! MUST DO
         state.resolution = [gl.drawingBufferWidth, gl.drawingBufferHeight];
-        state.frameIndex = 0;
         state.nPasses = 4;
 
         state.framebuffer = [0, 1].map((index) =>

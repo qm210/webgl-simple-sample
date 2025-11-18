@@ -22,7 +22,6 @@ export default {
 
         // TODO: Resizing the canvas DOES NOT scale the framebuffers / textures yet!! MUST DO
         const {width, height} = updateResolutionInState(state, gl);
-        state.frameIndex = 0;
         state.nPasses = 2;
 
         state.framebuffer =

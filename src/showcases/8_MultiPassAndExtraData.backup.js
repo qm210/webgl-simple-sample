@@ -24,7 +24,6 @@ export default {
 
         // TODO: Resizing the canvas DOES NOT scale the framebuffers / textures yet!! MUST DO
         const {width, height} = updateResolutionInState(state, gl);
-        state.frameIndex = 0;
         state.nPasses = 2;
 
         state.framebuffer = [0, 1].map((index) =>
@@ -37,7 +36,6 @@ export default {
         );
         state.fbPingIndex = 0;
         state.fbPongIndex = 1;
-
 
         state.simFB = Object.fromEntries(
             ["velocity", "divergence", "curl", "pressure"].map(key =>
