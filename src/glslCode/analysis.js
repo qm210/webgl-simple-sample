@@ -56,15 +56,13 @@ export function analyzeShader(source, errorLog, shaderKey) {
             original,
             trimmed: original.trim(),
             length: fullOriginal.length,
-            fullOriginal,
-            onlyDebug: {
-                hiddenComment,
-                visibleComment,
-                preVisibleComment,
-                preHiddenComment,
-            }
+            hiddenComment: (hiddenComment ?? "").trim(),
+            forDebug: {
+                fullOriginal, visibleComment, preVisibleComment, preHiddenComment
+            },
         };
         code.empty = !code.trimmed;
+        code.onlyHiddenComment = code.empty && code.hiddenComment;
         cursor.consecutiveEmpty = code.empty
             ? cursor.consecutiveEmpty + 1
             : 0;
@@ -93,7 +91,11 @@ export function analyzeShader(source, errorLog, shaderKey) {
             consecutiveEmpty: cursor.consecutiveEmpty,
             error: errors[cursor.index],
             scopeLevelAtStart: cursor.scopeLevel,
-            belongsToUnusedBlock: cursor.commentLevel > 0 || delimiters.justOpeningComment,
+            belongsToUnusedBlock: (
+                cursor.commentLevel > 0
+                || delimiters.justOpeningComment
+                || code.onlyHiddenComment
+            ),
             directives: {
                 current: cursor.directive.current,
                 conditions: [...cursor.directive.conditions],
@@ -108,7 +110,7 @@ export function analyzeShader(source, errorLog, shaderKey) {
     }
 
     analyzed.lines = analyzed.lines.filter(
-        l => l.consecutiveEmpty < 2
+        l => l.consecutiveEmpty < 2 && !l.code.onlyHiddenComment
     );
 
     for (const line of analyzed.lines) {
@@ -157,7 +159,7 @@ function parseSymbols(source) {
             if (typeof(name) !== "string") {
                 continue;
             }
-            if (REGEX.KEYWORD.test(name) || REGEX.DIRECTIVE_KEYWORD.test(name)) {
+            if (name.match(REGEX.KEYWORD) || name.match(REGEX.DIRECTIVE_KEYWORD)) {
                 continue;
             }
 
@@ -227,6 +229,7 @@ function parseErrors(errorLog) {
 
 function enhanceSymbols(analyzed) {
     for (const symbol of analyzed.symbols) {
+        symbol.definedInLine = undefined;
         for (const line of analyzed.lines) {
             if (line.positionInSource > symbol.sourcePosition) {
                 break;
@@ -236,10 +239,20 @@ function enhanceSymbols(analyzed) {
     }
 
     for (const symbol of analyzed.symbols) {
-        // -1 because the definition itself doesn't count as usage :)
-        symbol.usageCount = [...analyzed.source.matchAll(symbol.pattern)].length - 1;
-        symbol.unused = symbol.usageCount < 1 && !symbol.isMagic;
+        symbol.usages = [];
+        for (const line of analyzed.lines) {
+            if (line.number <= symbol.definedInLine) {
+                continue;
+            }
+            if (line.code.trimmed.match(symbol.pattern)) {
+                symbol.usages.push(line);
+            }
+        }
+        symbol.firstUsedInLine = symbol.usages[0]?.number;
+        symbol.unused = symbol.usages.length === 0 && !symbol.isMagic;
+    }
 
+    for (const symbol of analyzed.symbols) {
         symbol.definitionSpansLines = 1;
 
         if (symbol.symbolType === SymbolType.CustomFunction) {

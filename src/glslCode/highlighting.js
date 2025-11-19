@@ -20,8 +20,21 @@ export function withGlslHighlighting(code) {
         )
         .replaceAll(REGEX.NUMBER, match =>
             `<span class="number">${match}</span>`
-        );
+        )
+        .replaceAll(REGEX.VISIBLE_LINE_COMMENT, match =>
+            `<span class="line-comment">${match}</span>`
+        )
+        ;
 }
+
+const SymbolClass = {
+    [SymbolType.DefineDirective]: "is-defined",
+    [SymbolType.ShaderVariable]: "is-shader-variable",
+    [SymbolType.Constant]: "is-constant",
+    [SymbolType.CustomFunction]: "is-custom-function",
+    [SymbolType.Struct]: "is-custom-struct",
+};
+
 export function withSymbolsHighlighted(code, analyzedSymbols, lineNumber) {
     let result = code;
 
@@ -59,13 +72,6 @@ export function withSymbolsHighlighted(code, analyzedSymbols, lineNumber) {
     return result;
 }
 
-const SymbolClass = {
-    [SymbolType.DefineDirective]: "is-defined",
-    [SymbolType.ShaderVariable]: "is-global",
-    [SymbolType.Constant]: "is-constant",
-    [SymbolType.CustomFunction]: "is-custom-function",
-};
-
 function highlightedDefinition(symbol) {
     const classes = [];
     if (!symbol.isMagic) {
@@ -79,8 +85,12 @@ function highlightedDefinition(symbol) {
     if (symbol.unused) {
         element.classList.add("unused");
         element.title = `"${symbol.name}" appears unused.`;
-    } else if (symbol.usageCount > 0) {
-        element.title = `"${symbol.name}": ${symbol.usageCount}x used`;
+    } else if (symbol.usages.length > 0) {
+        element.title = `"${symbol.name}": ${symbol.usages.length}x used`;
+        element.title += ` in l. ${symbol.firstUsedInLine}`;
+        if (symbol.usages.length > 1) {
+            element.title += ` and below`;
+        }
     }
     return element;
 }

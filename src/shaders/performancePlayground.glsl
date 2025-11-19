@@ -110,8 +110,10 @@ vec3 hash33(vec3 p3) {
     return fract((p3.xxy + p3.yxx)*p3.zyx);
 }
 
-const float F3 =  0.3333333;
-const float G3 =  0.1666667;
+//const float F3 =  0.3333333;
+//const float G3 =  0.1666667;
+const vec3 F3 =  vec3(0.3333333);
+const vec3 G3 =  vec3(0.1666667);
 
 float lfnoise3(vec3 p) {
     /* 1. find current tetrahedron T and it's four vertices */
@@ -119,10 +121,13 @@ float lfnoise3(vec3 p) {
     /* x, x1, x2, x3 - unskewed coordinates of p relative to each of T vertices*/
 
     /* calculate s and x */
-    vec3 s = floor(p + dot(p, vec3(F3)));
-    vec3 x = p - s + dot(s, vec3(G3));
+//    vec3 s = floor(p + dot(p, vec3(F3)));
+//    vec3 x = p - s + dot(s, vec3(G3));
+    vec3 s = floor(p + dot(p, F3));
+    vec3 x = p - s + dot(s, G3);
 
     /* calculate i1 and i2 */
+//    vec3 e = x - x.yzx;
     vec3 e = step(vec3(0), x - x.yzx);
     vec3 i1 = e*(1.0 - e.zxy);
     vec3 i2 = 1.0 - e.zxy * (1. - e);
@@ -172,6 +177,9 @@ float mfnoise3(vec3 m) {
 }
 
 float noise( in vec3 x ) {
+    // Ratio of fbmB2A to fbmB2 with 4 iterations drops to 30x with lfnoise3(x), is 70x with mfnoise3(x)
+    // (but this difference for 2 iterations is negligible!)
+//    return lfnoise3(x);
     return mfnoise3(x);
 }
 
@@ -182,23 +190,20 @@ vec3 hash31(float p)
     return fract((p3.xxy+p3.yzz)*p3.zyx);
 }
 
-float fbmA(vec3 p) {
-    const bool lowRes = false;
+float fbmA(vec3 p, int maxOctave) {
     const float iCloudSeed = 11.07;
     p *= iScale;
 
     vec3 q = p + 1.e4*hash31(iCloudSeed);// + iTime * 0.5 * vec3(1.0, -0.2, -1.0);
-    float g = noise(q);
+    // float g = noise(q);
 
     float f = 0.0;
     float scale = 0.5;
     float factor = 2.02;
 
-    int maxOctave = 6;
-
-    if(lowRes) {
-        maxOctave = 3;
-    }
+//    if(lowRes) {
+//        maxOctave = 3;
+//    }
 
     for (int i = 0; i < maxOctave; i++) {
         f += scale * noise(q);
@@ -209,6 +214,10 @@ float fbmA(vec3 p) {
 
     // somewhat match the value range of fbmB()
     return 1.25 * (f + 0.4);
+}
+
+float fbmA(vec3 p) {
+    return fbmA(p, 6);
 }
 
 float hash( float n )
@@ -240,13 +249,69 @@ float fbmB( vec3 p )
 {
     float f;
     p *= iScale;
-    // somewhat match the scaling of fbmA():
+    // somewhat match the spatial scaling of fbmA():
     p *= 2.5;
 
     f  = 0.5000*xt95noise( p ); p = m*p*2.02;
     f += 0.2500*xt95noise( p ); p = m*p*2.03;
     f += 0.1250*xt95noise( p ); p = m*p*2.01;
     f += 0.0625*xt95noise( p );
+    return f;
+}
+
+float fbmB1(vec3 p, int maxOctave)
+{
+    // somewhat match the spatial scaling of fbmA():
+    p *= 2.5;
+    p *= iScale;
+    float f = 0.;
+    float a = 0.5;
+    float b = 2.02;
+    for (int i = 0; i < maxOctave; i++) {
+        f += a*xt95noise( p );
+        p = m*p;
+        p *= b;
+        b += (i == 1 ? -0.02 : 0.01);
+        a *= 0.5;
+    }
+    return f;
+}
+
+float fbmB2(vec3 p, int maxOctave)
+{
+    // somewhat match the spatial scaling of fbmA():
+    p *= 2.5;
+    p *= iScale;
+    float f = 0.;
+    float a = 0.5;
+    float b = 2.02;
+    f = a*xt95noise( p );
+    for (int i = 1; i < maxOctave; i++) {
+        p = m*p;
+        p *= b;
+        b += (i == 1 ? -0.02 : 0.01);
+        a *= 0.5;
+        f += a*xt95noise( p );
+    }
+    return f;
+}
+
+float fbmB2A(vec3 p, int maxOctave)
+{
+    // somewhat match the spatial scaling of fbmA():
+    p *= 2.5;
+    p *= iScale;
+    float f = 0.;
+    float a = 0.5;
+    float b = 2.02;
+    f = a*noise( p );
+    for (int i = 1; i < maxOctave; i++) {
+        p = m*p;
+        p *= b;
+        b += (i == 1 ? -0.02 : 0.01);
+        a *= 0.5;
+        f += a*noise( p );
+    }
     return f;
 }
 
@@ -286,18 +351,16 @@ void main() {
     }
 
     // common setup stuff that one comparison or the other might use
-    uv /= iScale;
-    vec3 ray = normalize(vec3(uv, 2.5 / iScale));
-    resultScale = 1. / (iResultMax - iResultMin);
     bool passA = iPassIndex == 0;
+    vec3 ray = normalize(vec3(uv, 2.5));
+    resultScale = 1. / (iResultMax - iResultMin);
+    uv /= iScale;
 
     for (int i = ZERO; i < iQueryRepetitions; i++) {
 //        toFragColor(passA ? doDivision(uv) : doMultiply(uv));
 //        toFragColor(passA ? inbuiltReflect(uv) : customReflect(uv));
 //        toFragColor(passA ? useBranching(uv) : useNoBranching(uv));
-        toFragColor(passA ? fbmA(ray) : fbmB(ray));
 //        toFragColor(passA ? inbuiltSmoothstep(uv) : splineSmoothstep(uv));
-
         /*
         if (passA) {
             toFragColor(calcSomethingViaReturn(uv));
@@ -307,5 +370,35 @@ void main() {
             toFragColor(resultB);
         }
         */
+
+//        toFragColor(passA ? fbmA(ray, 4) : fbmB(ray));
+//        toFragColor(passA ? fbmB1(ray, 4) : fbmB(ray));
+//        toFragColor(passA ? noise(ray) : xt95noise(ray));
+
+        // Sehr sehr interessant. fbmB-mit-Noise-von-A dauert ~ 70x so lang wie fbm
+//          toFragColor(passA ? fbmB2A(ray, 4) : fbmB2(ray, 4));
+//        toFragColor(passA ? fbmB2A(ray, 3) : fbmB2(ray, 3));
+//        toFragColor(passA ? fbmB2A(ray, 2) : fbmB2(ray, 2));
+        toFragColor(passA ? fbmB2A(ray, 5) : fbmB2(ray, 5));
+        // aber die beiden noises im Direktvergleich dauert nur ~ 2-3% länger :O
+//        toFragColor(passA ? noise(ray) : xt95noise(ray));
+
+        /*
+        if (passA) {
+            toFragColor(noise(ray));
+            toFragColor(noise(ray));
+            toFragColor(noise(ray));
+            toFragColor(noise(ray));
+        } else {
+            toFragColor(xt95noise(ray));
+            toFragColor(xt95noise(ray));
+            toFragColor(xt95noise(ray));
+            toFragColor(xt95noise(ray));
+        }
+        */
+
+        // More Stuff to investigate:
+        // - using c.xyz instead of vec3(...) calls
+
     }
 }

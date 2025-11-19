@@ -22,7 +22,7 @@ export function addButton({parent, onClick, onRightClick, title = "", className 
 export const addFreeRow = ({parent, label, id, content, valuePrefix}) => {
     const name = createElement("label", label);
     const container = createDiv("", "free-row");
-    container.id = id;
+    container.dataset.id = id;
     const value = createDiv("", "value-label");
     if (valuePrefix) {
         container.appendChild(
@@ -47,6 +47,13 @@ export function createInputElements(state, control) {
     );
     if (!expected) {
         console.warn("Could not find expected uniform", control.name, "(is it declared?), ", control, state);
+        return;
+    }
+
+    const inactive = !state.activeUniforms.find(
+        uniform => uniform.name === control.name
+    );
+    if (inactive) {
         return;
     }
 
@@ -122,7 +129,7 @@ const createInputControlElements = (control) => {
         reset: createSmallButton("reset", "reset"),
     };
     if (control) {
-        elements.value.id = control.name;
+        elements.value.dataset.id = control.name;
         elements.name.textContent = control.name;
     }
     elements.min.style.fontSize = "small";
@@ -378,7 +385,7 @@ export function createResetAllButton(elements, state, controls) {
         for (const control of controls.uniforms) {
             if (control.type === "cursorInput") {
                 state[control.name] = control.defaultValue;
-                const label = elements.uniformLabels[control.name];
+                const label = elements.uniforms[control.name].value;
                 updateVecLabel(label, state, control);
                 sessionStoreControlState(state, control);
             }

@@ -1,6 +1,6 @@
 import {extendAnalysis} from "./analysis.js";
 import {withGlslHighlighting, withSymbolsHighlighted} from "./highlighting.js";
-import {addShaderCodeEventListeners, scrollToElementId} from "../layout/events.js";
+import {addShaderCodeEventListeners, addShaderControlsEventListeners, scrollToElementId} from "../layout/events.js";
 import {createDiv} from "../layout/helpers.js";
 import {idForLine} from "../layout/shaderCode.js";
 
@@ -12,7 +12,7 @@ export function deferExtendedAnalysis(elements) {
                     applyExtendedAnalysis(
                         extended,
                         code.references,
-                        elements.scrollStack,
+                        elements,
                     );
                 })
                 .catch(error => {
@@ -23,7 +23,7 @@ export function deferExtendedAnalysis(elements) {
     );
 }
 
-function applyExtendedAnalysis(analyzed, references, scrollStack) {
+function applyExtendedAnalysis(analyzed, references, elements) {
     const {header, sources} = references;
     enrichHeader(header, analyzed);
 
@@ -45,7 +45,8 @@ function applyExtendedAnalysis(analyzed, references, scrollStack) {
         }
     }
 
-    addShaderCodeEventListeners(sources, scrollStack);
+    addShaderCodeEventListeners(analyzed, sources, elements.scrollStack);
+    addShaderControlsEventListeners(analyzed, elements);
 
     for (const element of sources.getElementsByClassName("symbol")) {
         const symbolName = element.getAttribute("data");

@@ -26,7 +26,7 @@ export default function initLayout(rootId) {
         controls: document.getElementById("shader-controls"),
         displayControls: document.getElementById("display-controls"),
         controlButtons: {},
-        uniformLabels: {},
+        uniforms: {},
         initialMs: performance.now(),
         pageLoadingMs: null,
     };

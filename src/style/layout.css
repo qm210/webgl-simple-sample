@@ -156,6 +156,10 @@ button.render-button {
     white-space: nowrap;
 }
 
+#shader-controls .unused {
+    opacity: 0.5;
+}
+
 .free-row button {
     padding: 0.25rem 0.5rem;
     flex: 1;
@@ -213,3 +217,4 @@ button.render-button {
     font-weight: bold;
     opacity: 0.6;
 }
+

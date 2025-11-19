@@ -117,11 +117,13 @@ export const addControlsToPage = (elements, state, controls, autoRenderOnLoad) =
             })
         );
     }
-    elements.toggleButtons = addFreeRow({
-        parent: elements.controls,
-        label: "Toggles:",
-        content: elements.toggles,
-    });
+    if (elements.toggles.length > 0) {
+        elements.toggleButtons = addFreeRow({
+            parent: elements.controls,
+            label: "Toggles:",
+            content: elements.toggles,
+        });
+    }
 
     for (const control of controls.uniforms ?? []) {
 
@@ -164,7 +166,10 @@ export const addControlsToPage = (elements, state, controls, autoRenderOnLoad) =
         elements.controls.appendChild(input.control);
         elements.controls.appendChild(input.max);
         elements.controls.appendChild(input.reset);
-        elements.uniformLabels[control.name] = input.value;
+        elements.uniforms[control.name] = {
+            value: input.value,
+            name: input.name
+        };
     }
 
     document.addEventListener("keydown", event => {

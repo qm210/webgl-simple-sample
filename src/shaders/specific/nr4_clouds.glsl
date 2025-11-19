@@ -37,7 +37,7 @@ const float pi = 3.14159;
 bool accumulate;
 bool useFbmB;
 
-// hashes created by David Hoskins and licensed under MIT.
+// Created by David Hoskins and licensed under MIT.
 // See https://www.shadertoy.com/view/4djSRW.
 
 // vec3->vec3 hash function
@@ -343,7 +343,9 @@ float fbmB( vec3 p, int maxOctave)
         p = m*p*2.03;
         f += 0.1250*xt95noise( p );
         p = m*p*2.01;
-        f += 0.0625*xt95noise( p );
+        if (maxOctave > 3) {
+            f += 0.0625*xt95noise( p );
+        }
     } else {
         float a = 0.5;
         float b = 2.02;
@@ -351,7 +353,7 @@ float fbmB( vec3 p, int maxOctave)
             f += a*xt95noise( p );
             p = m*p;
             p *= b;
-            b += 0.01;
+            b += (i == 1 ? -0.02 : 0.01);
             a *= 0.5;
         }
     }

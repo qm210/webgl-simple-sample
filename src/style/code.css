@@ -88,6 +88,11 @@ pre.error {
     color: dimgray;
 }
 
+.line-comment {
+    opacity: 0.5;
+    color: gray;
+}
+
 .empty {
     align-items: center;
 }
@@ -164,7 +169,7 @@ pre.error {
     color: magenta;
 }
 
-.code .is-global {
+.code .is-shader-variable {
     color: blue;
 }
 
@@ -176,15 +181,19 @@ pre.error {
     color: green;
 }
 
+.code .is-custom-struct {
+    color: forestgreen;
+}
+
 .code > .unused {
     opacity: 0.75;
 }
 
-.symbol {
+.linked {
     cursor: pointer;
 }
 
-.symbol:hover {
+.linked:hover {
     text-decoration: underline;
     background-color: white;
 }

@@ -289,9 +289,9 @@ float sdBouncyBox(vec3 pos, vec3 size, float bounceHeight, float bounceOffset, f
 struct Ray {
     vec3 origin;
     vec3 dir;
-    // Wir führen nun "pos" hier einfach mit, um Mehrfachberechnung zu sparen:
+    /// "pos" hier mitgeführt, um potentiell Mehrfachberechnung zu sparen:
     vec3 pos;
-    // Wir packen "attenuation" in den Ray, um _potentiell_ mehrere gleichzeitig haben zu können
+    /// und jetzt auch im Ray, weil thematisch zugehörig:
     vec3 attenuation;
     vec4 clouds;
 };

@@ -40,7 +40,7 @@ export function initBasicState(gl, sources) {
     const uniformCount = gl.getProgramParameter(state.program, gl.ACTIVE_UNIFORMS);
     for (let u = 0; u < uniformCount; u++) {
         const uniform = gl.getActiveUniform(state.program, u);
-        state.uniforms.push(uniform);
+        state.activeUniforms.push(uniform);
         state.location[uniform.name] = gl.getUniformLocation(state.program, uniform.name);
     }
 

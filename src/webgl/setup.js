@@ -86,7 +86,7 @@ function createInitialState(sources) {
             linker: "",
         },
         program: undefined,
-        uniforms: [],
+        activeUniforms: [],
         location: {},
         framebuffer: [],
     };
