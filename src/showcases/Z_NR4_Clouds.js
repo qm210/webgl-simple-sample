@@ -25,8 +25,14 @@ export default {
             });
         state.passIndex = 0;
 
-        state.debugOption = 0;
+        state.debugOption = +(sessionStorage.getItem("qm.clouds.debug") ?? 0);
         state.accumulate = false;
+
+        state.query = {
+            obj: gl.createQuery(),
+            execute: false,
+            lastNanos: null,
+        };
 
         return state;
     },
@@ -38,6 +44,50 @@ export default {
                 elements
             );
         },
+        toggles: [
+            {
+                label: () =>
+                    "Using FBM " + ((state.debugOption & 2) ? "B" : "A"),
+                onClick: () => {
+                    state.debugOption = state.debugOption ^ 2;
+                    sessionStorage.setItem("qm.clouds.debug", state.debugOption);
+                }
+            }, {
+                label: () =>
+                    (state.debugOption & 4) > 0 ? "Orig fbmB" : "Modded fbmB",
+                onClick: () => {
+                    state.debugOption = state.debugOption ^ 4;
+                    sessionStorage.setItem("qm.clouds.debug", state.debugOption);
+                }
+            }, {
+                label: () =>
+                    "Accumulate: " + (state.accumulate ? "On" : "Off"),
+                onClick: () => {
+                    clearFramebuffers(gl, state);
+                    state.frameIndex = 0;
+                    state.debugOption = state.debugOption ^ 1;
+                    state.accumulate = (state.debugOption & 1) !== 0;
+                    sessionStorage.setItem("qm.clouds.debug", state.debugOption);
+                }
+            }, {
+                label: () => {
+                    if (!state.query.lastNanos) {
+                        return "Query";
+                    }
+                    const micros = (0.001 * state.query.lastNanos).toFixed(0);
+                    return `${micros} µs`;
+                },
+                onClick: async () => {
+                    const nanos = await gl.extTimer.executeWithQuery(() =>
+                        render(gl, state)
+                    );
+                    const comparison = !state.query.lastNanos ? [] :
+                        ["- Ratio to last query:", nanos / state.query.lastNanos];
+                    console.log("Query took", nanos, "ns", ...comparison);
+                    state.query.lastNanos = nanos;
+                }
+            }
+        ],
         uniforms: [{
             type: "float",
             name: "iCloudYDisplacement",
@@ -77,10 +127,22 @@ export default {
             max: 200,
         }, {
             type: "int",
-            name: "iCloudLightCount",
+            name: "iLightLayerCount",
             defaultValue: 6,
             min: 1,
             max: 100,
+        }, {
+            type: "int",
+            name: "iCloudNoiseCount",
+            defaultValue: 6,
+            min: 1,
+            max: 10,
+        }, {
+            type: "int",
+            name: "iLightNoiseCount",
+            defaultValue: 3,
+            min: 1,
+            max: 10,
         }, {
             type: "float",
             name: "iCloudAbsorptionCoeff",
@@ -99,34 +161,6 @@ export default {
             defaultValue: [1, 0, 0],
             min: -10,
             max: 10,
-        }, {
-            type: "button",
-            name: "toggleAccumulate",
-            label: "Accumulate: Off",
-            onClick: (button) => {
-                state.framebuffer.fb.forEach(fb => {
-                    gl.bindFramebuffer(gl.FRAMEBUFFER, fb.fbo);
-                    gl.viewport(0, 0, fb.width, fb.height);
-                    gl.clearColor(0, 0, 0, 0);
-                    gl.clear(gl.COLOR_BUFFER_BIT);
-                });
-                gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-                state.frameIndex = 0;
-
-                state.debugOption = state.debugOption ^ 1;
-                state.accumulate = (state.debugOption & 1) !== 0;
-                button.textContent = "Accumulate: " + (state.accumulate ? "On" : "Off");
-            }
-        }, {
-            type: "button",
-            name: "debugOption",
-            label: "Use FBM A",
-            onClick: (button) => {
-                state.debugOption = state.debugOption ^ 2;
-                const useFbmB = (state.debugOption & 2) !== 0;
-                button.textContent = "Use FBM " + (useFbmB ? "B" : "A");
-                console.log("Debug Option:", state.debugOption);
-            }
         }, {
             type: "float",
             name: "iFree0",
@@ -176,7 +210,9 @@ function render(gl, state) {
     gl.uniform1f(state.location.iSkyQuetschung, state.iSkyQuetschung);
     gl.uniform1i(state.location.iSampleCount, state.iSampleCount);
     gl.uniform1i(state.location.iCloudLayerCount, state.iCloudLayerCount);
-    gl.uniform1i(state.location.iCloudLightCount, state.iCloudLightCount);
+    gl.uniform1i(state.location.iLightLayerCount, state.iLightLayerCount);
+    gl.uniform1i(state.location.iCloudNoiseCount, state.iCloudNoiseCount);
+    gl.uniform1i(state.location.iLightNoiseCount, state.iLightNoiseCount);
     gl.uniform1f(state.location.iCloudAbsorptionCoeff, state.iCloudAbsorptionCoeff);
     gl.uniform1f(state.location.iCloudAnisoScattering, state.iCloudAnisoScattering);
     gl.uniform3fv(state.location.vecSunPosition, state.vecSunPosition);
@@ -207,4 +243,21 @@ function render(gl, state) {
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.bindTexture(gl.TEXTURE_2D, read.texture);
     gl.drawArrays(gl.TRIANGLES, 0, 6);
+}
+
+async function renderWithQuery(gl, state) {
+    gl.beginQuery(gl.ext.timeElapsed, state.query.obj);
+    render(gl, state);
+    gl.endQuery(gl.ext.timeElapsed);
+    return evaluateQuery(state.query.obj, gl);
+}
+
+function clearFramebuffers(gl, state) {
+    state.framebuffer.fb.forEach(fb => {
+        gl.bindFramebuffer(gl.FRAMEBUFFER, fb.fbo);
+        gl.viewport(0, 0, fb.width, fb.height);
+        gl.clearColor(0, 0, 0, 0);
+        gl.clear(gl.COLOR_BUFFER_BIT);
+    });
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
 }

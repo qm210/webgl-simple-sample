@@ -19,15 +19,22 @@ export function addButton({parent, onClick, onRightClick, title = "", className 
     return button;
 }
 
-export const addFreeRow = ({parent, label, id, content}) => {
+export const addFreeRow = ({parent, label, id, content, valuePrefix}) => {
     const name = createElement("label", label);
     const container = createDiv("", "free-row");
     container.id = id;
     const value = createDiv("", "value-label");
-    if (content) {
-        container.appendChild(content);
+    if (valuePrefix) {
+        container.appendChild(
+            createDiv(valuePrefix, "value-label")
+        );
     }
     container.appendChild(value);
+    if (content instanceof Array) {
+        content.forEach(c => container.appendChild(c));
+    } else if (content) {
+        container.appendChild(content);
+    }
     parent.appendChild(name);
     parent.appendChild(container);
     return {container, name, value, content};

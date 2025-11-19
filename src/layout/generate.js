@@ -97,11 +97,31 @@ export const addControlsToPage = (elements, state, controls, autoRenderOnLoad) =
         parent: elements.controls,
         label: "iTime",
         id: "iTime",
-        content: createDiv("=", "value-label"),
+        valuePrefix: "=",
+        content: [
+            createResetAllButton(elements, state, controls)
+        ]
     });
-    elements.iTime.container.appendChild(
-        createResetAllButton(elements, state, controls)
-    );
+
+    elements.toggles = [];
+    for (const control of controls.toggles ?? []) {
+        const toggleIndex = elements.toggles.length;
+        elements.toggles.push(
+            addButton({
+                title: control.label(),
+                onClick: async () => {
+                    await control.onClick();
+                    const self = elements.toggles[toggleIndex];
+                    self.textContent = control.label();
+                }
+            })
+        );
+    }
+    elements.toggleButtons = addFreeRow({
+        parent: elements.controls,
+        label: "Toggles:",
+        content: elements.toggles,
+    });
 
     for (const control of controls.uniforms ?? []) {
 

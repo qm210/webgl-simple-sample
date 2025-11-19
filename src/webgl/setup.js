@@ -26,14 +26,20 @@ export function setupWebGl(canvas, geometry) {
         "EXT_color_buffer_float",
         "OES_texture_float_linear",
         "KHR_parallel_shader_compile",
+        "EXT_disjoint_timer_query_webgl2"
     ];
     gl.ext = {};
+    gl.extTimer = {};
     for (const extension of WEBGL_EXTENSIONS) {
         const ext = gl.getExtension(extension);
         if (!ext) {
             console.warn("Extension not available:", extension);
         }
         gl.ext[extension] = ext;
+
+        if (extension === "EXT_disjoint_timer_query_webgl2" && ext) {
+            enrichWithTimerHelpers(gl, ext);
+        }
     }
 
     const {width, height} = initialOrStoredResolution(canvas, geometry);
@@ -134,4 +140,27 @@ export function initVertices(gl, state, variableName) {
         0,
         0
     );
+}
+
+function enrichWithTimerHelpers(gl, ext) {
+    gl.extTimer.ELAPSED = ext.TIME_ELAPSED_EXT;
+    gl.extTimer.DISJOINT = ext.GPU_DISJOINT_EXT;
+    gl.extTimer.query = gl.createQuery();
+    gl.extTimer.executeWithQuery = async (func) => {
+        gl.beginQuery(gl.extTimer.ELAPSED, gl.extTimer.query);
+        func();
+        gl.endQuery(gl.extTimer.ELAPSED);
+        return evaluateQuery(gl.extTimer.query, gl);
+    };
+}
+
+async function evaluateQuery(query, gl) {
+    while (true) {
+        const available = gl.getQueryParameter(query, gl.QUERY_RESULT_AVAILABLE);
+        const disjoint = gl.getParameter(gl.extTimer.DISJOINT);
+        if (available && !disjoint) {
+            return gl.getQueryParameter(query, gl.QUERY_RESULT);
+        }
+        await new Promise(requestAnimationFrame);
+    }
 }

@@ -35,10 +35,6 @@ export default {
                 gl.createQuery(),
                 gl.createQuery()
             ],
-            pending: [
-                false,
-                false
-            ],
             doExecute: false,
         }
 
@@ -170,24 +166,24 @@ function checkQueries(gl, state) {
 
     Promise.all(
         state.query.obj.map((query, index) =>
-            new Promise((resolve) => {
-                function poll() {
-                    const available = gl.getQueryParameter(query, gl.QUERY_RESULT_AVAILABLE);
-                    const disjoint = gl.getParameter(gl.ext.timer.GPU_DISJOINT_EXT);
-                    if (available && !disjoint) {
-                        const elapsed = gl.getQueryParameter(query, gl.QUERY_RESULT);
-                        resolve(elapsed);
-                    } else {
-                        requestAnimationFrame(poll);
-                    }
-                }
-                poll();
-            }).then(time => {
-                console.log("Query Pass", index, "took", time / state.iQueryRepetitions, "ns per repetition");
-                return time;
-            })
+            evaluateQuery(query, gl)
+                .then(time => {
+                    console.log("Query Pass", index, "took", time / state.iQueryRepetitions, "ns per repetition");
+                    return time;
+                })
         )
     ).then(time => {
         console.log("Query Pass 0 over 1 Ratio:", time[0] / time[1]);
     })
+}
+
+async function evaluateQuery(query, gl) {
+    while (true) {
+        const available = gl.getQueryParameter(query, gl.QUERY_RESULT_AVAILABLE);
+        const disjoint = gl.getParameter(gl.ext.timer.GPU_DISJOINT_EXT);
+        if (available && !disjoint) {
+            return gl.getQueryParameter(query, gl.QUERY_RESULT);
+        }
+        await new Promise(requestAnimationFrame);
+    }
 }

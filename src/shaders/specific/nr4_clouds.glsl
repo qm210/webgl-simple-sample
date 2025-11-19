@@ -18,9 +18,11 @@ uniform float iCloudSeed;
 uniform float iSkyQuetschung;
 uniform int iSampleCount;
 uniform int iCloudLayerCount;
-uniform int iCloudLightCount;
+uniform int iLightLayerCount;
 uniform float iCloudAbsorptionCoeff;
 uniform float iCloudAnisoScattering;
+uniform int iCloudNoiseCount;
+uniform int iLightNoiseCount;
 uniform vec3 vecSunPosition;
 
 uniform float iFree0;
@@ -301,29 +303,6 @@ float noise( in vec3 x ) {
     return mfnoise3(x);
 }
 
-float fbmA(vec3 q, bool lowRes) {
-    float g = noise(q);
-
-    float f = 0.0;
-    float scale = 0.5;
-    float factor = 2.02;
-
-    int maxOctave = 6;
-
-    if(lowRes) {
-        maxOctave = 3;
-    }
-
-    for (int i = 0; i < maxOctave; i++) {
-        f += scale * noise(q);
-        q *= factor;
-        factor += 0.21;
-        scale *= 0.5;
-    }
-
-    return f;
-}
-
 float hash( float n )
 {
     return fract(sin(n)*43758.5453);
@@ -349,34 +328,64 @@ mat3 m = mat3(
     -0.60, -0.48,  0.64
 );
 
-float fbmB( vec3 p, bool lowRes )
+float fbmB( vec3 p, int maxOctave)
 {
-    float f;
     // somewhat match the spatial scaling of fbmA():
     p *= 2.81;
 
-    f  = 0.5000*xt95noise( p );
-    p = m*p*2.02;
-    f += 0.2500*xt95noise( p );
-    p = m*p*2.03;
-    f += 0.1250*xt95noise( p );
-    if (!lowRes) {
+    float f = 0.;
+
+    bool originalVersion = (debugOption & 4) != 0;
+    if (originalVersion) {
+        f  = 0.5000*xt95noise( p );
+        p = m*p*2.02;
+        f += 0.2500*xt95noise( p );
+        p = m*p*2.03;
+        f += 0.1250*xt95noise( p );
         p = m*p*2.01;
         f += 0.0625*xt95noise( p );
+    } else {
+        float a = 0.5;
+        float b = 2.02;
+        for (int i = 0; i < maxOctave; i++) {
+            f += a*xt95noise( p );
+            p = m*p;
+            p *= b;
+            b += 0.01;
+            a *= 0.5;
+        }
     }
     // somewhat match the value range of fbmA():
     return f / 1.25 - 0.4;
 }
 
-float fbm(vec3 p, bool lowRes) {
-    p += 1.e4*hash31(iCloudSeed);// + iTime * 0.5 * vec3(1.0, -0.2, -1.0);
-    return useFbmB ? fbmB(p, lowRes) : fbmA(p, lowRes);
+float fbmA(vec3 q, int maxOctave) {
+    float g = noise(q);
+
+    float f = 0.0;
+    float scale = 0.5;
+    float factor = 2.02;
+
+    for (int i = 0; i < maxOctave; i++) {
+        f += scale * noise(q);
+        q *= factor;
+        factor += 0.21;
+        scale *= 0.5;
+    }
+
+    return f;
 }
 
-float scene(vec3 p, bool lowRes) {
+float fbm(vec3 p, bool forLight) {
+    p += 1.e4*hash31(iCloudSeed);// + iTime * 0.5 * vec3(1.0, -0.2, -1.0);
+    int maxOctave = forLight ? iLightNoiseCount : iCloudNoiseCount;
+    return useFbmB ? fbmB(p, maxOctave) : fbmA(p, maxOctave);
+}
+
+float scene(vec3 p, bool forLight) {
     //float d = sdSphere(p, 1.2);
 
-    float f = fbm(p, lowRes);
+    float f = fbm(p, forLight);
 
     return .01 * iCloudYDisplacement - p.y + f;
 }
@@ -386,7 +395,7 @@ float lightmarch(vec3 position, vec3 rayDirection) {
     float totalDensity = 0.0;
     float marchSize = 0.03;
 
-    for (int step = 0; step < iCloudLightCount; step++) {
+    for (int step = 0; step < iLightLayerCount; step++) {
         position += lightDirection * marchSize * float(step);
 
         float lightSample = scene(position, true);
@@ -611,10 +620,7 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
         x *= pi * pi;
         vec2 newFragCoord = (uv - z) * iResolution.y + .5 * iResolution.xy;
         //pixel_3d(c1, newFragCoord);
-        int sampleIndex = int(i);
-        if (accumulate) {
-            // sampleIndex += iFrame;
-        }
+        int sampleIndex = int(i) + iFrame;
         cloudImage(c1, newFragCoord, sampleIndex);
         col +=
         // Remap to texture coordinates.
@@ -639,10 +645,7 @@ void main() {
     vec4 color = vec4(0.0);
     vec2 uv = (gl_FragCoord.xy - .5 * iResolution.xy) / iResolution.y;
 
-    // mainImage(color, gl_FragCoord.xy);
-
-    color.rgb = cmap_pastel(fract(1. - .9 * pow(uv.y + .5, iSkyQuetschung)));
-    // color.rgb += 0.5 * sunColor * pow(sun, 10.0);
+    mainImage(color, gl_FragCoord.xy);
 
     vec4 prevColor = texture(prevImage, gl_FragCoord.xy/iResolution.xy);
 
