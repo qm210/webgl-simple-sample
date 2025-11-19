@@ -22,7 +22,7 @@ export function withGlslHighlighting(code) {
             `<span class="number">${match}</span>`
         )
         .replaceAll(REGEX.VISIBLE_LINE_COMMENT, match =>
-            `<span class="line-comment">${match}</span>`
+            `<span class="comment">${match}</span>`
         )
         ;
 }

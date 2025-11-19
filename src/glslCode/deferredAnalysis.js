@@ -39,9 +39,11 @@ function applyExtendedAnalysis(analyzed, references, elements) {
             continue;
         }
 
-        if (line.belongsToUnusedBlock) {
+        if (line.belongsTo.unusedCode) {
             element.line.classList.add("unused-definition");
             element.annotation.textContent = "unused";
+        } else if (line.belongsTo.comment) {
+            element.line.classList.add("comment");
         }
     }
 

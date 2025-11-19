@@ -91,11 +91,14 @@ export function analyzeShader(source, errorLog, shaderKey) {
             consecutiveEmpty: cursor.consecutiveEmpty,
             error: errors[cursor.index],
             scopeLevelAtStart: cursor.scopeLevel,
-            belongsToUnusedBlock: (
-                cursor.commentLevel > 0
-                || delimiters.justOpeningComment
-                || code.onlyHiddenComment
-            ),
+            belongsTo: {
+                unusedCode: false,
+                comment: (
+                    cursor.commentLevel > 0
+                    || delimiters.justOpeningComment
+                    || code.onlyHiddenComment
+                )
+            },
             directives: {
                 current: cursor.directive.current,
                 conditions: [...cursor.directive.conditions],
@@ -178,7 +181,7 @@ function parseSymbols(source) {
                     full: match[0],
                     lines: matchedLines,
                 },
-                isMagic: REGEX.MAGIC_SYMBOL.test(name),
+                isMagic: name.match(REGEX.MAGIC_SYMBOL),
             };
             if (result.args) {
                 result.argString = result.args
@@ -251,6 +254,7 @@ function enhanceSymbols(analyzed) {
         symbol.firstUsedInLine = symbol.usages[0]?.number;
         symbol.unused = symbol.usages.length === 0 && !symbol.isMagic;
     }
+    console.log("Analü", analyzed.symbols);
 
     for (const symbol of analyzed.symbols) {
         symbol.definitionSpansLines = 1;
@@ -269,15 +273,61 @@ function enhanceSymbols(analyzed) {
     analyzed.unusedSymbols = analyzed.symbols
         .filter(symbol => symbol.unused);
 
+    console.log("UNUSEDD SYMBOOOLZ", analyzed.unusedSymbols);
     for (const symbol of analyzed.unusedSymbols) {
         for (let l = 0; l < symbol.definitionSpansLines; l++ ) {
             const analyzedLine = analyzed.lines.find(
                 line => line.number === symbol.definedInLine + l
             );
             if (!analyzedLine) {
+                continue;
+            }
+            analyzedLine.belongsTo.unusedCode = true;
+        }
+    }
+    const emptyBlocksBetween = linesBetweenUnusedSymbols(analyzed);
+    for (const block of emptyBlocksBetween) {
+        for (const line of block) {
+            line.belongsTo.unusedCode = true;
+        }
+    }
+}
+
+function linesBetweenUnusedSymbols(analyzed) {
+    const blocks = [];
+    if (analyzed.unusedSymbols.length < 2) {
+        return blocks;
+    }
+    let symbolIndex = 0;
+    let [symbol, nextSymbol] = symbolWithNext(symbolIndex);
+    let block = [];
+    let proceed = false;
+    for (const line of analyzed.lines) {
+        if (line.number < symbol.definedInLine + symbol.definitionSpansLines) {
+            continue;
+        }
+        if (line.number === nextSymbol.definedInLine) {
+            blocks.push(block);
+            proceed = true;
+        } else if (!line.code.empty) {
+            proceed = true;
+        } else {
+            block.push(line);
+        }
+
+        if (proceed) {
+            symbolIndex++;
+            if (symbolIndex > analyzed.unusedSymbols.length - 2) {
                 break;
             }
-            analyzedLine.belongsToUnusedBlock = true;
+            block = [];
+            [symbol, nextSymbol] = symbolWithNext(symbolIndex);
+            proceed = false;
         }
+    }
+    return blocks;
+
+    function symbolWithNext(index) {
+        return analyzed.unusedSymbols.slice(index, index + 2);
     }
 }

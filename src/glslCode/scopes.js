@@ -106,7 +106,7 @@ export function enhancedFunctionsWithBody(analyzed) {
             nextFunction.scope = analyzed.scopes
                 .find(scope => scope.openedIn >= nextFunction.endsAtLine);
 
-            if (line.belongsToUnusedBlock || line.scopeLevelAtStart > 0) {
+            if (line.belongsTo.unusedCode || line.scopeLevelAtStart > 0) {
                 nextFunction.dismiss = true;
             }
 

@@ -88,7 +88,7 @@ pre.error {
     color: dimgray;
 }
 
-.line-comment {
+.comment {
     opacity: 0.5;
     color: gray;
 }
@@ -187,6 +187,11 @@ pre.error {
 
 .code > .unused {
     opacity: 0.75;
+}
+
+.comment .code .number,
+.comment .code .keyword {
+    color: unset;
 }
 
 .linked {

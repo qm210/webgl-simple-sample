@@ -90,7 +90,7 @@ export function addShaderControlsEventListeners(analyzed, elements) {
         element.classList.add("linked");
         element.title = symbol.usages.length > 1
             ? `${symbol.usages.length}x used (click to scroll through usages)`
-            : `${symbol.usages.length}x used (click to scroll there)`;
+            : `${symbol.usages.length}x used (click to scroll to l. ${symbol.usages[0].number})`;
     }
 }
 
