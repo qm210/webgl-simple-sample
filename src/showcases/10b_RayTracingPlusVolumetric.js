@@ -29,32 +29,32 @@ export default {
             );
         },
         uniforms: [{
-            type: "floatInput",
+            type: "float",
             name: "iFieldOfViewDegrees",
             defaultValue: 20,
             min: 0.01,
             max: 180,
         }, {
-            type: "floatInput",
+            type: "float",
             name: "iSceneRotation",
             defaultValue: 0,
             min: 0.,
             max: 6.28,
         }, {
-            type: "floatInput",
+            type: "float",
             name: "iScenePitch",
             defaultValue: 0,
             min: -0.5,
             max: 0.5,
         }, {
-            type: "vec3Input",
+            type: "vec3",
             name: "vecDirectionalLight",
             defaultValue: [0.2, -0.4, 0.2],
             min: -1,
             max: 1,
             normalize: true,
         }, {
-            type: "floatInput",
+            type: "float",
             name: "iDiffuseAmount",
             defaultValue: 2.2,
             min: 0.,
@@ -84,7 +84,7 @@ export default {
             min: 0.,
             max: 20.,
         }, {
-            type: "vec3Input",
+            type: "vec3",
             name: "vecSkyColor",
             defaultValue: [0.4, 0.6, 1],
             min: 0,
@@ -228,13 +228,13 @@ export default {
             min: 0.,
             max: 10.,
         }, {
-            type: "vec2Input",
+            type: "vec2",
             name: "iCloudDistance",
             defaultValue: [17, 8],
             min: 0.,
             max: 50.,
         }, {
-            type: "vec3Input",
+            type: "vec3",
             name: "iCloudDimensions",
             defaultValue: [1, .33, 1],
             min: 0.,

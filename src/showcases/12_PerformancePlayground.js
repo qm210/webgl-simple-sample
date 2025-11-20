@@ -58,9 +58,9 @@ export default {
         }, {
             type: "int",
             name: "iQueryRepetitions",
-            defaultValue: 10000,
+            defaultValue: 1,
             min: 1,
-            max: 500_000,
+            max: 100_000,
             log: true
         }, {
             type: "float",
@@ -105,9 +105,9 @@ export default {
             type: "float",
             name: "iShenanigans",
             defaultValue: 1,
-            min: 0.01,
-            max: 10,
-            log: true,
+            min: 0.1,
+            max: 30,
+            step: 0.01,
         }]
     })
 };

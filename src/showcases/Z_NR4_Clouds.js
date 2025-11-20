@@ -23,16 +23,20 @@ export default {
                 dataFormat: gl.RGBA,
                 dataType: gl.FLOAT,
             });
+        state.framebuffer.readData = new Float32Array(width * height * 4);
+        // <-- not stable against rescaling, but anyway.
         state.passIndex = 0;
 
         state.debugOption = +(sessionStorage.getItem("qm.clouds.debug") ?? 0);
+        state.toggleDebugOption = (index) => {
+            state.debugOption ^= 1 << index;
+            sessionStorage.setItem("qm.clouds.debug", state.debugOption);
+        }
+        state.hasDebugOption = (index) =>
+            (state.debugOption & (1 << index)) !== 0;
         state.accumulate = false;
-
-        state.query = {
-            obj: gl.createQuery(),
-            execute: false,
-            lastNanos: null,
-        };
+        state.lastQueryNanos = undefined;
+        state.readNextPixels = false;
 
         return state;
     },
@@ -47,17 +51,14 @@ export default {
         toggles: [
             {
                 label: () =>
-                    "Using FBM " + ((state.debugOption & 2) ? "B" : "A"),
-                onClick: () => {
-                    state.debugOption = state.debugOption ^ 2;
-                    sessionStorage.setItem("qm.clouds.debug", state.debugOption);
-                }
+                    "Using FBM " + (state.hasDebugOption(1) ? "B" : "A"),
+                onClick: () =>
+                    state.toggleDebugOption(1)
             }, {
                 label: () =>
-                    (state.debugOption & 4) > 0 ? "Orig fbmB" : "Modded fbmB",
+                    state.hasDebugOption(2) ? "Modded fbm" : "Original fbm",
                 onClick: () => {
-                    state.debugOption = state.debugOption ^ 4;
-                    sessionStorage.setItem("qm.clouds.debug", state.debugOption);
+                    state.toggleDebugOption(2)
                 }
             }, {
                 label: () =>
@@ -65,40 +66,51 @@ export default {
                 onClick: () => {
                     clearFramebuffers(gl, state);
                     state.frameIndex = 0;
-                    state.debugOption = state.debugOption ^ 1;
-                    state.accumulate = (state.debugOption & 1) !== 0;
-                    sessionStorage.setItem("qm.clouds.debug", state.debugOption);
+                    state.toggleDebugOption(0);
+                    state.accumulate = state.hasDebugOption(0);
                 }
             }, {
                 label: () => {
-                    if (!state.query.lastNanos) {
+                    if (!state.lastQueryNanos) {
                         return "Query";
                     }
-                    const micros = (0.001 * state.query.lastNanos).toFixed(0);
-                    return `${micros} µs`;
+                    const millis = (1e-6 * state.lastQueryNanos).toFixed(2);
+                    return `${millis} ms`;
                 },
                 onClick: async () => {
                     const nanos = await gl.extTimer.executeWithQuery(() =>
                         render(gl, state)
                     );
-                    const comparison = !state.query.lastNanos ? [] :
-                        ["- Ratio to last query:", nanos / state.query.lastNanos];
+                    const comparison = !state.lastQueryNanos ? [] :
+                        ["- Ratio to last query:", nanos / state.lastQueryNanos];
                     console.log("Query took", nanos, "ns", ...comparison);
-                    state.query.lastNanos = nanos;
+                    state.lastQueryNanos = nanos;
                 }
+            }, {
+                label: () => "Read",
+                onClick: () => {
+                    state.readNextPixels = true;
+                },
+                style: { flex: 0 }
             }
         ],
         uniforms: [{
             type: "float",
             name: "iCloudYDisplacement",
             defaultValue: -12.43,
-            min: -20,
+            min: -50,
             max: 10,
         }, {
             type: "float",
             name: "iCloudLayerDistance",
             defaultValue: 4.46,
-            min: 0.,
+            min: 0.01,
+            max: 10,
+        }, {
+            type: "float",
+            name: "iLightLayerDistance",
+            defaultValue: 3.00,
+            min: 0.01,
             max: 10,
         }, {
             type: "float",
@@ -144,11 +156,24 @@ export default {
             min: 1,
             max: 10,
         }, {
+            type: "vec3",
+            name: "iNoiseScale",
+            defaultValue: [1, 1, 1],
+            min: 0.01,
+            max: 3,
+            step: 0.01,
+        }, {
+            type: "float",
+            name: "iNoiseScaleB",
+            defaultValue: 2.8,
+            min: 0.01,
+            max: 10,
+        }, {
             type: "float",
             name: "iCloudAbsorptionCoeff",
             defaultValue: 0.9,
-            min: 0,
-            max: 10,
+            min: 0.001,
+            max: 3,
         }, {
             type: "float",
             name: "iCloudAnisoScattering",
@@ -159,8 +184,39 @@ export default {
             type: "vec3",
             name: "vecSunPosition",
             defaultValue: [1, 0, 0],
-            min: -10,
-            max: 10,
+            min: -1,
+            max: 1,
+            normalize: true,
+        }, {
+            type: "vec3",
+            name: "vecSunColorYCH",
+            defaultValue: [0.6267, 0.5051, 0.1466], // YIQ [0.6267, 0.3622, 0.0535], RGB [1, 0.5, 0.3]
+            min: [0, 0.00, -3.142],
+            max: [1, 0.78, +3.142],
+        }, {
+            type: "float",
+            name: "iSunExponent",
+            defaultValue: 10,
+            min: 0.01,
+            max: 100,
+        }, {
+            type: "vec3",
+            name: "vecTone1",
+            defaultValue: [2.51, 0.03, 2.43],
+            min: 0,
+            max: 5,
+        }, {
+            type: "vec3",
+            name: "vecTone2",
+            defaultValue: [0.59, 0.14, 1.],
+            min: 0,
+            max: 5,
+        }, {
+            type: "float",
+            name: "iAccumulateMix",
+            defaultValue: 0.5,
+            min: -0.01,
+            max: 1,
         }, {
             type: "float",
             name: "iFree0",
@@ -195,6 +251,8 @@ export default {
     })
 };
 
+let write, read;
+
 function render(gl, state) {
     gl.uniform1f(state.location.iTime, state.time);
     gl.uniform1i(state.location.iFrame, state.frameIndex);
@@ -206,6 +264,7 @@ function render(gl, state) {
 
     gl.uniform1f(state.location.iCloudYDisplacement, state.iCloudYDisplacement);
     gl.uniform1f(state.location.iCloudLayerDistance, state.iCloudLayerDistance);
+    gl.uniform1f(state.location.iLightLayerDistance, state.iLightLayerDistance);
     gl.uniform1f(state.location.iCloudSeed, state.iCloudSeed);
     gl.uniform1f(state.location.iSkyQuetschung, state.iSkyQuetschung);
     gl.uniform1i(state.location.iSampleCount, state.iSampleCount);
@@ -213,9 +272,16 @@ function render(gl, state) {
     gl.uniform1i(state.location.iLightLayerCount, state.iLightLayerCount);
     gl.uniform1i(state.location.iCloudNoiseCount, state.iCloudNoiseCount);
     gl.uniform1i(state.location.iLightNoiseCount, state.iLightNoiseCount);
+    gl.uniform3fv(state.location.iNoiseScale, state.iNoiseScale);
+    gl.uniform1f(state.location.iNoiseScaleB, state.iNoiseScaleB);
     gl.uniform1f(state.location.iCloudAbsorptionCoeff, state.iCloudAbsorptionCoeff);
     gl.uniform1f(state.location.iCloudAnisoScattering, state.iCloudAnisoScattering);
     gl.uniform3fv(state.location.vecSunPosition, state.vecSunPosition);
+    gl.uniform3fv(state.location.vecSunColorYCH, state.vecSunColorYCH);
+    gl.uniform1f(state.location.iSunExponent, state.iSunExponent);
+    gl.uniform3fv(state.location.vecTone1, state.vecTone1);
+    gl.uniform3fv(state.location.vecTone2, state.vecTone2);
+    gl.uniform1f(state.location.iAccumulateMix, state.iAccumulateMix);
 
     gl.uniform1i(state.location.debugOption, state.debugOption);
     gl.uniform1f(state.location.iFree0, state.iFree0);
@@ -228,28 +294,36 @@ function render(gl, state) {
     gl.activeTexture(gl.TEXTURE0);
     gl.uniform1i(state.location.prevImage, 0);
 
-    let [write, read] = state.framebuffer.currentWriteAndRead();
+    [write, read] = state.framebuffer.currentWriteAndRead();
     gl.uniform1i(state.location.passIndex, 0);
-    if (state.accumulate)
-    {
-        state.framebuffer.doPingPong();
+    if (state.readNextPixels) {
+        state.readNextPixels = false;
+        state.toggleDebugOption(3);
+        gl.uniform1i(state.location.debugOption, state.debugOption);
+        state.toggleDebugOption(3);
+
         gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo);
         gl.bindTexture(gl.TEXTURE_2D, read.texture);
         gl.drawArrays(gl.TRIANGLES, 0, 6);
+        gl.bindFramebuffer(gl.READ_FRAMEBUFFER, write.fbo);
+        gl.readBuffer(gl.COLOR_ATTACHMENT0);
+        gl.readPixels(0, 0, write.width, write.height, gl.RGBA, gl.FLOAT, state.framebuffer.readData);
+        evaluateReadData(state.framebuffer.readData)
+            .then(result => console.log("Read Data", result));
 
-        gl.uniform1i(state.location.passIndex, 1);
-        [, read] = state.framebuffer.currentWriteAndRead();
+        state.framebuffer.doPingPong();
+    } else {
+        gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo);
+        gl.bindTexture(gl.TEXTURE_2D, read.texture);
+        gl.drawArrays(gl.TRIANGLES, 0, 6);
+        state.framebuffer.doPingPong();
     }
+    gl.uniform1i(state.location.passIndex, 1);
+    [, read] = state.framebuffer.currentWriteAndRead();
+
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.bindTexture(gl.TEXTURE_2D, read.texture);
     gl.drawArrays(gl.TRIANGLES, 0, 6);
-}
-
-async function renderWithQuery(gl, state) {
-    gl.beginQuery(gl.ext.timeElapsed, state.query.obj);
-    render(gl, state);
-    gl.endQuery(gl.ext.timeElapsed);
-    return evaluateQuery(state.query.obj, gl);
 }
 
 function clearFramebuffers(gl, state) {
@@ -260,4 +334,29 @@ function clearFramebuffers(gl, state) {
         gl.clear(gl.COLOR_BUFFER_BIT);
     });
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+}
+
+async function evaluateReadData(buffer) {
+    const rgba = value => [value, value, value, value];
+    let min = rgba(Infinity);
+    let max = rgba(-Infinity);
+    let avg = rgba(0);
+    const pixels = buffer.length / 4;
+    for (let i = 0; i < buffer.length; i += 4) {
+        for (let c = 0; c < 4; c++) {
+            const value = buffer[i + c];
+            if (value < min[c]) {
+                min[c] = value;
+            }
+            if (value > max[c]) {
+                max[c] = value;
+            }
+            avg[c] += value / pixels;
+        }
+    }
+    const span = rgba(0);
+    for (let c = 0; c < 4; c++) {
+        span[c] = max[c] - min[c];
+    }
+    return {min, max, avg, span};
 }

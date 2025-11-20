@@ -39,7 +39,7 @@ export default {
             type: "label",
             name: "iTime",
         }, {
-            type: "floatInput",
+            type: "float",
             name: "helloThere",
             defaultValue: 1.00,
             min: 0,

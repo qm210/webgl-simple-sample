@@ -104,11 +104,23 @@ float splineSmoothstep(vec2 uv) {
 
 ////////////////////////////////////////////////////////////////////////
 
+const vec3 pVec = vec3(.1031, .1030, .0973);
 vec3 hash33(vec3 p3) {
-    p3 = fract(p3 * vec3(.1031, .1030, .0973));
+    p3 = fract(p3 * pVec);
     p3 += dot(p3, p3.yxz+33.33);
     return fract((p3.xxy + p3.yxx)*p3.zyx);
 }
+//
+//vec3 hash33(vec3 p3) {
+//    // Simple hash using sine and fract - faster approximation
+//    p3 = fract(p3 * vec3(0.1031, 0.1030, 0.0973));
+//    p3 += sin(dot(p3, p3.yzx + 19.19)) * 0.1; // fewer/arithmetic ops
+//    return fract(vec3(
+//        dot(p3, vec3(0.3183099, 0.3678794, 0.6180339)),
+//        dot(p3, vec3(0.7071067, 0.1715729, 0.4142136)),
+//        dot(p3, vec3(0.5773503, 0.7071067, 0.7071067))
+//    ));
+//}
 
 //const float F3 =  0.3333333;
 //const float G3 =  0.1666667;
@@ -127,7 +139,6 @@ float lfnoise3(vec3 p) {
     vec3 x = p - s + dot(s, G3);
 
     /* calculate i1 and i2 */
-//    vec3 e = x - x.yzx;
     vec3 e = step(vec3(0), x - x.yzx);
     vec3 i1 = e*(1.0 - e.zxy);
     vec3 i2 = 1.0 - e.zxy * (1. - e);
@@ -149,6 +160,7 @@ float lfnoise3(vec3 p) {
     /* w fades from 0.6 at the center of the surflet to 0.0 at the margin */
     w = max(0.6 - w, 0.);
 
+    // vec3 h = hash33(s) - 0.5;
     /* calculate surflet components */
     d.x = dot(hash33(s) - .5, x);
     d.y = dot(hash33(s + i1) - .5, x1);
@@ -164,23 +176,35 @@ float lfnoise3(vec3 p) {
     return dot(d, vec4(52.));
 }
 
-float mfnoise3(vec3 m) {
-    /* const matrices for 3d rotation */
-    const mat3 rot1 = mat3(-0.37, 0.36, 0.85,-0.14,-0.93, 0.34,0.92, 0.01,0.4);
-    const mat3 rot2 = mat3(-0.55,-0.39, 0.74, 0.33,-0.91,-0.24,0.77, 0.12,0.63);
-    const mat3 rot3 = mat3(-0.71, 0.52,-0.47,-0.08,-0.72,-0.68,-0.7,-0.45,0.56);
+/* const matrices for 3d rotation */
+const mat3 rot1 = mat3(-0.37, 0.36, 0.85,-0.14,-0.93, 0.34,0.92, 0.01,0.4);
+const mat3 rot2 = mat3(-0.55,-0.39, 0.74, 0.33,-0.91,-0.24,0.77, 0.12,0.63);
+const mat3 rot3 = mat3(-0.71, 0.52,-0.47,-0.08,-0.72,-0.68,-0.7,-0.45,0.56);
 
+float mfnoise3(vec3 m) {
     return   0.5333333 * lfnoise3(m * rot1)
     + 0.2666667 * lfnoise3(2. * m * rot2)
     + 0.1333333 * lfnoise3(4. * m * rot3)
     + 0.0666667 * lfnoise3(8. * m);
 }
 
+float xt95noise(vec3 m);
+
+float xt95mfnoise3(vec3 m) {
+    return (
+        0.5333333 * xt95noise(m * rot1)
+        + 0.2666667 * xt95noise(2. * m * rot2)
+        + 0.1333333 * xt95noise(4. * m * rot3)
+        + 0.0666667 * xt95noise(8. * m)
+    ) * 1.5 - 0.75;
+}
+
 float noise( in vec3 x ) {
     // Ratio of fbmB2A to fbmB2 with 4 iterations drops to 30x with lfnoise3(x), is 70x with mfnoise3(x)
     // (but this difference for 2 iterations is negligible!)
+    // QM MOD II
 //    return lfnoise3(x);
-    return mfnoise3(x);
+     return mfnoise3(x);
 }
 
 vec3 hash31(float p)
@@ -192,8 +216,6 @@ vec3 hash31(float p)
 
 float fbmA(vec3 p, int maxOctave) {
     const float iCloudSeed = 11.07;
-    p *= iScale;
-
     vec3 q = p + 1.e4*hash31(iCloudSeed);// + iTime * 0.5 * vec3(1.0, -0.2, -1.0);
     // float g = noise(q);
 
@@ -216,6 +238,22 @@ float fbmA(vec3 p, int maxOctave) {
     return 1.25 * (f + 0.4);
 }
 
+
+float fbmA2B3(vec3 p, int maxOctave) {
+    const float iCloudSeed = 11.07;
+    vec3 q = p + 1.e4*hash31(iCloudSeed);
+    float f = 0.0;
+    float scale = 0.5;
+    float factor = 2.02;
+    for (int i = 0; i < maxOctave; i++) {
+        f += scale * xt95mfnoise3(q);
+        q *= factor;
+        factor += 0.21;
+        scale *= 0.5;
+    }
+    return f;
+}
+
 float fbmA(vec3 p) {
     return fbmA(p, 6);
 }
@@ -227,6 +265,7 @@ float hash( float n )
 
 float xt95noise( in vec3 x )
 {
+    x *= iShenanigans;
     vec3 p = floor(x);
     vec3 f = fract(x);
     f = f*f*(3.0-2.0*f);
@@ -277,40 +316,58 @@ float fbmB1(vec3 p, int maxOctave)
     return f;
 }
 
+const float xt95scale = 2.8;
+
 float fbmB2(vec3 p, int maxOctave)
 {
     // somewhat match the spatial scaling of fbmA():
-    p *= 2.5;
-    p *= iScale;
+    p *= xt95scale;
     float f = 0.;
     float a = 0.5;
     float b = 2.02;
     f = a*xt95noise( p );
-    for (int i = 1; i < maxOctave; i++) {
+    for (int i = 0; i < maxOctave - 1; i++) {
         p = m*p;
         p *= b;
         b += (i == 1 ? -0.02 : 0.01);
         a *= 0.5;
         f += a*xt95noise( p );
     }
-    return f;
+    // somewhatly match the output values
+    return 0.8 * f - 0.16;
 }
 
 float fbmB2A(vec3 p, int maxOctave)
 {
-    // somewhat match the spatial scaling of fbmA():
-    p *= 2.5;
-    p *= iScale;
+    // fbmB2 (B with more octaves) but with noise() from fbmA
     float f = 0.;
     float a = 0.5;
     float b = 2.02;
     f = a*noise( p );
-    for (int i = 1; i < maxOctave; i++) {
+    for (int i = 0; i < maxOctave - 1; i++) {
         p = m*p;
         p *= b;
         b += (i == 1 ? -0.02 : 0.01);
         a *= 0.5;
         f += a*noise( p );
+    }
+    return f;
+}
+
+
+float fbmB2A2(vec3 p, int maxOctave)
+{
+    // fbmB2 (B with more octaves) but noise() from fbmA for the base octave
+    float f = 0.;
+    float a = 0.5;
+    float b = 2.02;
+    f = a*noise( p );
+    for (int i = 0; i < maxOctave - 1; i++) {
+        p = m*p;
+        p *= b;
+        b += (i == 1 ? -0.02 : 0.01);
+        a *= 0.5;
+        f += a*xt95noise( xt95scale * p );
     }
     return f;
 }
@@ -355,6 +412,7 @@ void main() {
     vec3 ray = normalize(vec3(uv, 2.5));
     resultScale = 1. / (iResultMax - iResultMin);
     uv /= iScale;
+    ray /= iScale;
 
     for (int i = ZERO; i < iQueryRepetitions; i++) {
 //        toFragColor(passA ? doDivision(uv) : doMultiply(uv));
@@ -377,25 +435,18 @@ void main() {
 
         // Sehr sehr interessant. fbmB-mit-Noise-von-A dauert ~ 70x so lang wie fbm
 //          toFragColor(passA ? fbmB2A(ray, 4) : fbmB2(ray, 4));
-//        toFragColor(passA ? fbmB2A(ray, 3) : fbmB2(ray, 3));
-//        toFragColor(passA ? fbmB2A(ray, 2) : fbmB2(ray, 2));
-        toFragColor(passA ? fbmB2A(ray, 5) : fbmB2(ray, 5));
         // aber die beiden noises im Direktvergleich dauert nur ~ 2-3% länger :O
-//        toFragColor(passA ? noise(ray) : xt95noise(ray));
-
-        /*
-        if (passA) {
-            toFragColor(noise(ray));
-            toFragColor(noise(ray));
-            toFragColor(noise(ray));
-            toFragColor(noise(ray));
-        } else {
-            toFragColor(xt95noise(ray));
-            toFragColor(xt95noise(ray));
-            toFragColor(xt95noise(ray));
-            toFragColor(xt95noise(ray));
-        }
-        */
+//               toFragColor(passA ? noise(ray) : xt95noise(ray));
+        // aber ab 3 levels passiert das:
+        //        toFragColor(passA ? fbmB2A(ray, 2) : fbmB2(ray, 2));
+//        toFragColor(passA ? fbmB2A(ray, 3) : fbmB2(ray, 3));
+//        toFragColor(passA ? fbmB2A(ray, 6) : fbmA(ray, 6));
+//        toFragColor(passA ? fbmB2(ray, 4) : fbmB(ray));
+//         toFragColor(passA ? fbmB2A(ray, 6) : fbmB2(ray, 6));
+//        toFragColor(passA ? fbmB2A2(ray, 10) : fbmB2(ray, 10));
+//        toFragColor(passA ? fbmA2B3(ray, 6) : fbmA(ray, 6));
+//
+        toFragColor(passA ? mfnoise3(ray) : xt95mfnoise3(ray));
 
         // More Stuff to investigate:
         // - using c.xyz instead of vec3(...) calls

@@ -166,6 +166,15 @@ button.render-button {
     flex: 1;
 }
 
+.free-row .full-spacer {
+    flex: 1;
+}
+
+.free-row .spacer {
+    flex: 0;
+    min-width: 1rem;
+}
+
 .free-row .right-align {
     margin-left: auto;
     max-width: fit-content;
@@ -177,6 +186,9 @@ button.render-button {
     margin: 0;
     font-size: smaller;
     white-space: nowrap;
+    user-select: none;
+    outline-width: 1px !important;
+    outline-color: transparent;
 }
 
 #display-controls {
@@ -218,4 +230,3 @@ button.render-button {
     font-weight: bold;
     opacity: 0.6;
 }
-

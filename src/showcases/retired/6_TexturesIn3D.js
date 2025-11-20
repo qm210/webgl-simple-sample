@@ -69,11 +69,11 @@ export default {
             keys: ["w", "a", "s", "d", "r", "f", "q"],
             hidden: true,
         }, {
-            type: "floatInput",
+            type: "float",
             name: "iFieldOfView",
             defaultValue: 80,
         }, {
-            type: "floatInput",
+            type: "float",
             name: "iCameraTilt",
             defaultValue: -23,
         }]

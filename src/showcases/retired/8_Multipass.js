@@ -107,11 +107,11 @@ export default {
             type: "label",
             name: "iTime",
         }, {
-            type: "floatInput",
+            type: "float",
             name: "iFieldOfView",
             defaultValue: 80,
         }, {
-            type: "floatInput",
+            type: "float",
             name: "iCameraTilt",
             defaultValue: -23,
         }, {
@@ -119,15 +119,15 @@ export default {
             name: "cursorWalk",
             keys: ["w", "a", "s", "d", "r", "f", "q"],
         }, {
-            type: "floatInput",
+            type: "float",
             name: "focusDistance",
             defaultValue: 1,
         }, {
-            type: "floatInput",
+            type: "float",
             name: "focalLength",
             defaultValue: 0.5,
         }, {
-            type: "floatInput",
+            type: "float",
             name: "aperture",
             defaultValue: 0.25,
         }]

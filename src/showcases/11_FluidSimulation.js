@@ -113,25 +113,25 @@ export default {
             );
         },
         uniforms: [{
-            type: "floatInput",
+            type: "float",
             name: "iColorDissipation",
             defaultValue: 0.3,
             min: 0.,
             max: 2.,
         }, {
-            type: "floatInput",
+            type: "float",
             name: "iVelocityDissipation",
             defaultValue: 0.1,
             min: 0.,
             max: 2.,
         }, {
-            type: "floatInput",
+            type: "float",
             name: "iMaxInitialVelocity",
             defaultValue: 1,
             min: -500,
             max: 500,
         }, {
-            type: "floatInput",
+            type: "float",
             name: "iCurlStrength",
             defaultValue: 0,
             min: -0.5,
@@ -151,20 +151,20 @@ export default {
                 console.log(state);
             }
         }, {
-            type: "floatInput",
+            type: "float",
             name: "iSunraysWeight",
             defaultValue: 1.,
             min: 0.,
             max: 20.,
         }, {
-            type: "floatInput",
+            type: "float",
             name: "iSunraysIterations",
             defaultValue: 5,
             min: 1,
             max: 30,
             step: 1,
         }, {
-            type: "floatInput",
+            type: "float",
             name: "iNoiseLevel",
             defaultValue: 1,
             min: 0.,
@@ -213,19 +213,19 @@ export default {
             min: -2.,
             max: 2,
         }, {
-            type: "vec3Input",
+            type: "vec3",
             name: "iFree0",
             defaultValue: [0, 0, 0],
             min: -9.99,
             max: +9.99,
         }, {
-            type: "vec3Input",
+            type: "vec3",
             name: "iFree1",
             defaultValue: [0, 0, 0],
             min: -9.99,
             max: +9.99,
         }, {
-            type: "vec3Input",
+            type: "vec3",
             name: "iFree2",
             defaultValue: [0, 0, 0],
             min: -9.99,

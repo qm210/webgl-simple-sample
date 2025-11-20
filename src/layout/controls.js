@@ -1,4 +1,4 @@
-import {createDiv, createElement} from "./helpers.js";
+import {createDiv, createElement, createSpan} from "./helpers.js";
 import {initMouseState} from "./mouse.js";
 
 export function addButton({parent, onClick, onRightClick, title = "", className = "", style}) {
@@ -83,20 +83,15 @@ export function createInputElements(state, control) {
     const input = createInputControlElements(control);
     switch (control.type) {
         case "int":
-        case "intInput":
             control.integer = true;
             return asFloatInput(input, state, control);
         case "float":
-        case "floatInput":
             return asFloatInput(input, state, control);
         case "vec2":
-        case "vec2Input":
             return asVecInput(2, input, state, control);
         case "vec3":
-        case "vec3Input":
             return asVecInput(3, input, state, control);
         case "vec4":
-        case "vec4Input":
             return asVecInput(4, input, state, control);
         case "cursorInput":
             return asCursorInput(input, state, control);
@@ -117,7 +112,7 @@ function sessionStoreControlState(state, control) {
     }
 }
 
-function createSmallButton(title, ...extraClasses) {
+export function createSmallButton(title, ...extraClasses) {
     const button = document.createElement("button");
     button.classList.add("small-button", ...extraClasses);
     button.textContent = title;
@@ -204,7 +199,8 @@ function asSlider(inputElement, control) {
 }
 
 function updateSlider(elements, state, control, full = false, givenValue = undefined) {
-    let value = round(givenValue ?? state[control.name]);
+    let value = givenValue ?? state[control.name];
+    value = round(value);
     if (control.log) {
         value = Math.log10(value);
     }
@@ -241,35 +237,74 @@ function updateSlider(elements, state, control, full = false, givenValue = undef
     }
 }
 
+const toVec = (dim, value) =>
+    Array(dim).fill(null).map(_ => value);
+
 export const asVecInput = (dim, elements, state, control) => {
     elements.control = document.createElement("div");
-    elements.control.style.gap = "0.5rem";
+    elements.control.style.gap = "0.25rem";
 
-    let normFactor = 1;
+    let maybeNormFactor = 1;
     if (control.normalize) {
         control.min = control.log ? 1e-6 : -1;
         control.max = 1;
-        normFactor = 1 / (squareNorm(state[control.name]) || 1);
+        maybeNormFactor = 1 / (squareNorm(state[control.name]) || 1);
+    }
+
+    control.sameMin = !(control.min instanceof Array);
+    control.sameMax = !(control.max instanceof Array);
+    control.sameStep = !(control.step instanceof Array);
+    if (control.sameMin) {
+        control.min = toVec(dim, control.min);
+    }
+    if (control.sameMax) {
+        control.max = toVec(dim, control.max);
+    }
+    if (control.sameStep) {
+        control.step = toVec(dim, control.step);
+    }
+    if (!(control.defaultValue instanceof Array)) {
+        control.defaultValue = toVec(dim, control.defaultValue);
     }
 
     const sliders = [];
-    for (let i = 0; i < dim; i++) {
-        const componentInput = document.createElement("input");
-        sliders.push(componentInput);
-        elements.control.appendChild(componentInput);
-        asSlider(componentInput, control);
-        state[control.name][i] *= normFactor;
-        componentInput.value =
-            updateSlider(elements, state, control, true, state[control.name][i]);
-        componentInput.addEventListener("input", event => {
-            updateSlider(elements, state, control, false, event.target.value);
+    const elementsForComponent = [];
+    for (let index = 0; index < dim; index++) {
+        const componentControl = {
+            name: `${control.name}.${index}`,
+            min: control.min[index],
+            max: control.max[index],
+            step: control.step[index],
+            debugOriginal: control,
+        };
+        const forComponent = createInputControlElements(componentControl);
+        elementsForComponent.push(forComponent);
+        sliders.push(forComponent.control);
+        asSlider(forComponent.control, componentControl);
+        state[control.name][index] *= maybeNormFactor;
+        forComponent.control.value =
+            updateSlider(forComponent, state, componentControl, true, state[control.name][index]);
+        forComponent.control.addEventListener("input", event => {
+            updateSlider(forComponent, state, componentControl, false, event.target.value);
             updateAll();
         });
-        componentInput.addEventListener("change", event => {
-            updateSlider(elements, state, control, true, event.target.value);
+        forComponent.control.addEventListener("change", event => {
+            updateSlider(forComponent, state, componentControl, true, event.target.value);
             updateAll();
-            sessionStoreControlState(state, control);
+            sessionStoreControlState(state, componentControl);
         });
+    }
+    elements.min = elementsForComponent[0].min;
+    elements.max = elementsForComponent[dim - 1].max;
+    for (let index = 0; index < dim; index++) {
+        if (!control.sameMin && index > 0) {
+            elements.control.appendChild(elementsForComponent[index].min);
+        }
+        elements.control.appendChild(elementsForComponent[index].control);
+        if (!control.sameMax && index < dim - 1) {
+            elements.control.appendChild(elementsForComponent[index].max);
+            elements.control.appendChild(createSpan({text: "|"}));
+        }
     }
 
     elements.reset.addEventListener("click", () => {
@@ -288,7 +323,8 @@ export const asVecInput = (dim, elements, state, control) => {
     function updateAll() {
         if (control.normalize) {
             const norm = Math.sqrt(
-                sliders.reduce((sum, slider) =>
+                sliders.reduce(
+                    (sum, slider) =>
                         sum + (slider.value * slider.value),
                     0
                 )
@@ -376,6 +412,8 @@ function updateVecLabel(labelElement, state, control) {
         value = value
             .map(i => i.toFixed(2))
             .join(",");
+    } else {
+        console.warn("this is weird, updateVecLabel has no vec value", control, value);
     }
     labelElement.textContent = `= (${value})`;
 }

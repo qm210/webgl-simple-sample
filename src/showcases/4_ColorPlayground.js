@@ -46,38 +46,38 @@ export default {
             type: "label",
             name: "iTime",
         }, {
-            type: "vec3Input",
+            type: "vec3",
             name: "palA",
             defaultValue: [0.5, 0.5, 0.5],
             min: 0,
             max: 1
         }, {
-            type: "vec3Input",
+            type: "vec3",
             name: "palB",
             defaultValue: [0.5, 0.5, 0.5],
             min: 0,
             max: 1
         }, {
-            type: "vec3Input",
+            type: "vec3",
             name: "palC",
             defaultValue: [0.5, 0.5, 0.5],
             min: 0,
             max: 1
         }, {
-            type: "vec3Input",
+            type: "vec3",
             name: "palD",
             defaultValue: [0.5, 0.5, 0.5],
             min: 0,
             max: 1
         }, {
-            type: "floatInput",
+            type: "float",
             name: "iGamma",
             defaultValue: 1.00,
             min: 0.001,
             max: 10.,
             step: 0.001
         }, {
-            type: "floatInput",
+            type: "float",
             name: "iWhatever",
             defaultValue: 1.00,
             min: 0,

@@ -7,6 +7,7 @@ import {shiftTime} from "../webgl/render.js";
 import {setCanvasResolution} from "../webgl/setup.js";
 import {updateResolutionInState} from "../webgl/helpers.js";
 import {addCanvasMouseInteraction} from "./mouse.js";
+import {createClipboardButtons} from "./clipboard.js";
 
 
 const generatePage = (glContext, elements, state, controls, autoRenderOnLoad = true) => {
@@ -99,6 +100,9 @@ export const addControlsToPage = (elements, state, controls, autoRenderOnLoad) =
         id: "iTime",
         valuePrefix: "=",
         content: [
+            createDiv("", "full-spacer"),
+            ...createClipboardButtons(elements, state, controls),
+            createDiv("", "spacer"),
             createResetAllButton(elements, state, controls)
         ]
     });
@@ -167,10 +171,8 @@ export const addControlsToPage = (elements, state, controls, autoRenderOnLoad) =
         elements.controls.appendChild(input.control);
         elements.controls.appendChild(input.max);
         elements.controls.appendChild(input.reset);
-        elements.uniforms[control.name] = {
-            value: input.value,
-            name: input.name
-        };
+
+        elements.uniforms[control.name] = input;
     }
 
     document.addEventListener("keydown", event => {

@@ -14,6 +14,7 @@ uniform sampler2D prevImage;
 
 uniform float iCloudYDisplacement;
 uniform float iCloudLayerDistance;
+uniform float iLightLayerDistance;
 uniform float iCloudSeed;
 uniform float iSkyQuetschung;
 uniform int iSampleCount;
@@ -23,7 +24,14 @@ uniform float iCloudAbsorptionCoeff;
 uniform float iCloudAnisoScattering;
 uniform int iCloudNoiseCount;
 uniform int iLightNoiseCount;
+uniform vec3 iNoiseScale;
+uniform float iNoiseScaleB;
 uniform vec3 vecSunPosition;
+uniform vec3 vecSunColorYCH;
+uniform float iSunExponent;
+uniform vec3 vecTone1;
+uniform vec3 vecTone2;
+uniform float iAccumulateMix;
 
 uniform float iFree0;
 uniform float iFree1;
@@ -36,6 +44,7 @@ const float pi = 3.14159;
 
 bool accumulate;
 bool useFbmB;
+bool useModdedFbm;
 
 // Created by David Hoskins and licensed under MIT.
 // See https://www.shadertoy.com/view/4djSRW.
@@ -135,13 +144,13 @@ float lfnoise3(vec3 p) {
 // Available at https://www.shadertoy.com/view/XsX3zB.
 // Modified by NR4 for size-coding.
 
+/* const matrices for 3d rotation */
+const mat3 rot1 = mat3(-0.37, 0.36, 0.85,-0.14,-0.93, 0.34,0.92, 0.01,0.4);
+const mat3 rot2 = mat3(-0.55,-0.39, 0.74, 0.33,-0.91,-0.24,0.77, 0.12,0.63);
+const mat3 rot3 = mat3(-0.71, 0.52,-0.47,-0.08,-0.72,-0.68,-0.7,-0.45,0.56);
+
 /* directional artifacts can be reduced by rotating each octave */
 float mfnoise3(vec3 m) {
-    /* const matrices for 3d rotation */
-    const mat3 rot1 = mat3(-0.37, 0.36, 0.85,-0.14,-0.93, 0.34,0.92, 0.01,0.4);
-    const mat3 rot2 = mat3(-0.55,-0.39, 0.74, 0.33,-0.91,-0.24,0.77, 0.12,0.63);
-    const mat3 rot3 = mat3(-0.71, 0.52,-0.47,-0.08,-0.72,-0.68,-0.7,-0.45,0.56);
-
     return   0.5333333 * lfnoise3(m * rot1)
     + 0.2666667 * lfnoise3(2. * m * rot2)
     + 0.1333333 * lfnoise3(4. * m * rot3)
@@ -150,6 +159,16 @@ float mfnoise3(vec3 m) {
 
 // End of Nikita Miropolskiy's MIT licensed code.
 
+float xt95noise(vec3 m);
+float xt95mfnoise3(vec3 m) {
+    // scaled to produce a range like mfnoise3
+    return (
+        0.5333333 * xt95noise(m * rot1)
+        + 0.2666667 * xt95noise(2. * m * rot2)
+        + 0.1333333 * xt95noise(4. * m * rot3)
+        + 0.0666667 * xt95noise(8. * m)
+    ) * 1.62 - 0.005;
+}
 
 // Paint with antialiasing
 float sm(in float d)
@@ -300,6 +319,8 @@ float BeersLaw (float dist, float absorption) {
 }
 
 float noise( in vec3 x ) {
+    // try for comparison (but this looses granularity) just
+    // return lfnoise3(x);
     return mfnoise3(x);
 }
 
@@ -310,6 +331,9 @@ float hash( float n )
 
 float xt95noise( in vec3 x )
 {
+    // match spatial scale of noise(), this seems like a factor of 2.6 .. 3.0:
+    x *= iNoiseScaleB;
+
     vec3 p = floor(x);
     vec3 f = fract(x);
     f = f*f*(3.0-2.0*f);
@@ -319,7 +343,9 @@ float xt95noise( in vec3 x )
     mix( hash(n+ 57.0), hash(n+ 58.0),f.x),f.y),
     mix(mix( hash(n+113.0), hash(n+114.0),f.x),
     mix( hash(n+170.0), hash(n+171.0),f.x),f.y),f.z);
-    return res;
+
+    // also, match value range of output (I measured these values)
+    return 1.24 * res - 0.673;
 }
 
 mat3 m = mat3(
@@ -330,46 +356,32 @@ mat3 m = mat3(
 
 float fbmB( vec3 p, int maxOctave)
 {
-    // somewhat match the spatial scaling of fbmA():
-    p *= 2.81;
-
-    float f = 0.;
-
-    bool originalVersion = (debugOption & 4) != 0;
-    if (originalVersion) {
-        f  = 0.5000*xt95noise( p );
-        p = m*p*2.02;
-        f += 0.2500*xt95noise( p );
-        p = m*p*2.03;
-        f += 0.1250*xt95noise( p );
-        p = m*p*2.01;
-        if (maxOctave > 3) {
-            f += 0.0625*xt95noise( p );
-        }
-    } else {
-        float a = 0.5;
-        float b = 2.02;
-        for (int i = 0; i < maxOctave; i++) {
-            f += a*xt95noise( p );
-            p = m*p;
-            p *= b;
-            b += (i == 1 ? -0.02 : 0.01);
-            a *= 0.5;
-        }
+    // fbmB() original: just use xt95noise
+    // fbmB() modded: use noise() for the base octave // <--
+    // fbmB() modded: use xt95mfnoise3() for the base octave //
+    float a = 0.5;
+    float b = 2.02;
+    float f = useModdedFbm ? xt95mfnoise3(p) : a * xt95noise(p);
+    for (int i = 0; i < maxOctave - 1; i++) {
+        p = m*p;
+        p *= b;
+        b += (i == 1 ? -0.02 : 0.01);
+        a *= 0.5;
+        f += a*xt95noise( p );
     }
-    // somewhat match the value range of fbmA():
-    return f / 1.25 - 0.4;
+    return 0.78 * f + 0.02;
 }
 
 float fbmA(vec3 q, int maxOctave) {
-    float g = noise(q);
+    // fbmA() original: NR4's fbm with just noise()
+    // fbmB() modded: use xt95mfnoise3() = mfnoise3 with xt95noise() instead
 
     float f = 0.0;
     float scale = 0.5;
     float factor = 2.02;
 
     for (int i = 0; i < maxOctave; i++) {
-        f += scale * noise(q);
+        f += scale * (useModdedFbm ? xt95mfnoise3(q) : noise(q));
         q *= factor;
         factor += 0.21;
         scale *= 0.5;
@@ -380,22 +392,24 @@ float fbmA(vec3 q, int maxOctave) {
 
 float fbm(vec3 p, bool forLight) {
     p += 1.e4*hash31(iCloudSeed);// + iTime * 0.5 * vec3(1.0, -0.2, -1.0);
+    p *= iNoiseScale;
     int maxOctave = forLight ? iLightNoiseCount : iCloudNoiseCount;
     return useFbmB ? fbmB(p, maxOctave) : fbmA(p, maxOctave);
 }
 
 float scene(vec3 p, bool forLight) {
-    //float d = sdSphere(p, 1.2);
-
+    float y = p.y - 0.01 * iCloudYDisplacement + (0.08 * sin(iTime));
+    p.x += 0.1 * iTime;
+    p.y += 0.02 * iTime;
     float f = fbm(p, forLight);
-
-    return .01 * iCloudYDisplacement - p.y + f;
+    return f - y;
 }
 
 float lightmarch(vec3 position, vec3 rayDirection) {
     vec3 lightDirection = normalize(vecSunPosition);
     float totalDensity = 0.0;
-    float marchSize = 0.03;
+    // float marchSize = 0.03;
+    float marchSize = 0.01 * iLightLayerDistance;
 
     for (int step = 0; step < iLightLayerCount; step++) {
         position += lightDirection * marchSize * float(step);
@@ -416,7 +430,6 @@ float HenyeyGreenstein(float g, float mu) {
 float MARCH_SIZE;
 float raymarch(vec3 rayOrigin, vec3 rayDirection, float offset) {
     float depth = 0.0;
-    MARCH_SIZE = .01 * iCloudLayerDistance;
     depth += MARCH_SIZE * offset;
     vec3 p = rayOrigin + depth * rayDirection;
     vec3 sunDirection = normalize(vecSunPosition);
@@ -564,6 +577,27 @@ vec3 cmap_pastel(float t) {
     ))))));
 }
 
+const mat3 rgb2yiq = mat3(
+    0.299,  0.5959,  0.2215,
+    0.587, -0.2746, -0.5227,
+    0.114, -0.3213,  0.3112
+);
+
+vec3 rgbToYCh(vec3 rgb) {
+    vec3 yiq = rgb2yiq * rgb;
+    float C = length(yiq.yz);
+    float h = atan(yiq.z, yiq.y);
+    return vec3(yiq.x, C, h);
+}
+vec3 ychToRgb(float Y, float C, float h) {
+    float I = C * cos(h);
+    float Q = C * sin(h);
+    float R = Y + 0.9469 * I + 0.6236 * Q;
+    float G = Y - 0.2748 * I - 0.6357 * Q;
+    float B = Y - 1.1000 * I + 1.7000 * Q;
+    return clamp(vec3(R, G, B), 0.0, 1.0);
+}
+
 void cloudImage(out vec4 color, vec2 fragCoord, int sampleIndex) {
 
     vec2 uv = fragCoord.xy/iResolution.xy;
@@ -578,7 +612,8 @@ void cloudImage(out vec4 color, vec2 fragCoord, int sampleIndex) {
 
 
     // Sun and Sky
-    vec3 sunColor = vec3(1.0,0.5,0.3);
+//    vec3 sunColor = vec3(1.0,0.5,0.3);
+     vec3 sunColor = ychToRgb(vecSunColorYCH.x, vecSunColorYCH.y, vecSunColorYCH.z);
     vec3 sunDirection = normalize(vecSunPosition);
     float sun = clamp(dot(sunDirection, rd), 0.0, 1.0);
     /*
@@ -589,7 +624,7 @@ void cloudImage(out vec4 color, vec2 fragCoord, int sampleIndex) {
     */
     color.rgb = cmap_pastel(fract(1. - .9 * pow(uv.y + .5, iSkyQuetschung)));
     // Add sun color to sky
-    color.rgb += 0.5 * sunColor * pow(sun, 10.0);
+    color.rgb += 0.5 * sunColor * pow(sun, iSunExponent);
 
     float blueNoise = hilbert_r1_blue_noisef(uvec2(fragCoord.xy));//texture2D(uBlueNoise, fragCoord.xy / 1024.0).r;
     float offset = fract(blueNoise + float(sampleIndex%32) / sqrt(0.5));
@@ -611,22 +646,25 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
         float x = i / sampleCount;
         float p = gold * i;
         vec2 z =
-        // Pixel size.
-        .5 / iResolution.y
-        // Vogel order.
-        * sqrt(x) * vec2(cos(p), sin(p))
-        // Adjust width for DOF effect.
-        * 1.
-        ;
+            // Pixel size.
+            .5 / iResolution.y
+            // Vogel order.
+            * sqrt(x) * vec2(cos(p), sin(p))
+            // Adjust width for DOF effect.
+            * 1.
+            ;
         vec4 c1;
         x *= pi * pi;
         vec2 newFragCoord = (uv - z) * iResolution.y + .5 * iResolution.xy;
         //pixel_3d(c1, newFragCoord);
-        int sampleIndex = int(i) + iFrame;
+        int sampleIndex = int(i);
+        if (accumulate) {
+            sampleIndex += iFrame;
+        }
         cloudImage(c1, newFragCoord, sampleIndex);
         col +=
-        // Remap to texture coordinates.
-        c1;
+            // Remap to texture coordinates.
+            c1;
     }
     fragColor = col / sampleCount;
     /*
@@ -641,11 +679,24 @@ void mainImage(out vec4 fragColor, in vec2 fragCoord) {
 }
 
 void main() {
+    vec2 uv = (gl_FragCoord.xy - .5 * iResolution.xy) / iResolution.y;
     accumulate = (debugOption & 1) != 0;
     useFbmB = (debugOption & 2) != 0;
+    useModdedFbm = (debugOption & 4) != 0;
+    bool debugRead = (debugOption & 8) != 0;
+
+    if (debugRead) {
+        vec3 ray = normalize(vec3(uv, -1));
+        outColor.r = fbmA(ray, 6);
+        outColor.g = fbmB(ray, 6);
+        outColor.b = mfnoise3(ray);
+        outColor.a = xt95mfnoise3(ray);
+        return;
+    }
 
     vec4 color = vec4(0.0);
-    vec2 uv = (gl_FragCoord.xy - .5 * iResolution.xy) / iResolution.y;
+
+    MARCH_SIZE = .01 * iCloudLayerDistance;
 
     mainImage(color, gl_FragCoord.xy);
 
@@ -655,10 +706,29 @@ void main() {
         outColor = vec4(color.rgb, 1.0);
 
         if (accumulate && iFrame > 0) {
-            outColor += prevColor;
+            if (iAccumulateMix < 0.) {
+                outColor += prevColor;
+            } else {
+                outColor = mix(outColor, prevColor, iAccumulateMix);
+            }
         }
     }
     if (passIndex == 1) {
-        outColor = vec4(prevColor.rgb / prevColor.a, 1.);
+        vec3 col = prevColor.rgb / prevColor.a;
+        // ACES filmic curve
+//        const float a = 2.51;
+//        const float b = 0.03;
+//        const float c = 2.43;
+//        const float d = 0.59;
+//        const float e = 0.14;
+        float a = vecTone1.x;
+        float b = vecTone1.y;
+        float c = vecTone1.z;
+        float d = vecTone2.x;
+        float e = vecTone2.y;
+        float gamma = vecTone2.z;
+        col = (col * (a * col + b)) / (col * (c * col + d) + e);
+        col = pow(clamp(col, 0.0, 1.0), vec3(gamma));
+        outColor = vec4(col, 1.);
     }
 }
