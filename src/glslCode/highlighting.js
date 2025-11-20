@@ -1,4 +1,4 @@
-import {REGEX, SymbolType} from "./symbols.js";
+import {REGEX, SymbolType} from "./definitions.js";
 import {createSpan} from "../layout/helpers.js";
 
 export function withGlslHighlighting(code) {

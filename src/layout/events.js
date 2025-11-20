@@ -1,5 +1,5 @@
 import {assignGloballyUniqueClass, findParentOfClass} from "./helpers.js";
-import {SymbolType} from "../glslCode/symbols.js";
+import {SymbolType} from "../glslCode/definitions.js";
 import {idForLine} from "./shaderCode.js";
 
 

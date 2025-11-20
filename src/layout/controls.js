@@ -1,11 +1,16 @@
 import {createDiv, createElement} from "./helpers.js";
 import {initMouseState} from "./mouse.js";
 
-export function addButton({parent, onClick, onRightClick, title = "", className = ""}) {
+export function addButton({parent, onClick, onRightClick, title = "", className = "", style}) {
     const button = document.createElement("button");
     button.textContent = title;
     if (className) {
         button.className = className;
+    }
+    if (style) {
+        for (const key in style) {
+            button.style[key] = style[key];
+        }
     }
     if (onClick) {
       button.addEventListener("click", onClick);
@@ -50,13 +55,6 @@ export function createInputElements(state, control) {
         return;
     }
 
-    const inactive = !state.activeUniforms.find(
-        uniform => uniform.name === control.name
-    );
-    if (inactive) {
-        return;
-    }
-
     control.storageKey = `qm.${state.title}.${control.name}`;
     const storedState = sessionStorage.getItem(control.storageKey);
     if (storedState) {
@@ -72,6 +70,13 @@ export function createInputElements(state, control) {
     }
 
     if (control.hidden) {
+        return;
+    }
+
+    const inactive = !state.activeUniforms.find(
+        uniform => uniform.name === control.name
+    );
+    if (inactive) {
         return;
     }
 

@@ -1,4 +1,4 @@
-import {REGEX, SymbolType} from "./symbols.js";
+import {REGEX, SymbolType} from "./definitions.js";
 
 export function countBlockDelimiters(code) {
     const delta = {

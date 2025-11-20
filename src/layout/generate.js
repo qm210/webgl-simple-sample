@@ -109,6 +109,7 @@ export const addControlsToPage = (elements, state, controls, autoRenderOnLoad) =
         elements.toggles.push(
             addButton({
                 title: control.label(),
+                style: control.style,
                 onClick: async () => {
                     await control.onClick();
                     const self = elements.toggles[toggleIndex];

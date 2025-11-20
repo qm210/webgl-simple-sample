@@ -141,6 +141,7 @@ button.render-button {
     font-size: var(--font-size-large);
     display: flex;
     flex-direction: row;
+    align-items: stretch;
     padding-left: 0.25rem;
     width: 100%;
 }

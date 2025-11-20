@@ -1,4 +1,4 @@
-import {REGEX} from "./symbols.js";
+import {REGEX} from "./definitions.js";
 
 const CONDITIONAL_DIRECTIVES =
     ["if", "elif", "else", "ifdef", "ifndef", "endif"];

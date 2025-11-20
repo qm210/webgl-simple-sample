@@ -1,3 +1,5 @@
+import {REGEX} from "./definitions.js";
+
 const ChangeType = {
     Added: "Added",
     Changed: "Changed",
@@ -30,3 +32,31 @@ export function handleConsecutiveChanges(analyzed, cursor, diff) {
         };
     }
 }
+
+export function enhanceChangedBlocks(analyzed) {
+    for (const line of analyzed.lines) {
+        if (analyzed.changedBlockAt[line.number]) {
+            line.changedBlock = analyzed.changedBlockAt[line.number]
+            line.changedBlock.removed = line.changedBlock.diffs
+                .filter(d => d.removed);
+            line.changedBlock.indent = commonIndentation(line.changedBlock.removed);
+        }
+    }
+}
+
+export function commonIndentation(diffs) {
+    return diffs.reduce(
+        (acc, diff) => {
+            const leadingSpaces = diff.value.match(REGEX.LEADING_SPACES)?.[0].length;
+            if (leadingSpaces === undefined) {
+                return acc;
+            }
+            if (acc === null) {
+                return leadingSpaces;
+            }
+            return Math.min(acc, leadingSpaces);
+        },
+        null
+    ) ?? 0;
+}
+
