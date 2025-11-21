@@ -1,6 +1,5 @@
-import {assignGloballyUniqueClass, findParentOfClass} from "./helpers.js";
-import {SymbolType} from "../glslCode/definitions.js";
-import {idForLine} from "./shaderCode.js";
+import {assignGloballyUniqueClass, findParentOfClass} from "./layout/dom.js";
+import {idForLine} from "./layout/shaderCode.js";
 
 
 export function createScrollStackOn(parent) {

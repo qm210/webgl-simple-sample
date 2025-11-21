@@ -1,9 +1,9 @@
 import {setupWebGl} from "./webgl/setup.js";
-import {prepareShowcase} from "./layout/showcase.js";
-import generatePage from "./layout/generate.js";
-import initLayout from "./layout/init.js";
+import {prepareShowcase} from "./app/showcase.js";
+import generatePage from "./app/layout/generate.js";
+import initLayout from "./app/layout/page.js";
 import {selectShowcase} from "./showcases.js";
-import './style/index.css';
+import './app/style/index.css';
 
 const showcase = selectShowcase();
 

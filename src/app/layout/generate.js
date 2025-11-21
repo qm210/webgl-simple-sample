@@ -1,13 +1,13 @@
 import {addButton, createInputElements, addFreeRow, createResetAllButton} from "./controls.js";
 import {registerShaderCode} from "./shaderCode.js";
-import {appendButton, appendElement, createDiv, createElement} from "./helpers.js";
-import {createScrollStackOn, scrollToFirstInterestingLine} from "./events.js";
-import {deferExtendedAnalysis} from "../glslCode/deferredAnalysis.js";
-import {shiftTime} from "../webgl/render.js";
-import {setCanvasResolution} from "../webgl/setup.js";
-import {updateResolutionInState} from "../webgl/helpers.js";
-import {addCanvasMouseInteraction} from "./mouse.js";
-import {createClipboardButtons} from "./clipboard.js";
+import {appendButton, appendElement, createDiv, createElement} from "./dom.js";
+import {createScrollStackOn, scrollToFirstInterestingLine} from "../events.js";
+import {deferExtendedAnalysis} from "../../glslCode/deferredAnalysis.js";
+import {shiftTime} from "../../webgl/render.js";
+import {setCanvasResolution} from "../../webgl/setup.js";
+import {updateResolutionInState} from "../../webgl/helpers.js";
+import {addCanvasMouseInteraction} from "../mouse.js";
+import {createClipboardButtons, createPresetSelector} from "../exchange.js";
 
 
 const generatePage = (glContext, elements, state, controls, autoRenderOnLoad = true) => {
@@ -101,7 +101,8 @@ export const addControlsToPage = (elements, state, controls, autoRenderOnLoad) =
         valuePrefix: "=",
         content: [
             createDiv("", "full-spacer"),
-            ...createClipboardButtons(elements, state, controls),
+            ...createPresetSelector(elements, state),
+            ...createClipboardButtons(elements, state),
             createDiv("", "spacer"),
             createResetAllButton(elements, state, controls)
         ]

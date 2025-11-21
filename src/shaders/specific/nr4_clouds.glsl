@@ -46,6 +46,22 @@ bool accumulate;
 bool useFbmB;
 bool useModdedFbm;
 
+/*
+const uvec4 pcg_magic_numbers = uvec4(1664525, 1013904223, 16, 0);
+
+uvec3 pcg3d(uvec3 v) {
+    v = v * pcg_magic_numbers.x + pcg_magic_numbers.y;
+    v += v.yzx*v.zxy;
+    v ^= v >> pcg_magic_numbers.z;
+    v += v.yzx*v.zxy;
+    return v;
+}
+
+vec3 hash33(vec3 v) {
+    return vec3(pcg3d(uvec3(1.e3*v)))/vec3(uint(0xffffffff));
+}
+*/
+
 // Created by David Hoskins and licensed under MIT.
 // See https://www.shadertoy.com/view/4djSRW.
 
@@ -706,11 +722,8 @@ void main() {
         outColor = vec4(color.rgb, 1.0);
 
         if (accumulate && iFrame > 0) {
-            if (iAccumulateMix < 0.) {
-                outColor += prevColor;
-            } else {
-                outColor = mix(outColor, prevColor, iAccumulateMix);
-            }
+//            outColor += prevColor;
+            outColor.rgb = mix(outColor.rgb, prevColor.rgb, iAccumulateMix);
         }
     }
     if (passIndex == 1) {

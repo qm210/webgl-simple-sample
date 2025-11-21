@@ -33,7 +33,7 @@ export default {
         state.fbPingIndex = 0;
         state.fbPongIndex = 1;
 
-        // for the second, i.e. layout(location=1) out ... we need another texture PER FRAMEBUFFER.
+        // for the second, i.e. app(location=1) out ... we need another texture PER FRAMEBUFFER.
         const extraOut = {
             // The specific linking between one framebuffer object (FBO) and one texture is called "attachment",
             // as this FBO already has its primary texture on COLOR_ATTACHMENT0, we need a second one.

@@ -5,8 +5,8 @@ import showcase2c from "./showcases/2_GeometryPlayground_grid.js";
 import showcase3 from "./showcases/3_Textures.js";
 import showcase4 from "./showcases/4_ColorPlayground.js";
 import showcase5 from "./showcases/5_Noise.js";
-import showcase6a from "./showcases/6a_RayMarchingPrimitivesSimplified.js";
-import showcase6b from "./showcases/6b_RayMarchingPrimitives.js";
+import showcase6 from "./showcases/6a_RayMarchingPrimitivesSimplified.js";
+import showcaseIQ from "./showcases/6b_RayMarchingPrimitives.js";
 import showcase7 from "./showcases/7_VariousConceptsFor3D.js";
 import showcase8 from "./showcases/8_MultiPassAndExtraData.js";
 import showcase9 from "./showcases/9_FramebufferPingPong.js";
@@ -20,60 +20,43 @@ import showcaseOld11 from "./showcases/retired/11_Volumetric.js";
 import showcaseX from "./showcases/X_SimulationPlayground.js";
 import showcaseZClouds from "./showcases/Z_NR4_Clouds.js";
 
-const defaultShowcase = showcase12;
+const defaultShowcase    = showcase12;
+
+const BY_PATH = {
+    "1": showcase1,
+    "2": showcase2,
+    "2b": showcase2b,
+    "2c": showcase2c,
+    "3": showcase3,
+    "4": showcase4,
+    "5": showcase5,
+    "6": showcase6,
+    "6a": showcase6,
+    "6b": showcaseIQ,
+    "7": showcase7,
+    "8": showcase8,
+    "9": showcase9,
+    "10": showcase10a,
+    "10a": showcase10a,
+    "10b": showcase10b,
+    "11": showcase11,
+    "12": showcase12,
+    // specific references:
+    "iq": showcaseIQ,
+    "riow": showcaseRIOW,
+    "old8": showcaseOld8,
+    "old11": showcaseOld11,
+    // some advanced investigations:
+    "210": showcaseX,
+    "nr4": showcaseZClouds,
+};
 
 export function selectShowcase() {
-
-    // Flexibel umschalten, per URL z.B. für 5a: http://localhost:5173/5a
-    const showcaseId = window.location.pathname.slice(1);
-
-    switch(showcaseId) {
-        case "1":
-            return showcase1;
-        case "2":
-            return showcase2;
-        case "2b":
-            return showcase2b;
-        case "2c":
-            return showcase2c;
-        case "3":
-            return showcase3;
-        case "4":
-            return showcase4;
-        case "5":
-            return showcase5;
-        case "6":
-        case "6a":
-            return showcase6a;
-        case "iq":
-        case "6b":
-            return showcase6b;
-        case "7":
-            return showcase7;
-        case "8":
-            return showcase8;
-        case "9":
-            return showcase9;
-        case "10":
-        case "10a":
-            return showcase10a;
-        case "10b":
-            return showcase10b;
-        case "11":
-            return showcase11;
-        case "12":
-            return showcase11;
-        case "riow":
-            return showcaseRIOW;
-        case "old8":
-            return showcaseOld8;
-        case "old11":
-            return showcaseOld11;
-        case "210":
-            return showcaseX;
-        case "nr4":
-            return showcaseZClouds;
-        default:
-            return defaultShowcase;
+    const path = window.location.pathname.slice(1);
+    const showcase = BY_PATH[path]
+    if (showcase) {
+        showcase.path = path;
+        return showcase;
     }
+    return defaultShowcase;
 }

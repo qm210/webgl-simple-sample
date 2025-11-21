@@ -214,8 +214,8 @@ export default {
         }, {
             type: "float",
             name: "iAccumulateMix",
-            defaultValue: 0.5,
-            min: -0.01,
+            defaultValue: 1.,
+            min: 0.,
             max: 1,
         }, {
             type: "float",

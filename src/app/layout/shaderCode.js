@@ -1,5 +1,5 @@
-import {createDiv} from "./helpers.js";
-import {analyzeShader} from "../glslCode/analysis.js";
+import {createDiv} from "./dom.js";
+import {analyzeShader} from "../../glslCode/analysis.js";
 
 export function registerShaderCode(elements, shaderSource, errorLog, shaderKey, title = "") {
     if (!shaderSource) {
