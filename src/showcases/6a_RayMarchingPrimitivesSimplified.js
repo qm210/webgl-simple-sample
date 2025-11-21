@@ -86,19 +86,19 @@ export default {
             min: -9.99,
             max: +9.99,
         }, {
-            type: "floatInput",
+            type: "float",
             name: "iFree7",
             defaultValue: 0,
             min: -9.99,
             max: +9.99,
         }, {
-            type: "floatInput",
+            type: "float",
             name: "iFree8",
             defaultValue: 0,
             min: -9.99,
             max: +9.99,
         }, {
-            type: "floatInput",
+            type: "float",
             name: "iFree9",
             defaultValue: 0,
             min: -9.99,

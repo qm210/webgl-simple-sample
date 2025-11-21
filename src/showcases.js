@@ -13,6 +13,7 @@ import showcase9 from "./showcases/9_FramebufferPingPong.js";
 import showcase10a from "./showcases/10_RayTracing.js"
 import showcase10b from "./showcases/10b_RayTracingPlusVolumetric.js"
 import showcase11 from "./showcases/11_FluidSimulation.js";
+import showcase11b from "./showcases/11b_MoreFramebufferProcessing.js";
 import showcase12 from "./showcases/12_PerformancePlayground.js";
 import showcaseRIOW from "./showcases/retired/10_StochasticRayTracing.js";
 import showcaseOld8 from "./showcases/retired/8_Multipass.js";
@@ -20,7 +21,7 @@ import showcaseOld11 from "./showcases/retired/11_Volumetric.js";
 import showcaseX from "./showcases/X_SimulationPlayground.js";
 import showcaseZClouds from "./showcases/Z_NR4_Clouds.js";
 
-const defaultShowcase    = showcase12;
+const defaultShowcase    = showcase11b; // showcase12
 
 const BY_PATH = {
     "1": showcase1,
@@ -40,6 +41,7 @@ const BY_PATH = {
     "10a": showcase10a,
     "10b": showcase10b,
     "11": showcase11,
+    "11b": showcase11b,
     "12": showcase12,
     // specific references:
     "iq": showcaseIQ,

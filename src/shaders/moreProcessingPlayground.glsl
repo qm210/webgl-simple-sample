@@ -2,9 +2,6 @@
 precision highp float;
 precision highp sampler2D;
 
-// Inspiration durch https://github.com/PavelDoGreat/WebGL-Fluid-Simulation,
-// cf. https://github.com/PavelDoGreat/WebGL-Fluid-Simulation/blob/master/script.js
-
 out vec4 fragColor;
 
 // werden jetzt im Vertex Shader definiert, weil Fragment-unabhängig
@@ -18,10 +15,9 @@ in float aspRatio;
 uniform vec2 iResolution;
 uniform float iTime;
 uniform int iFrame;
-uniform int iPassIndex;
+uniform int passIndex;
 uniform sampler2D texPrevious;
-uniform sampler2D texVelocity;
-uniform sampler2D texCurl;
+uniform sampler2D texImage;
 uniform sampler2D texPostSunrays;
 uniform sampler2D texPostBloom; // not implemented yet
 
@@ -647,6 +643,10 @@ float max3(vec3 vec) {
     return max(vec.x, max(vec.y, vec.z));
 }
 
+float min3(vec3 vec) {
+    return min(vec.x, min(vec.y, vec.z));
+}
+
 float val4(vec4 vec) {
     return vec.a * max3(vec.rgb);
 }
@@ -723,14 +723,13 @@ vec4 blur() {
     return sum;
 }
 
-#define INIT_VELOCITY_PASS 0
-#define INIT_IMAGE_PASS 1
-#define PROCESS_VELOCITY_PASS(x) (10+x)
-#define PROCESS_FLUID_COLOR_PASS 50
-#define POST_PASS_SUNRAYS_MASK 80
-#define POST_PASS_SUNRAYS_ACTUAL 81
-#define POST_PASS_SUNRAYS_BLUR 82
-#define RENDER_TO_SCREEN_PASS 99
+float noise(vec2 p) {
+    return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453);
+}
+
+float waveSpeed(float x) {
+    return 0.2 + 0.01 * sin(x * 10.0 + iTime * 3.0);
+}
 
 void main() {
     // vec2 uv = (2. * gl_FragCoord.xy) / iResolution.y - vec2(aspRatio, 1.);
@@ -741,162 +740,84 @@ void main() {
 
     // brauchen wir nicht für jeden Pass, aber erlauben wir uns für lesbareren Zugriff...
     previous = texture(texPrevious, st);
-    velocity = texture(texVelocity, st).xy;
 
-    vec2 spawnCenter = hash22(vec2(1.2, 1.1) * iSpawnSeed);
-    const float spawnSize = 0.5;
-    float d, velL, velR, velU, velD;
+    if (passIndex == 0) {
+        vec2 stImage = vec2(
+            st.x,
+            (1. - st.y) * aspRatio
+        );
+        vec4 image = texture(texImage, stImage);
+        // cut off:
+        fragColor = mix(image, c.yyyy, step(1., stImage.y));
+        // declare white to transparent:
+        // fragColor.a = min3(fragColor.rgb);
+        // front-to-back-blending with white:
+         fragColor.rgb = fragColor.rgb + (1. - fragColor.a) * c.xxx;
+         fragColor.a = 1.;
 
-    // this switch has a principle:
-    // return; to declare the current rendering done.
-    // break; to pass the previous color just through (see below)
-    // ...if you modify stuff and then break; you will likely gain nothing :|
-    switch (iPassIndex) {
-        case INIT_VELOCITY_PASS:
-            if (iSpawnSeed < 0.) {
-                break;
-            }
-            vec2 randomVelocity = hash22(vec2(iSpawnSeed, iSpawnSeed + 0.1))
-                * iMaxInitialVelocity * vec2(aspRatio, 1.);
-            // <-- hash22(x) is _pseudo_random_, i.e. same x results in same "random" value
-            // we want randomVelocity.x != randomVelocity.y, thus the 0.1 offset
-            // but the overall randomVelocity will only differ when sampleSeed differs.
-            // vec2 initialVelocity = randomVelocity * iMaxInitialVelocity;
-            // <-- would be random, but can also direct towards / away from center
-            vec2 initialVelocity = uv * iMaxInitialVelocity;
-            uv = uv - spawnCenter;
-            d = sdCircle(uv, spawnSize);
-            d = smoothstep(0.02, 0., d);
-            d   = exp(-dot(uv, uv) / spawnSize);
-            vec2 newValue = d * initialVelocity;
-            fragColor.xy = previous.xy + newValue;
-            // can ignore fragColor.zw because these will never be read
-            return;
-        case INIT_IMAGE_PASS:
-            if (iSpawnSeed < 0.) {
-                break;
-            }
-            uv = uv - spawnCenter;
-            d = sdCircle(uv, spawnSize);
-            float a = smoothstep(0.02, 0., d) * exp(-dot(uv, uv) / spawnSize);
-            vec4 spawn = a * c.yyxx;
-            spawn.r += pow(-min(0., d), 0.5) * 1.6;
-            // mix old stuff in:
-            fragColor = vec4(previous.rgb + spawn.rgb, 1.);
-            // just new stuff:
-            // fragColor = vec4(spawn.rgb, 1.);
-            return;
+        // nah, separate to alpha channel:
 
-        case PROCESS_VELOCITY_PASS(1):
-            // this just calculates the "curl" (scalar => only red) for the next pass
-            // understand the curl as kind of "orthogonal to the gradient": (x, y) -> (-y, x)
-            velL = +texture(texVelocity, stL).y;
-            velR = +texture(texVelocity, stR).y;
-            velU = -texture(texVelocity, stU).x;
-            velD = -texture(texVelocity, stD).x;
-            float vorticity = (velR - velL) + (velU - velD);
-            fragColor = vec4(vorticity, 0., 0., 1.);
-            return;
-        case PROCESS_VELOCITY_PASS(2):
-            // the curl from the previous pass is here the "previous.r"
-            float curlHere = texture(texCurl, st).x;
-            float curlL = texture(texCurl, stL).x;
-            float curlR = texture(texCurl, stR).x;
-            float curlU = texture(texCurl, stU).x;
-            float curlD = texture(texCurl, stD).x;
-            vec2 force = vec2(abs(curlU) - abs(curlD), abs(curlR) - abs(curlL));
-            if (length(force) == 0.) {
-                break;
-            }
-            // TODO: check performance difference between this check and no-branching
-            // : force /(length(force) + 0.0001;
-            force *= iCurlStrength * curlHere * normalize(force) * vec2(1, -1);
-            velocity += force * deltaTime;
-            velocity = clamp(velocity, -1000., 1000.);
-            fragColor = vec4(velocity, 0., 1.);
-            return;
-        case PROCESS_VELOCITY_PASS(3):
-            // this handles divergence at the borders
-            velL = texture(texVelocity, stL).x;
-            velR = texture(texVelocity, stR).x;
-            velU = texture(texVelocity, stU).y;
-            velD = texture(texVelocity, stD).y;
-            // these are equivalent mathematically:
-            // if (a < b) { velL = c; }
-            // velL = a < b ? c : L;
-            // velL = mix(velL, c, float(a < b));
-            // velL = mix(velL, c, step(a, b));
-            // and compiler might recognize them as equal; but the last one is the most idiomatic GLSL
-//            velL = mix(velL, -velocity.x, step(stL.x, 0.0));
-//            velR = mix(velR, -velocity.x, step(1.0, stR.x));
-//            velU = mix(velU, -velocity.y, step(1.0, stU.y));
-//            velD = mix(velD, -velocity.y, step(stD.y, 0.0));
-            if (stL.x < 0.0) { velL = -velocity.x; }
-            if (stR.x > 1.0) { velR = -velocity.x; }
-            if (stU.y > 1.0) { velU = -velocity.y; }
-            if (stD.y < 0.0) { velD = -velocity.y; }
-            // the divergence texture is scalar / one-dimensional / a single value,
-            float divergence = 0.5 * (velR - velL + velU - velD);
-            // i.e. in terms of usually RGBA; this considers just "red"
-            fragColor = vec4(divergence, 0., 0., 1.);
-            return;
-        case PROCESS_VELOCITY_PASS(4):
-            // init pressure
-            break;
-        case PROCESS_VELOCITY_PASS(5):
-            // propagate pressure
-            break;
-        case PROCESS_VELOCITY_PASS(6):
-            // incompressible flow: vel -> vel - nabla pressuree
-            break;
-        case PROCESS_VELOCITY_PASS(7):
-            fragColor = simulateAdvection(texVelocity, iVelocityDissipation);
-            return;
+        float whiteness = min3(fragColor.rgb);
+        vec4 srcColor = c.yyyy;
+        srcColor.a = 1. - whiteness;
+        if (srcColor.a > 0.001) {
+            //            srcColor.rgb = (fragColor.rgb - whiteness) / srcColor.a;
+            srcColor.rgb = fragColor.rgb - whiteness;
+        }
+        fragColor.rgb = srcColor.rgb;
+        fragColor.a = clamp(1.6 * srcColor.a, 0., 1.);
+        //fragColor.rgb = srcColor.rgb;
 
-        case PROCESS_FLUID_COLOR_PASS:
-            fragColor = previous;
-            // this does not go through right now
-            fragColor = simulateAdvection(texPrevious, iColorDissipation);
-            return;
+    } else {
+        // fragColor = previous;
+//        const float meltSpeed = 0.02;
+//        const float waveAmplitude = 0.0;
+//        const float waveFrequency = 30.0;
+//        float meltAmount = iTime * meltSpeed;
+//        float horizontalWave = sin(st.x * waveFrequency + iTime * 5.0) * waveAmplitude;
+//        vec2 stShifted = vec2(st.x + horizontalWave, st.y + meltAmount);
+//        float alphaFade = smoothstep(meltAmount + 0.1, meltAmount + 0.3, stShifted.y);
+//        const vec4 bg = c.wxwx;
+        // fragColor.rgb = min(bg.rgb, fragColor.rgb, fragColor.a);
 
-        case POST_PASS_SUNRAYS_MASK:
-            float br = max3(previous.rgb);
-            fragColor.a = 1.0 - clamp(br * 20., 0., 0.8);
-            fragColor.rgb = previous.rgb;
-            return;
-        case POST_PASS_SUNRAYS_ACTUAL:
-            fragColor = vec4(calcSunrays(), 0., 0., 1.);
-            return;
-        case POST_PASS_SUNRAYS_BLUR:
-            fragColor = blur();
-            return;
+        /*
+        float speed  = 0.03 + sin(st.x * 10. - 0.1*iTime) * 0.005; // + noise(gl_FragCoord.xy) * 0.005;
+        float offset = mod(iTime * speed, .5);
+        vec2 st2 = vec2(st.x, fract(st.y + offset));
+        vec4 color = texture(texPrevious, st2);
+        float fade = smoothstep(0., 0.5, offset);
+        color.a *= 1. - fade;
+        fragColor = mix(fragColor, color, 0.9);
+        */
 
-        case RENDER_TO_SCREEN_PASS:
-            if (doRenderVelocity > 0) {
-                if (doRenderVelocity == 1) {
-                    fragColor = 0.5 * texture(texVelocity, st) + 0.5;
-                }
-                if (doRenderVelocity == 2) {
-                    fragColor = 0.5 * texture(texCurl, st) + 0.5;
-                }
-                fragColor.a = 1.;
-                return;
-            }
-            // <-- meant for debugging
-            // --> actual rendering / composition of textures
+        float speedBase = 0.03;
+        float speed = speedBase + 0.005 * sin(12. * st.x + 3. * iTime); //  + noise(vec2(st.x * iResolution.x, 0.)) * 0.005;
+        float offset = mod(iTime * speed, 1.0);
 
-            // 1. first, mimic the gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
-            const vec3 bg = c.yyy;
-            fragColor.rgb = makeSurplusWhite(previous.rgb);
-            fragColor.rgb = previous.rgb + (1. - previous.a) * bg;
-            // 2. mix post-processing-sunrays in from their texture
-            float sunrays = texture(texPostSunrays, st).r;
-            fragColor.rgb *= sunrays;
-            // fragColor.a = max3(fragColor.rgb);
-            fragColor.a = 1.;
-            return;
-        default:
-            break;
+        vec3 colorSum = vec3(0.0);
+        float alphaSum = 0.0;
+
+        int blurSize = 15;          // Number of samples in blur kernel
+        float blurRadius = 0.005;   // Vertical blur radius in UV space
+
+        for (int i = -blurSize; i <= blurSize; ++i) {
+            float sampleOffset = offset + float(i) * blurRadius;
+            float y = fract(st.y + sampleOffset);
+            vec2 sampleUV = vec2(st.x, y);
+            vec4 sampleColor = texture(texPrevious, sampleUV);
+
+            float weight = 1.0 - abs(float(i)) / float(blurSize + 1);  // simple linear weight
+
+            colorSum += sampleColor.rgb * sampleColor.a * weight;
+            alphaSum += sampleColor.a * weight;
+        }
+
+        fragColor.rgb = (alphaSum > 0.0) ? (colorSum / alphaSum) : vec3(0.0);
+        fragColor.a = clamp(alphaSum / float(2 * blurSize + 1), 0.0, 1.0);
+
+        // front-to-back-blending:
+        vec3 bg = c.xxx;
+        fragColor.rgb += (1. - fragColor.a) * bg;
+        fragColor.a = 1.;
     }
-    fragColor = previous;
 }

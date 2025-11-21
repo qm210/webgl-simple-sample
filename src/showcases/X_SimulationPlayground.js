@@ -1,5 +1,5 @@
 import {startRenderLoop} from "../webgl/render.js";
-import {createFramebufferWithTexture, createTextureFromImage, takePingPongFramebuffers} from "../webgl/helpers.js";
+import {createFramebufferWithTexture, createTextureFromImage} from "../webgl/helpers.js";
 
 import fragmentShaderSource from "../shaders/xSimulationPlayground.glsl";
 import {initBasicState} from "./common.js";
@@ -96,8 +96,8 @@ export default {
         state.location.prevImage = gl.getUniformLocation(state.program, "iPrevImage");
         state.location.prevVelocity = gl.getUniformLocation(state.program, "iPrevVelocity");
         state.location.passIndex = gl.getUniformLocation(state.program, "iPassIndex");
-
         state.location.iFrame = gl.getUniformLocation(state.program, "iFrame");
+
         state.location.iNoiseLevel = gl.getUniformLocation(state.program, "iNoiseLevel");
         state.location.iNoiseFreq = gl.getUniformLocation(state.program, "iNoiseFreq");
         state.location.iNoiseOffset = gl.getUniformLocation(state.program, "iNoiseOffset");
@@ -116,7 +116,7 @@ export default {
             minFilter: gl.LINEAR,
             magFilter: gl.NEAREST,
         });
-        state.location.iDream210 = gl.getUniformLocation(state.program, "iDream210");
+        state.location.iDream210 = gl.getUniformLocation(state.program, "texImage");
 
         gl.useProgram(state.program);
 
