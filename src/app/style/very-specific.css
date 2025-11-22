@@ -1,0 +1,26 @@
+.fps {
+    font-size: smaller;
+    font-weight: bold;
+    opacity: 0.6;
+}
+
+.readout-stats {
+    display: flex;
+    flex-direction: column;
+    font-family: monospace;
+    align-items: center;
+    justify-content: space-evenly;
+}
+
+.readout-stats > div:first-of-type {
+    margin-bottom: 0.5rem;
+}
+
+.readout-stats > div {
+    white-space: pre;
+}
+
+.readout-stats > span {
+    margin-top: 0.5rem;
+    font-style: italic;
+}

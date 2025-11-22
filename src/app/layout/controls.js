@@ -68,21 +68,19 @@ export function createInputElements(state, control) {
             state[control.name] = [...control.defaultValue];
         }
     }
-    if (control.type === "bool") {
-        console.log("was geht hier vor sich?", control.name, control.type, state[control.name]);
-    }
 
     if (control.hidden) {
         return;
     }
 
-    const inactive = !state.activeUniforms.find(
+    const activelyUsed = state.activeUniforms.find(
         uniform => uniform.name === control.name
     );
-    if (inactive) {
+    if (!activelyUsed) {
         return;
     }
 
+    control.dim = 1;
     const input = createInputControlElements(control);
     switch (control.type) {
         case "int":
@@ -91,11 +89,14 @@ export function createInputElements(state, control) {
         case "float":
             return asFloatInput(input, state, control);
         case "vec2":
-            return asVecInput(2, input, state, control);
+            control.dim = 2;
+            return asVecInput(input, state, control);
         case "vec3":
-            return asVecInput(3, input, state, control);
+            control.dim = 3;
+            return asVecInput(input, state, control);
         case "vec4":
-            return asVecInput(4, input, state, control);
+            control.dim = 4;
+            return asVecInput(input, state, control);
         case "cursorInput":
             return asCursorInput(input, state, control);
         case "bool":
@@ -190,6 +191,7 @@ function asSlider(inputElement, control) {
         control.min = Math.log10(control.min);
         control.max = Math.log10(control.max);
     }
+    control.digits = control.integer ? 0 : -Math.log10(control.step);
     if (control.min !== undefined) {
         inputElement.min = control.min;
     }
@@ -203,11 +205,10 @@ function asSlider(inputElement, control) {
 
 function updateSlider(elements, state, control, full = false, givenValue = undefined) {
     let value = givenValue ?? state[control.name];
-    value = round(value);
+    value = round(value, control.step);
     if (control.log) {
         value = Math.log10(value);
     }
-    const digits = control.integer ? 0 : -Math.log10(control.step);
     if (full) {
         const defaultMin =
             value === 0 ? -1
@@ -217,33 +218,40 @@ function updateSlider(elements, state, control, full = false, givenValue = undef
             value === 0 ? +1
             : value < 0 ? 0
             : 2 * value;
-        elements.control.min = round(control.min ?? defaultMin);
-        elements.control.max = round(control.max ?? defaultMax);
-        elements.min.textContent = toDigits(elements.control.min);
-        elements.max.textContent = toDigits(elements.control.max);
+        elements.control.min = round(control.min ?? defaultMin, control.step);
+        elements.control.max = round(control.max ?? defaultMax, control.step);
+        elements.min.textContent = toDigits(elements.control.min, control);
+        elements.max.textContent = toDigits(elements.control.max, control);
     }
     elements.control.value = value;
-    value = toDigits(value);
+    value = toDigits(value, control);
     elements.value.textContent = ` = ${value}`;
     return value;
+}
 
-    function round(value) {
-        return Math.round(value / control.step) * control.step;
+function toDigits(value, control) {
+    value = +value;
+    if (control.log) {
+        value = Math.pow(10, value);
     }
+    return value.toFixed(control.digits);
+}
 
-    function toDigits(value) {
-        value = +value;
-        if (control.log) {
-            value = Math.pow(10, value);
-        }
-        return value.toFixed(digits);
-    }
+function round(value, step) {
+    return Math.round(value / step) * step;
 }
 
 const toVec = (dim, value) =>
     Array(dim).fill(null).map(_ => value);
 
-export const asVecInput = (dim, elements, state, control) => {
+const randomVec = (control) =>
+    Array(control.dim).fill(null)
+        .map((_, i) => {
+            const random = (control.max[i] - control.min[i]) * Math.random();
+            return round(control.min[i] + random, control.step[i]);
+        });
+
+export const asVecInput = (elements, state, control) => {
     elements.control = document.createElement("div");
     elements.control.style.gap = "0.25rem";
 
@@ -258,18 +266,18 @@ export const asVecInput = (dim, elements, state, control) => {
     control.sameMax = !(control.max instanceof Array);
     control.sameStep = !(control.step instanceof Array);
     if (control.sameMin) {
-        control.min = toVec(dim, control.min);
+        control.min = toVec(control.dim, control.min);
     }
     if (control.sameMax) {
-        control.max = toVec(dim, control.max);
+        control.max = toVec(control.dim, control.max);
     }
     if (control.sameStep) {
-        control.step = toVec(dim, control.step);
+        control.step = toVec(control.dim, control.step);
     }
 
     const sliders = [];
     const elementsForComponent = [];
-    for (let index = 0; index < dim; index++) {
+    for (let index = 0; index < control.dim; index++) {
         const componentControl = {
             name: `${control.name}.${index}`,
             min: control.min[index],
@@ -295,22 +303,25 @@ export const asVecInput = (dim, elements, state, control) => {
         });
     }
     elements.min = elementsForComponent[0].min;
-    elements.max = elementsForComponent[dim - 1].max;
-    for (let index = 0; index < dim; index++) {
+    elements.max = elementsForComponent[control.dim - 1].max;
+    for (let index = 0; index < control.dim; index++) {
         if (!control.sameMin && index > 0) {
             elements.control.appendChild(elementsForComponent[index].min);
         }
         elements.control.appendChild(elementsForComponent[index].control);
-        if (!control.sameMax && index < dim - 1) {
+        if (!control.sameMax && index < control.dim - 1) {
             elements.control.appendChild(elementsForComponent[index].max);
             elements.control.appendChild(createSpan({text: "|"}));
         }
     }
 
-    elements.reset.addEventListener("click", () => {
-        state[control.name] = control.defaultValue;
+    elements.reset.addEventListener("click", (event) => {
+        state[control.name] =
+            event.ctrlKey
+                ? randomVec(control)
+                : control.defaultValue;
         sliders.forEach((input, index) => {
-            input.value = control.defaultValue[index];
+            input.value = state[control.name][index];
         });
         updateAll();
         sessionStoreControlState(state, control);
@@ -322,13 +333,15 @@ export const asVecInput = (dim, elements, state, control) => {
 
     function updateAll() {
         if (control.normalize) {
-            const norm = Math.sqrt(
-                sliders.reduce(
-                    (sum, slider) =>
-                        sum + (slider.value * slider.value),
-                    0
-                )
-            );
+            const norm =
+                squareNorm(sliders.map(s => s.value));
+            //     Math.sqrt(
+            //     sliders.reduce(
+            //         (sum, slider) =>
+            //             sum + (slider.value * slider.value),
+            //         0
+            //     )
+            // );
             sliders.forEach(slider => {
                 slider.value /= norm;
             });
@@ -420,9 +433,8 @@ function updateVecLabel(labelElement, state, control) {
 
 export const asBoolInput = (elements, state, control) => {
     control.defaultValue ??= false;
-    elements.reset.textContent = `reset: ${control.defaultValue}`;
     elements.control.type = "checkbox";
-    elements.control.checked = control.defaultValue;
+    elements.reset.textContent = `reset: ${control.defaultValue}`;
     update();
 
     elements.control.addEventListener("change", event => {
@@ -442,6 +454,7 @@ export const asBoolInput = (elements, state, control) => {
         } else {
             value = !!state[control.name];
         }
+        elements.control.checked = value;
         elements.value.textContent = `= ${value}`;
     }
 };

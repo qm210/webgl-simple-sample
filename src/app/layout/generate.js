@@ -157,6 +157,7 @@ export const addControlsToPage = (elements, state, controls, autoRenderOnLoad) =
                 addFreeRow({
                     parent: elements.controls,
                     label: "",
+                    id: control.name,
                     content: elements.controlButtons[control.name]
                 })
             continue;
@@ -379,7 +380,6 @@ function openUniformInputHelper() {
         inputControl += `\n            max: ${max},`;
     }
 
-    console.info(glslDeclaration);
-    console.info(glUniformCall);
-    console.info(inputControl);
+    const combined = [glslDeclaration, glUniformCall, inputControl].join("\n\n");
+    console.info(combined);
 }

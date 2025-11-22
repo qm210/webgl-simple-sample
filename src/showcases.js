@@ -4,7 +4,8 @@ import showcase2b from "./showcases/2_GeometryPlayground_sdBox.js";
 import showcase2c from "./showcases/2_GeometryPlayground_grid.js";
 import showcase3 from "./showcases/3_Textures.js";
 import showcase4 from "./showcases/4_ColorPlayground.js";
-import showcase5 from "./showcases/5_Noise.js";
+import showcase5 from "./showcases/5a_Noise.js";
+import showcase5b from "./showcases/5b_NoiseExtended.js";
 import showcase6 from "./showcases/6a_RayMarchingPrimitivesSimplified.js";
 import showcaseIQ from "./showcases/6b_RayMarchingPrimitives.js";
 import showcase7 from "./showcases/7_VariousConceptsFor3D.js";
@@ -31,6 +32,8 @@ const BY_PATH = {
     "3": showcase3,
     "4": showcase4,
     "5": showcase5,
+    "5a": showcase5,
+    "5b": showcase5b,
     "6": showcase6,
     "6a": showcase6,
     "6b": showcaseIQ,

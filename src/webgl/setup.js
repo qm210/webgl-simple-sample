@@ -1,5 +1,6 @@
 import {createShader, initialOrStoredResolution, storeResolution} from "./helpers.js";
 import {maybeAdjustForCompatibility} from "./compatibility.js";
+import {loadExtensions} from "./extensions.js";
 
 /**
  *
@@ -19,28 +20,22 @@ export function setupWebGl(canvas, geometry) {
         // https://caniuse.com/webgl2
     }
 
-    // WebGL2-spezifisch müsen manche Erweiterungen für manche Anwendungszwecke nachgeladen werden,
+    gl.ext = {};
+    gl.timer = {};
+    // Grafikprogrammierung ist (egal welche Grafik-API man zugrundelegt) recht hardwareabhängig,
+    // und WebGL2 ist ein Kompromiss zwischen Grundvoraussetzungen, die man inzwischen von den
+    // meisten real verwendeten Grafikkarten verlangen kann.
+    // Einige Grundfunktionen sind aber erst durch das Nachladen spezifischer "Extensions" verfügbar,
+    // die zwar auch in den meisten Geräten verfügbar sind, aber das gilt es extra zu überprüfen.
+    // Wer hier Fehlermeldungen in der Browser-Konsole findet -> besprechen wir dann im Einzelfall.
+    // Manche Extensions sind für manche der Showcases unabdingbar, andere nur nice-to-have.
     // https://developer.mozilla.org/en-US/docs/Web/API/WebGL_API/Using_Extensions
-    // EXT_color_buffer_float: braucht man (später) für Float-Texturen / Framebuffer
-    const WEBGL_EXTENSIONS = [
+    loadExtensions(gl, [
         "EXT_color_buffer_float",
         "OES_texture_float_linear",
         "KHR_parallel_shader_compile",
         "EXT_disjoint_timer_query_webgl2"
-    ];
-    gl.ext = {};
-    gl.extTimer = {};
-    for (const extension of WEBGL_EXTENSIONS) {
-        const ext = gl.getExtension(extension);
-        if (!ext) {
-            console.warn("Extension not available:", extension);
-        }
-        gl.ext[extension] = ext;
-
-        if (extension === "EXT_disjoint_timer_query_webgl2" && ext) {
-            enrichWithTimerHelpers(gl, ext);
-        }
-    }
+    ]);
 
     const {width, height} = initialOrStoredResolution(canvas, geometry);
     setCanvasResolution(canvas, gl, width, height);
@@ -121,8 +116,10 @@ export function compile(gl, sources) {
         gl.deleteProgram(program);
         return result;
     }
-
     result.program = program;
+
+    collectActiveUniforms(gl, result);
+
     return result;
 }
 
@@ -142,25 +139,17 @@ export function initVertices(gl, state, variableName) {
     );
 }
 
-function enrichWithTimerHelpers(gl, ext) {
-    gl.extTimer.ELAPSED = ext.TIME_ELAPSED_EXT;
-    gl.extTimer.DISJOINT = ext.GPU_DISJOINT_EXT;
-    gl.extTimer.query = gl.createQuery();
-    gl.extTimer.executeWithQuery = async (func) => {
-        gl.beginQuery(gl.extTimer.ELAPSED, gl.extTimer.query);
-        func();
-        gl.endQuery(gl.extTimer.ELAPSED);
-        return evaluateQuery(gl.extTimer.query, gl);
-    };
-}
-
-async function evaluateQuery(query, gl) {
-    while (true) {
-        const available = gl.getQueryParameter(query, gl.QUERY_RESULT_AVAILABLE);
-        const disjoint = gl.getParameter(gl.extTimer.DISJOINT);
-        if (available && !disjoint) {
-            return gl.getQueryParameter(query, gl.QUERY_RESULT);
-        }
-        await new Promise(requestAnimationFrame);
+function collectActiveUniforms(gl, state) {
+    // Earlier examples (or other simple WebGL / OpenGL codes) carry such definitions:
+    //   state.location.iTime = gl.getUniformLocation(state.program, "iTime");
+    //   state.location.iResolution = gl.getUniformLocation(state.program, "iResolution");
+    //   state.location.iMouse = gl.getUniformLocation(state.program, "iMouse");
+    //   etc...
+    // -> this can be unified with WebGL functions (active == the uniform is actually accessed)
+    const uniformCount = gl.getProgramParameter(state.program, gl.ACTIVE_UNIFORMS);
+    for (let u = 0; u < uniformCount; u++) {
+        const uniform = gl.getActiveUniform(state.program, u);
+        state.activeUniforms.push(uniform);
+        state.location[uniform.name] = gl.getUniformLocation(state.program, uniform.name);
     }
 }

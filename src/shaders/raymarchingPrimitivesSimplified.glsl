@@ -403,59 +403,36 @@ vec2 map( in vec3 pos )
     vec2 res = vec2( pos.y, 0.0 );
 
     // Anmerkung: Größere Szenen sollten mithilfe solcher Bounding Boxes unterteilt werden:
+//    if( sdBox( pos-vec3(-2.0,0.3,0.25),vec3(0.3,0.3,1.0) )<res.x )
+//    {
+//        res = opUnion(... sdf(...) ...);
+//    }
+    // --> brauchen wir hier nicht (außer eurer Rechner versagt bereits die FPS),
+    // aber das ist dennoch häufig nützlich (und im Verstehen fremder Shader eine Hilfe)
 
-
-
-    // Anstatt der bounding boxes KÖNNTE man hier alles berechnen und jeweils opUnion() nehmen
-    // das ist aber offensichtlich viel aufwändiger und, wenn man das Ergebnis kennt, evtl. verschwendet.
-
-    // bounding box
-    // if( sdBox( pos-vec3(-2.0,0.3,0.25),vec3(0.3,0.3,1.0) )<res.x )
-    {
-        res = opUnion( res, vec2( sdHexPrism(    pos-vec3(-2.0,0.25, 0.0), vec2(0.2,0.05) ), 18.4 ) );
-        res = opUnion( res, vec2( sdRhombus(  (pos-vec3(-2.0,0.25, 1.0)).xzy, 0.15, 0.25, 0.04, 0.08 ),17.0 ) );
-    }
-
-    // bounding box
-    // if( sdBox( pos-vec3(0.0,0.3,-1.0),vec3(0.35,0.3,2.5) )<res.x )
-    {
-        res = opUnion( res, vec2( sdCappedTorus((pos-vec3( 0.0,0.30, 1.0))*vec3(1,-1,1), vec2(0.866025,-0.5), 0.25, 0.05), 25.0) );
-        res = opUnion( res, vec2( sdBoxFrame(    pos-vec3( 0.0,0.25, 0.0), vec3(0.3,0.25,0.2), 0.025 ), 16.9 ) );
-        res = opUnion( res, vec2( sdCone(        pos-vec3( 0.0,0.45,-1.0), vec2(0.6,0.8),0.45 ), 55.0 ) );
-        res = opUnion( res, vec2( sdCappedCone(  pos-vec3( 0.0,0.25,-2.0), 0.25, 0.25, 0.1 ), 13.67 ) );
-        res = opUnion( res, vec2( sdSolidAngle(  pos-vec3( 0.0,0.00,-3.0), vec2(3,4)/5.0, 0.4 ), 49.13 ) );
-    }
-
-    // bounding box
-    // if( sdBox( pos-vec3(1.0,0.3,-1.0),vec3(0.35,0.3,2.5) )<res.x )
-    {
-        res = opUnion( res, vec2( sdTorus(      (pos-vec3( 1.0,0.30, 1.0)).xzy, vec2(0.25,0.05) ), 7.1 ) );
-        res = opUnion( res, vec2( sdBox(         pos-vec3( 1.0,0.25, 0.0), vec3(0.3,0.25,0.1) ), 3.0 ) );
-        res = opUnion( res, vec2( sdSphere(      pos-vec3( 1.0,0.2,-1.0), 0.25 ), 26.9 ) );
-        res = opUnion( res, vec2( sdCylinder(    rotZ(0.8*iTime)* (pos-vec3( 1.0,0.25,-2.0)), vec2(0.15,0.25) ), 8.0 ) );
-        res = opUnion( res, vec2( sdCapsule(     pos-vec3( 1.0,0.00,-3.0),vec3(-0.1,0.1,-0.1), vec3(0.2,0.4,0.2), 0.1  ), 31.9 ) );
-    }
-
-    // bounding box
-    // if( sdBox( pos-vec3(-1.0,0.35,-1.0),vec3(0.35,0.35,2.5))<res.x )
-    {
-        res = opUnion( res, vec2( sdPyramid(    pos-vec3(-1.0,-0.6,-3.0), 1.0 ), 13.56 ) );
-        res = opUnion( res, vec2( sdOctahedron( pos-vec3(-1.0,0.15,-2.0) - rotY(iTime * 1.3)*vec3(-2.0,0.,0.), 0.35 ), 23.56 ) );
-        res = opUnion( res, vec2( sdTriPrism(   pos-vec3(-1.0,0.15,-1.0), vec2(0.3,0.05) ),43.5 ) );
-        res = opUnion( res, vec2( sdEllipsoid(  pos-vec3(-1.0,0.25, 0.0), vec3(0.2, 0.25, 0.05) ), 43.17 ) );
-        float jumpY = max(0.25, 0.25 + 0.25 * cos(twoPi * 2. * iTime));
-        res = opUnion( res, vec2( sdHorseshoe(  pos-vec3(-1.0, jumpY, 1.0), vec2(cos(1.3),sin(1.3)), 0.2, 0.3, vec2(0.03,0.08) ), 11.5 ) );
-    }
-
-    // bounding box
-    // if( sdBox( pos-vec3(2.0,0.3,-1.0),vec3(0.35,0.3,2.5) )<res.x )
-    {
-        res = opUnion( res, vec2( sdOctogonPrism(pos-vec3( 2.0,0.2,-3.0), 0.2, 0.05), 51.8 ) );
-        res = opUnion( res, vec2( sdCylinder(    pos-vec3( 2.0,0.14,-2.0), vec3(0.1,-0.1,0.0), vec3(-0.2,0.35,0.1), 0.08), 31.2 ) );
-        res = opUnion( res, vec2( sdCappedCone(  pos-vec3( 2.0,0.09,-1.0), vec3(0.1,0.0,0.0), vec3(-0.2,0.40,0.1), 0.15, 0.05), 46.1 ) );
-        res = opUnion( res, vec2( sdRoundCone(   pos-vec3( 2.0,0.15, 0.0), vec3(0.1,0.0,0.0), vec3(-0.1,0.35,0.1), 0.15, 0.05), 51.7 ) );
-        res = opUnion( res, vec2( sdRoundCone(   rotX(0.5 * pi * sin(iTime))*(pos-vec3( 2.0,0.20, 1.0)), 0.2, 0.1, 0.3 ), 37.0 ) );
-    }
+    res = opUnion( res, vec2( sdHexPrism(    pos-vec3(-2.0,0.25, 0.0), vec2(0.2,0.05) ), 18.4 ) );
+    res = opUnion( res, vec2( sdRhombus(  (pos-vec3(-2.0,0.25, 1.0)).xzy, 0.15, 0.25, 0.04, 0.08 ),17.0 ) );
+    res = opUnion( res, vec2( sdCappedTorus((pos-vec3( 0.0,0.30, 1.0))*vec3(1,-1,1), vec2(0.866025,-0.5), 0.25, 0.05), 25.0) );
+    res = opUnion( res, vec2( sdBoxFrame(    pos-vec3( 0.0,0.25, 0.0), vec3(0.3,0.25,0.2), 0.025 ), 16.9 ) );
+    res = opUnion( res, vec2( sdCone(        pos-vec3( 0.0,0.45,-1.0), vec2(0.6,0.8),0.45 ), 55.0 ) );
+    res = opUnion( res, vec2( sdCappedCone(  pos-vec3( 0.0,0.25,-2.0), 0.25, 0.25, 0.1 ), 13.67 ) );
+    res = opUnion( res, vec2( sdSolidAngle(  pos-vec3( 0.0,0.00,-3.0), vec2(3,4)/5.0, 0.4 ), 49.13 ) );
+    res = opUnion( res, vec2( sdTorus(      (pos-vec3( 1.0,0.30, 1.0)).xzy, vec2(0.25,0.05) ), 7.1 ) );
+    res = opUnion( res, vec2( sdBox(         pos-vec3( 1.0,0.25, 0.0), vec3(0.3,0.25,0.1) ), 3.0 ) );
+    res = opUnion( res, vec2( sdSphere(      pos-vec3( 1.0,0.2,-1.0), 0.25 ), 26.9 ) );
+    res = opUnion( res, vec2( sdCylinder(    rotZ(0.8*iTime)* (pos-vec3( 1.0,0.25,-2.0)), vec2(0.15,0.25) ), 8.0 ) );
+    res = opUnion( res, vec2( sdCapsule(     pos-vec3( 1.0,0.00,-3.0),vec3(-0.1,0.1,-0.1), vec3(0.2,0.4,0.2), 0.1  ), 31.9 ) );
+    res = opUnion( res, vec2( sdPyramid(    pos-vec3(-1.0,-0.6,-3.0), 1.0 ), 13.56 ) );
+    res = opUnion( res, vec2( sdOctahedron( pos-vec3(-1.0,0.15,-2.0) - rotY(iTime * 1.3)*vec3(-2.0,0.,0.), 0.35 ), 23.56 ) );
+    res = opUnion( res, vec2( sdTriPrism(   pos-vec3(-1.0,0.15,-1.0), vec2(0.3,0.05) ),43.5 ) );
+    res = opUnion( res, vec2( sdEllipsoid(  pos-vec3(-1.0,0.25, 0.0), vec3(0.2, 0.25, 0.05) ), 43.17 ) );
+    float jumpY = max(0.25, 0.25 + 0.25 * cos(twoPi * 2. * iTime));
+    res = opUnion( res, vec2( sdHorseshoe(  pos-vec3(-1.0, jumpY, 1.0), vec2(cos(1.3),sin(1.3)), 0.2, 0.3, vec2(0.03,0.08) ), 11.5 ) );
+    res = opUnion( res, vec2( sdOctogonPrism(pos-vec3( 2.0,0.2,-3.0), 0.2, 0.05), 51.8 ) );
+    res = opUnion( res, vec2( sdCylinder(    pos-vec3( 2.0,0.14,-2.0), vec3(0.1,-0.1,0.0), vec3(-0.2,0.35,0.1), 0.08), 31.2 ) );
+    res = opUnion( res, vec2( sdCappedCone(  pos-vec3( 2.0,0.09,-1.0), vec3(0.1,0.0,0.0), vec3(-0.2,0.40,0.1), 0.15, 0.05), 46.1 ) );
+    res = opUnion( res, vec2( sdRoundCone(   pos-vec3( 2.0,0.15, 0.0), vec3(0.1,0.0,0.0), vec3(-0.1,0.35,0.1), 0.15, 0.05), 51.7 ) );
+    res = opUnion( res, vec2( sdRoundCone(   pos-vec3( 2.0,0.20, 1.0), 0.2, 0.1, 0.3 ), 37.0 ) );
 
     return res;
 }

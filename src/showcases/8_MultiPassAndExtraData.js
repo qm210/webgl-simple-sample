@@ -244,7 +244,7 @@ function render(gl, state) {
         console.time("readPixels()");
         gl.bindFramebuffer(gl.READ_FRAMEBUFFER, read.fbo);
         gl.readBuffer(state.extraData.attachment);
-        gl.readPixels(0, 0, ...state.resolution, state.extraData.dataFormat, state.extraData.dataType, state.extraData.readData);
+        gl.reading(0, 0, ...state.resolution, state.extraData.dataFormat, state.extraData.dataType, state.extraData.readData);
         state.extraData.readAtTime = state.time;
         console.timeEnd("readPixels()");
         console.info(

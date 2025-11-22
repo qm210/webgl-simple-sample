@@ -57,6 +57,7 @@ function updateFromBundle(json, state, elements) {
         }
         input.value = uniform.value;
     }
+    console.info("Updated from", json, state, elements);
 }
 
 export function createClipboardButtons(elements, state) {
@@ -70,7 +71,7 @@ export function createClipboardButtons(elements, state) {
             await navigator.clipboard.writeText(
                 JSON.stringify(json, null, 4)
             );
-            console.log("Copied to Clipboard", json);
+            console.info("Copied to Clipboard", json);
             copyButton.textContent = "✔ copied";
         } catch (error) {
             console.error(error);
@@ -118,7 +119,14 @@ function queryOption(selector, value) {
     );
 }
 
+const weHasPresets =
+    new URLSearchParams(window.location.search).has("presets");
+
 export function createPresetSelector(elements, state) {
+    if (!weHasPresets) {
+        return [];
+    }
+
     const selector = document.createElement("select");
     addOption(selector, "Loading Presets...");
     selector.disabled = true;

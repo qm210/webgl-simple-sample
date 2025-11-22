@@ -1,7 +1,12 @@
 import {startRenderLoop} from "../webgl/render.js";
 import {initBasicState} from "./common.js";
 import fragmentShaderSource from "../shaders/specific/nr4_clouds.glsl";
-import {createPingPongFramebuffersWithTexture, updateResolutionInState} from "../webgl/helpers.js";
+import {
+    clearFramebuffers,
+    createPingPongFramebuffersWithTexture,
+    evaluateReadData,
+    updateResolutionInState
+} from "../webgl/helpers.js";
 
 export default {
     title: "NR4's Clouds",
@@ -78,7 +83,7 @@ export default {
                     return `${millis} ms`;
                 },
                 onClick: async () => {
-                    const nanos = await gl.extTimer.executeWithQuery(() =>
+                    const nanos = await gl.timer.executeWithQuery(() =>
                         render(gl, state)
                     );
                     const comparison = !state.lastQueryNanos ? [] :
@@ -307,7 +312,7 @@ function render(gl, state) {
         gl.drawArrays(gl.TRIANGLES, 0, 6);
         gl.bindFramebuffer(gl.READ_FRAMEBUFFER, write.fbo);
         gl.readBuffer(gl.COLOR_ATTACHMENT0);
-        gl.readPixels(0, 0, write.width, write.height, gl.RGBA, gl.FLOAT, state.framebuffer.readData);
+        gl.reading(0, 0, write.width, write.height, gl.RGBA, gl.FLOAT, state.framebuffer.readData);
         evaluateReadData(state.framebuffer.readData)
             .then(result => console.log("Read Data", result));
 
@@ -324,39 +329,4 @@ function render(gl, state) {
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.bindTexture(gl.TEXTURE_2D, read.texture);
     gl.drawArrays(gl.TRIANGLES, 0, 6);
-}
-
-function clearFramebuffers(gl, state) {
-    state.framebuffer.fb.forEach(fb => {
-        gl.bindFramebuffer(gl.FRAMEBUFFER, fb.fbo);
-        gl.viewport(0, 0, fb.width, fb.height);
-        gl.clearColor(0, 0, 0, 0);
-        gl.clear(gl.COLOR_BUFFER_BIT);
-    });
-    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-}
-
-async function evaluateReadData(buffer) {
-    const rgba = value => [value, value, value, value];
-    let min = rgba(Infinity);
-    let max = rgba(-Infinity);
-    let avg = rgba(0);
-    const pixels = buffer.length / 4;
-    for (let i = 0; i < buffer.length; i += 4) {
-        for (let c = 0; c < 4; c++) {
-            const value = buffer[i + c];
-            if (value < min[c]) {
-                min[c] = value;
-            }
-            if (value > max[c]) {
-                max[c] = value;
-            }
-            avg[c] += value / pixels;
-        }
-    }
-    const span = rgba(0);
-    for (let c = 0; c < 4; c++) {
-        span[c] = max[c] - min[c];
-    }
-    return {min, max, avg, span};
 }

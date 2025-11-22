@@ -51,8 +51,8 @@ export function analyzeShader(source, errorLog, shaderKey) {
         const fullOriginal = diff.value;
         const [preVisibleComment, visibleComment] = fullOriginal.split("///");
         const [preHiddenComment, hiddenComment] = preVisibleComment.split("//");
-        const original = [preHiddenComment, visibleComment]
-            .filter(o => o).join("///");
+        const original = preHiddenComment
+            + (visibleComment ? ("///" + visibleComment) : "");
         const code = {
             original,
             trimmed: original.trim(),

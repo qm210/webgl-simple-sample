@@ -1,0 +1,37 @@
+
+export function loadExtensions(gl, extensions) {
+    for (const extension of extensions) {
+        const ext = gl.getExtension(extension);
+        if (!ext) {
+            console.warn("Extension not available:", extension);
+        }
+        gl.ext[extension] = ext;
+
+        if (extension === "EXT_disjoint_timer_query_webgl2" && ext) {
+            enrichWithTimerHelpers(gl, ext);
+        }
+    }
+}
+
+function enrichWithTimerHelpers(gl, ext) {
+    gl.timer.ELAPSED = ext.TIME_ELAPSED_EXT;
+    gl.timer.DISJOINT = ext.GPU_DISJOINT_EXT;
+    gl.timer.query = gl.createQuery();
+    gl.timer.executeWithQuery = async (func) => {
+        gl.beginQuery(gl.timer.ELAPSED, gl.timer.query);
+        func();
+        gl.endQuery(gl.timer.ELAPSED);
+        return evaluateQuery(gl.timer.query, gl);
+    };
+}
+
+async function evaluateQuery(query, gl) {
+    while (true) {
+        const available = gl.getQueryParameter(query, gl.QUERY_RESULT_AVAILABLE);
+        const disjoint = gl.getParameter(gl.timer.DISJOINT);
+        if (available && !disjoint) {
+            return gl.getQueryParameter(query, gl.QUERY_RESULT);
+        }
+        await new Promise(requestAnimationFrame);
+    }
+}

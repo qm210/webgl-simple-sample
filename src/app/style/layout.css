@@ -224,9 +224,3 @@ button.render-button {
     text-align: center;
     gap: 0;
 }
-
-.fps {
-    font-size: smaller;
-    font-weight: bold;
-    opacity: 0.6;
-}
