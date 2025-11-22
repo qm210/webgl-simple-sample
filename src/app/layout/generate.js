@@ -184,6 +184,7 @@ export const addControlsToPage = (elements, state, controls, autoRenderOnLoad) =
         if (document.activeElement !== document.body) {
             return;
         }
+        let preventBrowserBehaviour = true;
         // cf. render.js for how the state variables work
         switch (event.key) {
             case "Backspace":
@@ -209,8 +210,16 @@ export const addControlsToPage = (elements, state, controls, autoRenderOnLoad) =
             case "ArrowDown":
                 shiftTime(state, -0.05);
                 break;
-            default:
+            case "u":
+                openUniformInputHelper();
                 break;
+            default:
+                preventBrowserBehaviour = false;
+                break;
+        }
+        if (preventBrowserBehaviour) {
+            event.preventDefault();
+            event.stopPropagation();
         }
     });
 };
@@ -312,4 +321,65 @@ function addDisplayControls(elements, state, glContext) {
         const currentFactor = JSON.parse(localStorage.getItem(PAGE_FONT.storageKey) ?? "1");
         document.documentElement.style.setProperty(PAGE_FONT.cssProperty, currentFactor);
     }
+}
+
+/**
+ * openUniformInputHelper() is just for developing when adding new uniforms to a shader.
+ * The output is given in the Browser Console and consists of
+ * - the declaration line in GLSL
+ * - the gl.uniform...() call for our render(...) function
+ * - the object for the uniforms array in generateControls(...) for the slider
+ */
+function openUniformInputHelper() {
+    const inputString = window.prompt(
+        "Enter for new Uniform (whitespace-separated, i.e. vectors as [0,1] without spaces):\n" +
+        "<type> <name> <defaultValue> [<min> <max>]\n\n" +
+        "(then check output in Console)"
+    );
+    if (!inputString) {
+        return;
+    }
+    const glUniformSuffix = {
+        "float": "1f",
+        "int": "1i",
+        "bool": "1i",
+        "vec2": "2fv",
+        "vec3": "3fv",
+        "vec4": "4fv",
+        "ivec2": "2iv",
+        "ivec3": "3iv",
+        "ivec4": "4iv",
+    };
+    const knownTypes = Object.keys(glUniformSuffix);
+    let type, name, defaultValue, min, max;
+    const parts = inputString
+        .split(/\s+/)
+        .map(part =>
+            part.replaceAll(",", ", ")
+        );
+    if (knownTypes.includes(parts[0])) {
+        [type, name, defaultValue, min, max] = parts;
+    } else {
+        type = "float";
+        [name, defaultValue, min, max] = parts;
+    }
+    const glslDeclaration =
+        `uniform ${type} ${name};`;
+    const glUniformCall =
+        `gl.uniform${glUniformSuffix[type]}(state.location.${name}, state.${name});`;
+    let inputControl =
+        `        }, {
+            type: "${type}",
+            name: "${name}",
+            defaultValue: ${defaultValue ?? 0},`;
+    if (min !== undefined) {
+        inputControl += `\n            min: ${min},`;
+    }
+    if (max !== undefined) {
+        inputControl += `\n            max: ${max},`;
+    }
+
+    console.info(glslDeclaration);
+    console.info(glUniformCall);
+    console.info(inputControl);
 }

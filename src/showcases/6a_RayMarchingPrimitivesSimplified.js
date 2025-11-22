@@ -12,18 +12,6 @@ export default {
             return state;
         }
 
-        // state.location.iFocalLength = gl.getUniformLocation(state.program, "iFocalLength");
-        state.location.iFree0 = gl.getUniformLocation(state.program, "iFree0");
-        state.location.iFree1 = gl.getUniformLocation(state.program, "iFree1");
-        state.location.iFree2 = gl.getUniformLocation(state.program, "iFree2");
-        state.location.iFree3 = gl.getUniformLocation(state.program, "iFree3");
-        state.location.iFree4 = gl.getUniformLocation(state.program, "iFree4");
-        state.location.iFree5 = gl.getUniformLocation(state.program, "iFree5");
-        state.location.iFree6 = gl.getUniformLocation(state.program, "iFree6");
-        state.location.iFree7 = gl.getUniformLocation(state.program, "iFree7");
-        state.location.iFree8 = gl.getUniformLocation(state.program, "iFree8");
-        state.location.iFree9 = gl.getUniformLocation(state.program, "iFree9");
-
         return state;
     },
     generateControls: (gl, state, elements) => ({
@@ -38,17 +26,66 @@ export default {
             type: "label",
             name: "iTime",
         }, {
-        //     type: "float",
-        //     name: "iFocalLength",
-        //     defaultValue: 2.5,
-        //     min: 0.001,
-        //     max: 20,
-        // }, {
             type: "float",
-            name: "iFree0",
-            defaultValue: 0,
+            name: "iFocalLength",
+            defaultValue: 2.5,
+            min: 0.001,
+            max: 20,
+        }, {
+            type: "vec3",
+            name: "iCameraTargetOffset",
+            defaultValue: [0, 0, 0],
             min: -9.99,
             max: +9.99,
+        }, {
+            type: "float",
+            name: "iCameraCenterDistance",
+            defaultValue: 4.5,
+            min: 0.01,
+            max: 10,
+        }, {
+            type: "float",
+            name: "iCameraHeight",
+            defaultValue: 2.1,
+            min: 0.01,
+            max: 10,
+        }, {
+            type: "float",
+            name: "iCameraRotationFrequency",
+            defaultValue: 0.02,
+            min: 0,
+            max: 1,
+        }, {
+            type: "float",
+            name: "iCameraRotationAngle",
+            defaultValue: 0,
+            min: 0,
+            max: 6.283,
+        }, {
+            type: "vec3",
+            name: "vecDirectionalLight",
+            defaultValue: [-0.4, 0.8, -0.4],
+            min: -1,
+            max: 1,
+            normalize: true
+        }, {
+            type: "float",
+            name: "iDiffuseAmount",
+            defaultValue: 2.2,
+            min: 0,
+            max: 20,
+        }, {
+            type: "float",
+            name: "iSpecularAmount",
+            defaultValue: 1.0,
+            min: 0,
+            max: 20,
+        }, {
+            type: "float",
+            name: "iSpecularExponent",
+            defaultValue: 20,
+            min: 0.01,
+            max: 100,
         }, {
             type: "float",
             name: "iFree1",
@@ -112,7 +149,17 @@ function render(gl, state) {
     gl.uniform2fv(state.location.iResolution, state.resolution);
     gl.uniform4fv(state.location.iMouse, state.iMouse);
 
-    // gl.uniform1f(state.location.iFocalLength, state.iFocalLength);
+    gl.uniform1f(state.location.iFocalLength, state.iFocalLength);
+    gl.uniform3fv(state.location.iCameraTargetOffset, state.iCameraTargetOffset);
+    gl.uniform1f(state.location.iCameraCenterDistance, state.iCameraCenterDistance);
+    gl.uniform1f(state.location.iCameraHeight, state.iCameraHeight);
+    gl.uniform1f(state.location.iCameraRotationFrequency, state.iCameraRotationFrequency);
+    gl.uniform1f(state.location.iCameraRotationAngle, state.iCameraRotationAngle);
+    gl.uniform3fv(state.location.vecDirectionalLight, state.vecDirectionalLight);
+
+    gl.uniform1f(state.location.iDiffuseAmount, state.iDiffuseAmount);
+    gl.uniform1f(state.location.iSpecularAmount, state.iSpecularAmount);
+    gl.uniform1f(state.location.iSpecularExponent, state.iSpecularExponent);
 
     gl.uniform1f(state.location.iFree0, state.iFree0);
     gl.uniform1f(state.location.iFree1, state.iFree1);

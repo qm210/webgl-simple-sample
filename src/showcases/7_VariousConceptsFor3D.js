@@ -110,6 +110,12 @@ function render(gl, state) {
     gl.uniform1f(state.location.iAmbientOcclusionScale, state.iAmbientOcclusionScale);
     gl.uniform1f(state.location.iAmbientOcclusionStep, state.iAmbientOcclusionStep);
     gl.uniform1f(state.location.iAmbientOcclusionSamples, state.iAmbientOcclusionSamples);
+
+    gl.uniform1i(state.location.doUseCameraPath, state.doUseCameraPath);
+    gl.uniform1i(state.location.doShowCameraPathPoints, state.doShowCameraPathPoints);
+    gl.uniform1i(state.location.doUseCameraTargetPath, state.doUseCameraTargetPath);
+    gl.uniform1i(state.location.doShowPointLightSource, state.doShowPointLightSource);
+
     gl.uniform1f(state.location.iToneMapExposure, state.iToneMapExposure);
     gl.uniform1f(state.location.iToneCompressedGain, state.iToneCompressedGain);
     gl.uniform1f(state.location.iGammaExponent, state.iGammaExponent);
@@ -175,6 +181,18 @@ function defineUniformControlsBelow() {
         min: -2,
         max: 2,
     }, {
+        type: "bool",
+        name: "doUseCameraPath",
+        defaultValue: true,
+    }, {
+        type: "bool",
+        name: "doShowCameraPathPoints",
+        defaultValue: true,
+    }, {
+        type: "bool",
+        name: "doUseCameraTargetPath",
+        defaultValue: false,
+    }, {
         type: "float",
         name: "iPathSpeed",
         defaultValue: 0,
@@ -185,19 +203,23 @@ function defineUniformControlsBelow() {
         name: "iPathOffset",
         defaultValue: 0,
         min: 0.,
-        max: 12.,
+        max: 14.,
     }, {
         type: "float",
         name: "iLightSourceMix",
-        defaultValue: 0,
-        min: -2,
-        max: 3,
+        defaultValue: 0.3,
+        min: 0,
+        max: 1,
     }, {
         type: "float",
         name: "iLightPointPaletteColor",
         defaultValue: 0,
         min: 0.,
         max: 10.,
+    }, {
+        type: "bool",
+        name: "doShowPointLightSource",
+        defaultValue: true,
     }, {
         type: "float",
         name: "iDiffuseAmount",

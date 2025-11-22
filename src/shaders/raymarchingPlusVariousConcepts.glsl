@@ -38,6 +38,11 @@ uniform float iNoiseOffset;
 uniform int iFractionSteps;
 uniform float iFractionScale;
 uniform float iFractionAmplitude;
+// toggle options
+uniform bool doShowPointLightSource;
+uniform bool doUseCameraPath;
+uniform bool doShowCameraPathPoints;
+uniform bool doUseCameraTargetPath; // try it :)
 // and for you to play around with:
 uniform float iFree0;
 uniform float iFree1;
@@ -63,24 +68,23 @@ const float MATERIAL_PYRAMID = 13.0;
 const float MATERIAL_MOUNTAINS = 2.0;
 const float MATERIAL_PATH_POINT = 1.4;
 
-// SHADER OPTIONS ////////
+// global shader options
 const bool DRAW_GRID_ON_FLOOR = true;
-const bool SHOW_POINT_LIGHT_SOURCE = true;
-const bool USE_AUTOMATED_CAMERA_PATH = true;
-const bool USE_AUTOMATED_CAMERA_TARGET_PATH = false; // try it :)
 /////////////////////////
 
-const int nPath = 6;
-vec3 camPosPath[nPath] = vec3[6](
+const int nPath = 7;
+vec3 camPosPath[nPath] = vec3[nPath](
     vec3(-0.75, 1.5, 3.),
-    vec3(0.4, 0.35, 1.25),
+    vec3(-0., 1.0, 1.8),
+    vec3(0.5, 0.25, 1.25),
     vec3(-0.3, 0.7, -3.3),
     vec3(-2.3,0.73, -1.3),
-    vec3(1.5, 0.4, -3.0),
-    vec3(0.1, 0.8, 0.1)
+    vec3(1.7, 0.4, -3.0),
+    vec3(1.5, 0.8, 2.1)
 );
 
-vec4 targetPath[nPath] = vec4[6](
+vec4 targetPath[nPath] = vec4[nPath](
+    vec4(-0.3, 0.35, 1.05, 0.),
     vec4(-0.3, 0.35, 1.05, 0.),
     vec4(-0.3, 0.65, -3.3, -.2),
     vec4(-2.,0.73, -1.3, 2.),
@@ -479,11 +483,11 @@ MarchHit map( in vec3 pos )
     );
 
     // render the path points for debugging
-    if (USE_AUTOMATED_CAMERA_PATH)
+    if (doShowCameraPathPoints)
     for (int p = 0; p < nPath; p++) {
         res = takeCloser(res,
             MarchHit(
-                sdSphere(pos - camPosPath[p].xyz, 0.03),
+                sdSphere(pos - camPosPath[p].xyz, 0.015 - 0.005 * cos(12. * iTime)),
                 MATERIAL_PATH_POINT,
                 vec2(float(p), 0.) // <-- Zweckentfremdung von texCoord für Unterscheidung :)
             )
@@ -696,7 +700,10 @@ void render(in vec3 rayOrigin, in vec3 rayDir)
     }
     else if (res.material == MATERIAL_PATH_POINT) {
         // einfache Visualisierung von Punkten im Raum (z.B: unserer Kamerapfad, falls aktiv)
-        col = vec3(0., res.texCoord.x * 0.2, 1. - res.texCoord.x * 0.2);
+        // hier haben wir res.texCoord.x zweckentfremdet, um die Pfadpunkte durchzunummerieren
+        float partOfPath = res.texCoord.x/float(nPath - 1);
+        // partOfPath geht also von 0.0 = erster Punkt bis 1.0 = letzter Punkt.
+        col = vec3(0., partOfPath, 1. - partOfPath);
         specularCoeff = 0.1;
     }
     else if (isFloor || res.material == MATERIAL_MOUNTAINS)
@@ -749,7 +756,7 @@ void render(in vec3 rayOrigin, in vec3 rayDir)
             // aber immer noch aufpassen mit dem Vorzeichen: Richtung ZUM Licht!
             lightDirection = normalize(vecDirectionalLight);
             lightSourceColor = vec3(1.30, 1.00, 0.70);
-            // iLightSourceMix ist wie ein mix() zwischen den beiden Quellen gedacht.
+            // iLightSourceMix vermittelt ähnlich einem mix() zwischen den beiden Quellen.
             lightSourceColor *= max(0., 1. - iLightSourceMix);
         }
         else {
@@ -758,16 +765,16 @@ void render(in vec3 rayOrigin, in vec3 rayDir)
             // Punktlicht: Richtung unterschiedlich je nach Strahl, es geht um die Differenz:
             lightDirection = normalize(lightPointSource - rayDir);
             lightSourceColor = mix(c.xxx, materialPalette(14.5 + iLightPointPaletteColor), 0.7);
-            // iLightSourceMix ist wie ein mix() zwischen den beiden Quellen gedacht. (s.o.)
+            // iLightSourceMix vermittelt ähnlich einem mix() zwischen den beiden Quellen. (s.o.)
             lightSourceColor *= max(0., iLightSourceMix);
 
             // um die Punktquelle SELBST zu sehen, müssen wir sie aber extra zeichnen
-            if (SHOW_POINT_LIGHT_SOURCE) {
+            if (doShowPointLightSource) {
                 // einfache Logik: wenn unsere Blickrichtung direkt überlappt, färben wir fragColor ein.
                 // -> ergibt dann einen improvisierten Kreis. Reicht.
                 vec3 rayDirectionIntoTheLight = normalize(lightPointSource - rayOrigin);
                 float overlap = dot(rayDir, rayDirectionIntoTheLight);
-                if (overlap > 0.99999) {
+                if (overlap > 0.99995) {
                     fragColor = vec4(lightSourceColor, 1.);
                     return;
                 }
@@ -896,29 +903,30 @@ void main()
     vec3 camOrigin = vec3(-0.75, 1.5, 3.);
     // mit fester Blick_richtung_ (im Gegensatz zu festem Blick-Zielpunkt)
     // (je nachdem eben, ob relativ zu Kameraposition oder unabhängig)
-    vec3 camTarget = camOrigin + vec3(0.27, -0.32, -0.84);
-    float camRoll = iCamRoll;
+    vec3 camTarget = camOrigin + vec3(1.2, -1.2, -3.5);
+    float camRoll = 0.;
 
     // Demonstration: Automatisierten Pfad ablaufen (per Spline-Interpolation)
-    vec3 pathPos;
-    if (USE_AUTOMATED_CAMERA_PATH) {
-        pathPos = getPathPosition(iPathOffset + iPathSpeed * iTime);
+    if (doUseCameraPath) {
+        vec3 pathPos = getPathPosition(iPathOffset + iPathSpeed * iTime);
         camOrigin = pathPos.xyz;
-        if (USE_AUTOMATED_CAMERA_TARGET_PATH) {
-            // dann Blickpunkt mit weiterem Pfad angeben...
-            // (+ hier noch im sonst ungenutzten .w den Rollwinkel animiert)
-            vec4 pathTarget = getTargetPathAndRoll(iPathOffset + iPathSpeed * iTime);
-            camTarget = pathTarget.xyz;
-            camRoll = pathTarget.w;
-        } else {
-            // ... oder halt die Kamera auf auf etwas weiter vorne im Pfad richten:
-            pathPos = getPathPosition(iPathOffset + iPathSpeed * iTime + 0.5);
-            camTarget = pathPos.xyz;
-        }
+        // Wohin blicken? Entweder auf einen Punkt etwas weiter im Pfad... (*)
+        camTarget = getPathPosition(iPathOffset + iPathSpeed * iTime + 0.5);
     }
+    if (doUseCameraTargetPath) {
+        // (*) oder einen komplett eigenen Pfad dafür verwenden
+        // (hier vec4, um noch zusätzlich als Komponente .w den Rollwinkel zu animieren)
+        vec4 pathTarget = getTargetPathAndRoll(iPathOffset + iPathSpeed * iTime);
+        camTarget = pathTarget.xyz;
+        camRoll = pathTarget.w;
+    }
+
     // iCamLookOffset: bewegt angeblickten _Punkt_ frei, ist deswegen
-    // aber etwas anderes Verhalten als die Blickrichtung frei zu drehen.
+    // aber etwas anderes Verhalten als "die Blickrichtung frei zu drehen".
+    // Letzteres ist nämlich kein einfach beschreibenes Problem.
+    // ("Eulerwinkel", "Gimbal Lock", "Quaternionen" etc.)
     camTarget += iCamLookOffset;
+    camRoll += iCamRoll;
 
     // camera-to-world transformation
     mat3 camMatrix = setCamera(camOrigin, camTarget, camRoll);

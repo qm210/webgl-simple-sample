@@ -68,6 +68,9 @@ export function createInputElements(state, control) {
             state[control.name] = [...control.defaultValue];
         }
     }
+    if (control.type === "bool") {
+        console.log("was geht hier vor sich?", control.name, control.type, state[control.name]);
+    }
 
     if (control.hidden) {
         return;
@@ -95,6 +98,8 @@ export function createInputElements(state, control) {
             return asVecInput(4, input, state, control);
         case "cursorInput":
             return asCursorInput(input, state, control);
+        case "bool":
+            return asBoolInput(input, state, control);
         default:
             console.warn("Control type has no elements definition (yet)", control);
             return undefined;
@@ -142,10 +147,8 @@ const createInputControlElements = (control) => {
 
 export const asFloatInput = (elements, state, control) => {
     control.defaultValue ??= control.log ? 1 : 0;
-
     elements.reset.textContent = `reset: ${control.defaultValue}`;
     asSlider(elements.control, control);
-
     updateSlider(elements, state, control, true);
 
     elements.control.addEventListener("input", event => {
@@ -262,9 +265,6 @@ export const asVecInput = (dim, elements, state, control) => {
     }
     if (control.sameStep) {
         control.step = toVec(dim, control.step);
-    }
-    if (!(control.defaultValue instanceof Array)) {
-        control.defaultValue = toVec(dim, control.defaultValue);
     }
 
     const sliders = [];
@@ -417,6 +417,34 @@ function updateVecLabel(labelElement, state, control) {
     }
     labelElement.textContent = `= (${value})`;
 }
+
+export const asBoolInput = (elements, state, control) => {
+    control.defaultValue ??= false;
+    elements.reset.textContent = `reset: ${control.defaultValue}`;
+    elements.control.type = "checkbox";
+    elements.control.checked = control.defaultValue;
+    update();
+
+    elements.control.addEventListener("change", event => {
+        update(event.target.checked);
+    });
+
+    elements.reset.addEventListener("click", () => {
+        update(control.defaultValue);
+    });
+
+    return elements;
+
+    function update(value = undefined) {
+        if (value !== undefined) {
+            state[control.name] = value;
+            sessionStoreControlState(state, control);
+        } else {
+            value = !!state[control.name];
+        }
+        elements.value.textContent = `= ${value}`;
+    }
+};
 
 export function createResetAllButton(elements, state, controls) {
     const button = createSmallButton("Reset All", "right-align");

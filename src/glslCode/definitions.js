@@ -11,7 +11,7 @@ export const REGEX = {
     DEFINE_DIRECTIVE:
         /^\s*#define\s*(?<name>\w*)(?<args>\(.*?\))?\s*(?<value>.*)\s*$/mg,
     SHADER_VARIABLE:
-        /^\b(layout\s*\(location\s*=\s*(?<location>\d+)\)\s*)?(?<keyword>out|uniform|varying|attribute)\s*(?<type>\w+)\s*(?<name>\w*);$/mg,
+        /^\b(layout\s*\(location\s*=\s*(?<location>\d+)\)\s*)?(?<keyword>out|uniform|varying|attribute)\s*(?<type>\w+)\s*(?<name>\w*);/mg,
     CONSTANT:
         /\bconst\s*(?<type>float|u?int|bool|[iu]?vec[2-4]|mat[2-4])\s*(?<name>\w*)\s*=\s*(?<value>\S*);/g,
     FUNCTION:

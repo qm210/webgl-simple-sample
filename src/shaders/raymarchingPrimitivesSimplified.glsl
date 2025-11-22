@@ -13,7 +13,16 @@ out vec4 fragColor;
 uniform vec2 iResolution;
 uniform float iTime;
 uniform vec4 iMouse;
-// uniform float iFocalLength;
+uniform float iFocalLength;
+uniform vec3 iCameraTargetOffset;
+uniform float iCameraCenterDistance;
+uniform float iCameraHeight;
+uniform float iCameraRotationAngle;
+uniform float iCameraRotationFrequency;
+uniform vec3 vecDirectionalLight;
+uniform float iDiffuseAmount;
+uniform float iSpecularAmount;
+uniform float iSpecularExponent;
 // for you to play around with, put 'em wherever you want:
 uniform float iFree0;
 uniform float iFree1;
@@ -393,7 +402,11 @@ vec2 map( in vec3 pos )
 {
     vec2 res = vec2( pos.y, 0.0 );
 
-    // Anmerkung: Anstatt der bounding boxes KÖNNTE man hier alles berechnen und jeweils opUnion() nehmen
+    // Anmerkung: Größere Szenen sollten mithilfe solcher Bounding Boxes unterteilt werden:
+
+
+
+    // Anstatt der bounding boxes KÖNNTE man hier alles berechnen und jeweils opUnion() nehmen
     // das ist aber offensichtlich viel aufwändiger und, wenn man das Ergebnis kennt, evtl. verschwendet.
 
     // bounding box
@@ -430,7 +443,8 @@ vec2 map( in vec3 pos )
         res = opUnion( res, vec2( sdOctahedron( pos-vec3(-1.0,0.15,-2.0) - rotY(iTime * 1.3)*vec3(-2.0,0.,0.), 0.35 ), 23.56 ) );
         res = opUnion( res, vec2( sdTriPrism(   pos-vec3(-1.0,0.15,-1.0), vec2(0.3,0.05) ),43.5 ) );
         res = opUnion( res, vec2( sdEllipsoid(  pos-vec3(-1.0,0.25, 0.0), vec3(0.2, 0.25, 0.05) ), 43.17 ) );
-        res = opUnion( res, vec2( sdHorseshoe(  pos-vec3(-1.0,0.25 + 0.25 * cos(twoPi * 2. * iTime), 1.0), vec2(cos(1.3),sin(1.3)), 0.2, 0.3, vec2(0.03,0.08) ), 11.5 ) );
+        float jumpY = max(0.25, 0.25 + 0.25 * cos(twoPi * 2. * iTime));
+        res = opUnion( res, vec2( sdHorseshoe(  pos-vec3(-1.0, jumpY, 1.0), vec2(cos(1.3),sin(1.3)), 0.2, 0.3, vec2(0.03,0.08) ), 11.5 ) );
     }
 
     // bounding box
@@ -440,7 +454,7 @@ vec2 map( in vec3 pos )
         res = opUnion( res, vec2( sdCylinder(    pos-vec3( 2.0,0.14,-2.0), vec3(0.1,-0.1,0.0), vec3(-0.2,0.35,0.1), 0.08), 31.2 ) );
         res = opUnion( res, vec2( sdCappedCone(  pos-vec3( 2.0,0.09,-1.0), vec3(0.1,0.0,0.0), vec3(-0.2,0.40,0.1), 0.15, 0.05), 46.1 ) );
         res = opUnion( res, vec2( sdRoundCone(   pos-vec3( 2.0,0.15, 0.0), vec3(0.1,0.0,0.0), vec3(-0.1,0.35,0.1), 0.15, 0.05), 51.7 ) );
-        res = opUnion( res, vec2( sdRoundCone(   pos-vec3( 2.0,0.20, 1.0), 0.2, 0.1, 0.3 ), 37.0 ) );
+        res = opUnion( res, vec2( sdRoundCone(   rotX(0.5 * pi * sin(iTime))*(pos-vec3( 2.0,0.20, 1.0)), 0.2, 0.1, 0.3 ), 37.0 ) );
     }
 
     return res;
@@ -601,7 +615,7 @@ vec3 render(in vec3 rayOrigin, in vec3 rayDir)
     {
         // material
         col = 0.2 + 0.2*sin( res.material*2.0 + vec3(0.0,1.0,2.0) );
-        float specularCoeff = 1.0;
+        float specularCoeff = 0.4 + 0.5 *exp(0.03 * res.material);
         bool isFloor = res.material < 1.5;
 
         // ray evaluation
@@ -619,16 +633,16 @@ vec3 render(in vec3 rayOrigin, in vec3 rayDir)
 
         // Licht: reines Richtungslicht (passt zu einer Sonne, die weit weg ist, im Gegensatz zu Punktlicht)
         {
-            vec3  lightDirection = normalize( vec3(-0.2 + iFree3, 0.4 + iFree4, -0.2 + iFree5) ); // Vorsicht, Vorzeichenkonvention
+            vec3  lightDirection = normalize( vecDirectionalLight ); // Vorsicht, Vorzeichenkonvention
             vec3  halfway = normalize(lightDirection - rayDir); // was ist das, geometrisch?
             float diffuse = clamp( dot(normal, lightDirection), 0.0, 1.0); // dot(normal, lightSource) <-- diffus (warum?)
             diffuse *= calcSoftshadow(rayPos, lightDirection, 0.02, 2.5); // warum hier *= ...?
-            float specular = pow( clamp( dot( normal, halfway ), 0.0, 1.0), 20.0); // <-- glänzend (warum?)
-            // float fresnelAttenuation = 0.04 + 0.36*pow(clamp(1.0-dot(halfway,lightDirection), 0.0, 1.0), 5.0);
-            // specular *= fresnelAttenuation;
+
+            float specular = pow( clamp( dot( normal, halfway ), 0.0, 1.0), iSpecularExponent); // <-- glänzend (warum?)
+
             const vec3 sourceCol = vec3(1.30,1.00,0.70);
-            shade += col * 2.20 * sourceCol * diffuse;
-            shade +=       3.00 * sourceCol * specular * specularCoeff;
+            shade += col * iDiffuseAmount * sourceCol * diffuse;
+            shade +=       iSpecularAmount * sourceCol * specular * specularCoeff;
         }
 
         col = shade;
@@ -654,17 +668,19 @@ mat3 setCamera( in vec3 origin, in vec3 target, float rollAngle )
 void main()
 {
     vec2 uv = (2.0 * gl_FragCoord.xy - iResolution.xy) / iResolution.y;
-    vec2 mo = iMouse.zw / iResolution.y;
-    float rot = mo.x == 0. ? 0.02 * iTime : mo.x;
 
     // camera
-    vec3 cameraTarget = vec3( 0.25 + iFree0, -0.75 + iFree1, -0.75 + iFree2);
-    vec3 rayOrigin = cameraTarget + vec3( 4.5 * cos(twoPi * rot), 1.2, 4.5 * sin(-twoPi * rot));
+    vec3 cameraTarget = vec3(0.25, -0.25, -0.75) + iCameraTargetOffset;
+    float rot = iCameraRotationFrequency * iTime + iCameraRotationAngle;
+    vec3 rayOrigin = cameraTarget + vec3(
+        iCameraCenterDistance * cos(twoPi * rot),
+        iCameraHeight,
+        iCameraCenterDistance * sin(-twoPi * rot)
+    );
     // camera-to-world transformation
     mat3 ca = setCamera( rayOrigin, cameraTarget, 0.0 );
     // ray direction
-    const float focalLength = 2.5;
-    vec3 rayDirection = ca * normalize( vec3(uv, focalLength) );
+    vec3 rayDirection = ca * normalize( vec3(uv, iFocalLength) );
 
     // render
     vec3 col = render( rayOrigin, rayDirection);
