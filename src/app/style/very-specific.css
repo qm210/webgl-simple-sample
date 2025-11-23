@@ -26,9 +26,13 @@
 }
 
 .bool-description {
-    grid-column: span 3;
+    grid-column: span 2;
     white-space: pre-line;
     overflow-wrap: break-word;
     font-size: small;
     font-family: sans-serif;
+}
+
+.bool-description.extra-column {
+    grid-column: span 3;
 }

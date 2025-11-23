@@ -182,6 +182,8 @@ export const addControlsToPage = (elements, state, controls, autoRenderOnLoad) =
             elements.controls.appendChild(input.min);
             elements.controls.appendChild(input.control);
             elements.controls.appendChild(input.max);
+        }
+        if (input.control.type !== "radio" || control.defaultValue === true) {
             elements.controls.appendChild(input.reset);
         }
         elements.uniforms[control.name] = input;

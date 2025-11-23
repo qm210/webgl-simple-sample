@@ -6,13 +6,14 @@ out vec4 fragColor;
 uniform vec2 iResolution;
 uniform float iTime;
 uniform float iSaturationOrChroma;
-uniform float iValueOrLightnessOrPerceptualBrightness;
+uniform float iLightnessEquivalent;
 uniform vec3 palA;
 uniform vec3 palB;
 uniform vec3 palC;
 uniform vec3 palD;
 uniform float iGamma;
 uniform float iToneMapping;
+uniform float iToneExposure;
 uniform bool demoHsvHsl;
 uniform bool demoHsvOklch;
 uniform bool demoCosinePalette;
@@ -22,6 +23,8 @@ vec4 c = vec4(1., 0., -1., .5);
 const float pi = 3.141592;
 const float twoPi = 2. * pi;
 const float eps = 1.e-7;
+
+/// --> conversion methods between color models
 
 vec3 hsl2rgb(in vec3 col) {
     vec3 rgb = clamp( abs(mod(col.x*6.0+vec3(0.0,4.0,2.0),6.0)-3.0)-1.0, 0.0, 1.0 );
@@ -106,7 +109,6 @@ vec3 oklch2oklab(vec3 lch) {
     return vec3(lch.x, lch.y * vec2(cos(lch.z), sin(lch.z)));
 }
 
-// Abkürzungen
 vec3 rgb2oklab(vec3 rgb) {
     return xyz2oklab(rgb2xyz_srgb(rgb));
 }
@@ -121,10 +123,98 @@ vec3 oklch2rgb(vec3 lch) {
     return xyz2rgb_srgb(oklab2xyz(oklch2oklab(lch)));
 }
 
-float sdCircle( in vec2 p, in float r )
-{
-    return length(p)-r;
+mat3 m11 = mat3(
+    .41,.54,.05,
+    .21,.68,.11,
+    .09,.28,.63
+);
+
+mat3 m2 = mat3(
+    .21,.79,0,
+    1.97,-2.42,.45,
+    .03,.78,-.81
+);
+
+vec3 srgb_to_oklch( vec3 c ) {
+    c = pow(c * m11,vec3(1./3.)) * m2;
+    return vec3(c.x,sqrt((c.y*c.y) + (c.z * c.z)),atan(c.z,c.y));
 }
+vec3 oklch_to_srgb( vec3 c ) {
+    return pow(vec3(c.x,c.y*cos(c.z),c.y*sin(c.z)) * inverse(m2),vec3(3.)) * inverse(m11);
+}
+
+vec3 rgb2yiq(vec3 rgb) {
+    const mat3 rgb2yiq = mat3(
+    0.299, 0.587, 0.114,
+    0.596, -0.275, -0.321,
+    0.212, -0.523, 0.311
+    );
+    return rgb2yiq * rgb;
+}
+
+vec3 yiqPolar(vec3 yiq) {
+    float Y = yiq.x;
+    float I = yiq.y;
+    float Q = yiq.z;
+    float chroma = length(yiq.yz);
+    float hue = atan(Q, I);
+    return vec3(Y, chroma, hue);
+}
+
+vec3 yiqPolarToRgb(vec3 polar) {
+    float Y = polar.x;
+    float chroma = polar.y;
+    float hue = polar.z;
+    float I = chroma * cos(hue);
+    float Q = chroma * sin(hue);
+
+    const mat3 yiq2rgb = mat3(
+    1.0, 0.956, 0.621,
+    1.0, -0.272, -0.647,
+    1.0, -1.106, 1.703
+    );
+
+    return yiq2rgb * vec3(Y, I, Q);
+}
+
+/// <-- conversion methods between color models
+/// --> tone mapping
+
+void gammaCorrection(inout vec3 col) {
+    col = pow(col, vec3(1./iGamma));
+}
+
+vec3 Uncharted2Tonemap(vec3 x) {
+    // Beispiel eines Tone-Mappings, das nicht nur aus Gamma besteht
+    float A = 0.15;
+    float B = 0.50;
+    float C = 0.10;
+    float D = 0.20;
+    float E = 0.02;
+    float F = 0.30;
+    return ((x * (A * x + C * B) + D * E) / (x * (A * x + B) + D * F)) - E / F;
+}
+
+vec3 filmicToneMap(vec3 color, float exposure) {
+    const vec3 whitePoint = vec3(11.2);
+    vec3 mapped = Uncharted2Tonemap(exposure * color);
+    vec3 whiteScale = vec3(1.0) / Uncharted2Tonemap(whitePoint);
+    return mapped * whiteScale;
+}
+
+vec3 ACESFittedToneMap(vec3 color) {
+    const float a = 2.51;
+    const float b = 0.03;
+    const float c = 2.43;
+    const float d = 0.59;
+    const float e = 0.14;
+    return clamp(
+        (color * (a * color + b)) / (color * (c * color + d) + e),
+        0.0, 1.0
+    );
+}
+
+/// <--
 
 vec3 cosPalette(float t, vec3 a, vec3 b, vec3 c, vec3 d){
     // cf. https://iquilezles.org/articles/palettes/
@@ -158,6 +248,11 @@ void applyGrid(inout vec3 col, in vec2 uv) {
     col *= 0.5 + 0.5 * frame;
 }
 
+float sdCircle( in vec2 p, in float r )
+{
+    return length(p)-r;
+}
+
 void background(out vec3 col, vec2 uv) {
     col = c.yyy;
     col = uniformPalette(uv.x + 1.);
@@ -181,28 +276,6 @@ void drawPaletteRing(inout vec3 col, vec2 uv, float theta) {
     drawRing(col, colRing, uv);
 }
 
-void gammaCorrection(inout vec3 col) {
-    col = pow(col, vec3(1./iGamma));
-}
-
-vec3 Uncharted2Tonemap(vec3 x) {
-    // Beispiel eines Tone-Mappings, das nicht nur aus Gamma besteht
-    float A = 0.15;
-    float B = 0.50;
-    float C = 0.10;
-    float D = 0.20;
-    float E = 0.02;
-    float F = 0.30;
-    return ((x * (A * x + C * B) + D * E) / (x * (A * x + B) + D * F)) - E / F;
-}
-
-vec3 filmicToneMap(vec3 color) {
-    const vec3 whitePoint = vec3(11.2);
-    vec3 mapped = Uncharted2Tonemap(color);
-    vec3 whiteScale = vec3(1.0) / Uncharted2Tonemap(whitePoint);
-    return mapped * whiteScale;
-}
-
 // Wir hatten diese #defines, aber das sind jetzt Bool-Uniforms
 // um im laufenden Betrieb viel direkter umschalten zu können
 // (erfordert kein neues Kompilieren des Shaders)
@@ -219,11 +292,11 @@ void drawColors(inout vec3 col, vec2 uv, bool right) {
 
     // Wir sind hier mit den Begriffen zwar penibel, aber wollen jeweils
     // denselben Uniform nutzen. Daher diese eigenartige Aufspaltung hier.
-    float value = iValueOrLightnessOrPerceptualBrightness;
-    float lightness = iValueOrLightnessOrPerceptualBrightness;
-    float perceptualBrightness = iValueOrLightnessOrPerceptualBrightness;
+    float value = iLightnessEquivalent;
+    float lightness = iLightnessEquivalent;
+    float perceptualBrightness = iLightnessEquivalent;
     float saturation = iSaturationOrChroma;
-    float chroma = clamp(iSaturationOrChroma, 0., 0.37);
+    float chroma = iSaturationOrChroma; // clamp(iSaturationOrChroma, 0., 0.37);
 
     vec3 colHSV = vec3(theta, r, value);
     vec3 colHSL;
@@ -248,7 +321,12 @@ void drawColors(inout vec3 col, vec2 uv, bool right) {
     if (demoCosinePalette) {
         drawPaletteRing(col, uv, theta);
         if (right) {
-            col = mix(col, filmicToneMap(col), iToneMapping);
+            col = mix(
+                col,
+                // ACESFittedToneMap(col),
+                filmicToneMap(col, iToneExposure),
+                iToneMapping
+            );
             gammaCorrection(col);
         }
         return;

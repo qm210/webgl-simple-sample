@@ -446,7 +446,10 @@ export const asBoolInput = (elements, state, control) => {
     elements.description.htmlFor = elements.control.id;
 
     control.defaultValue ??= false;
-    elements.reset.textContent = `reset: ${control.defaultValue}`;
+    elements.reset.textContent = `reset`;
+    if (!control.defaultValue) {
+        elements.description.classList.add("extra-column");
+    }
 
     update();
 

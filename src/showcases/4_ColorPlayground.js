@@ -48,7 +48,7 @@ export default {
             max: 1,
         }, {
             type: "float",
-            name: "iValueOrLightnessOrPerceptualBrightness",
+            name: "iLightnessEquivalent",
             defaultValue: 0.5,
             min: 0,
             max: 1,
@@ -62,14 +62,14 @@ export default {
             type: "bool",
             name: "demoHsvHsl",
             group: "demo",
-            description: "H = Polarwinkel, S = Abstand von Mitte. V/L über Uniform iValueOrL...",
+            description: "H = Polarwinkel, S = Abstand von Mitte. V/L über Uniform iLightnessEquivalent",
             defaultValue: false,
         }, {
             type: "bool",
             name: "demoHsvOklch",
             group: "demo",
-            description: "Analog zur letzten Zeile. Chroma ist ähnlich Sättigung " +
-                "(referenziert den \"Gehalt an Farbpigmenten\" vgl. zu Weiß), geht aber nur bis 0.37",
+            description: "Links HSV, rechts OkLCh. Chroma ist ähnlich Sättigung " +
+                "(referenziert den \"Farbgehalt\" vgl. zu Weiß), geht aber nur bis 0.37",
             defaultValue: false,
         }, {
             type: "bool",
@@ -110,8 +110,14 @@ export default {
             max: 1,
         }, {
             type: "float",
+            name: "iToneExposure",
+            defaultValue: 1,
+            min: 0,
+            max: 10,
+        }, {
+            type: "float",
             name: "iGamma",
-            defaultValue: 2.20,
+            defaultValue: 1.0,
             min: 0.001,
             max: 10.,
             step: 0.001
@@ -125,13 +131,14 @@ function render(gl, state) {
     gl.uniform1f(state.location.iTime, state.time);
     gl.uniform2fv(state.location.iResolution, state.resolution);
     gl.uniform1f(state.location.iSaturationOrChroma, state.iSaturationOrChroma);
-    gl.uniform1f(state.location.iValueOrLightnessOrPerceptualBrightness, state.iValueOrLightnessOrPerceptualBrightness);
+    gl.uniform1f(state.location.iLightnessEquivalent, state.iLightnessEquivalent);
     gl.uniform3fv(state.location.palA, state.palA);
     gl.uniform3fv(state.location.palB, state.palB);
     gl.uniform3fv(state.location.palC, state.palC);
     gl.uniform3fv(state.location.palD, state.palD);
     gl.uniform1f(state.location.iGamma, state.iGamma);
     gl.uniform1f(state.location.iToneMapping, state.iToneMapping);
+    gl.uniform1f(state.location.iToneExposure, state.iToneExposure);
     gl.uniform1i(state.location.demoHsvHsl, state.demoHsvHsl);
     gl.uniform1i(state.location.demoHsvOklch, state.demoHsvOklch);
     gl.uniform1i(state.location.demoCosinePalette, state.demoCosinePalette);
