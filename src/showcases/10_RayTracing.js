@@ -137,7 +137,7 @@ export default {
         }, {
             type: "float",
             name: "iMarchingMinDistance",
-            defaultValue: 0.01,
+            defaultValue: 0.1,
             min: 0.0001,
             max: 2.,
             step: 0.001,

@@ -5,7 +5,7 @@ import {createFramebufferWithTexture, takePingPongFramebuffers} from "../../webg
 // dieses Beispiel basiert auf dem bekannten "Ray Tracing In One Weekend" von Peter Shirley
 // https://raytracing.github.io/books/RayTracingInOneWeekend.html#wherenext?
 // bzw. seiner Shader-Toy-Implementierung, big credits an "reinder":
-import fragmentShaderSource from "../../shaders/spring-2025/stochasticRayTracing_fromTheBook.glsl";
+import fragmentShaderSource from "../../shaders/specific/stochasticRayTracing_fromTheBook.glsl";
 
 export default {
     title: "Stochastic Ray Tracing",

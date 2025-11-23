@@ -35,16 +35,49 @@ export default {
         state.location.iGamma = gl.getUniformLocation(state.program, "iGamma");
         state.resolution = [gl.drawingBufferWidth, gl.drawingBufferHeight];
 
-        console.log(state);
-
         return state;
     },
     generateControls: (gl, state, elements) => ({
         onRender: () =>
             startRenderLoop(state => render(gl, state), state, elements),
         uniforms: [{
-            type: "label",
-            name: "iTime",
+            type: "float",
+            name: "iSaturationOrChroma",
+            defaultValue: 0.5,
+            min: 0,
+            max: 1,
+        }, {
+            type: "float",
+            name: "iValueOrLightnessOrPerceptualBrightness",
+            defaultValue: 0.5,
+            min: 0,
+            max: 1,
+        }, {
+            type: "bool",
+            name: "demoRainbowRing",
+            group: "demo",
+            description: "HSV-Rainbow left, OkLCh right (use uniforms above)",
+            defaultValue: true,
+        }, {
+            type: "bool",
+            name: "demoHsvHsl",
+            group: "demo",
+            description: "H = Polarwinkel, S = Abstand von Mitte. V/L über Uniform iValueOrL...",
+            defaultValue: false,
+        }, {
+            type: "bool",
+            name: "demoHsvOklch",
+            group: "demo",
+            description: "Analog zur letzten Zeile. Chroma ist ähnlich Sättigung " +
+                "(referenziert den \"Gehalt an Farbpigmenten\" vgl. zu Weiß), geht aber nur bis 0.37",
+            defaultValue: false,
+        }, {
+            type: "bool",
+            name: "demoCosinePalette",
+            group: "demo",
+            description: "die Palette wird dann durch die 12 Einträge in palA...palD gebildet.\n" +
+                " Links direkt, Rechts mit Tone Mapping + Gammakorrektur.",
+            defaultValue: false,
         }, {
             type: "vec3",
             name: "palA",
@@ -71,17 +104,17 @@ export default {
             max: 1
         }, {
             type: "float",
+            name: "iToneMapping",
+            defaultValue: 0,
+            min: 0,
+            max: 1,
+        }, {
+            type: "float",
             name: "iGamma",
-            defaultValue: 1.00,
+            defaultValue: 2.20,
             min: 0.001,
             max: 10.,
             step: 0.001
-        }, {
-            type: "float",
-            name: "iWhatever",
-            defaultValue: 1.00,
-            min: 0,
-            max: 10.,
         }]
     })
 }
@@ -91,12 +124,18 @@ function render(gl, state) {
 
     gl.uniform1f(state.location.iTime, state.time);
     gl.uniform2fv(state.location.iResolution, state.resolution);
+    gl.uniform1f(state.location.iSaturationOrChroma, state.iSaturationOrChroma);
+    gl.uniform1f(state.location.iValueOrLightnessOrPerceptualBrightness, state.iValueOrLightnessOrPerceptualBrightness);
     gl.uniform3fv(state.location.palA, state.palA);
     gl.uniform3fv(state.location.palB, state.palB);
     gl.uniform3fv(state.location.palC, state.palC);
     gl.uniform3fv(state.location.palD, state.palD);
-    gl.uniform1f(state.location.iWhatever, state.iWhatever);
     gl.uniform1f(state.location.iGamma, state.iGamma);
+    gl.uniform1f(state.location.iToneMapping, state.iToneMapping);
+    gl.uniform1i(state.location.demoHsvHsl, state.demoHsvHsl);
+    gl.uniform1i(state.location.demoHsvOklch, state.demoHsvOklch);
+    gl.uniform1i(state.location.demoCosinePalette, state.demoCosinePalette);
+    gl.uniform1i(state.location.demoRainbowRing, state.demoRainbowRing);
 
     gl.drawArrays(gl.TRIANGLES, 0, 6);
 }

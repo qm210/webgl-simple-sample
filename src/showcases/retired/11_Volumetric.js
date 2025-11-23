@@ -1,7 +1,7 @@
 import standardSetup from "./3_SimpleGeometry.js";
 import {startRenderLoop} from "../../webgl/render.js";
 
-import fragmentShaderSource from "../../shaders/spring-2025/volumetricClouds.glsl";
+import fragmentShaderSource from "../../shaders/specific/volumetricClouds.glsl";
 // <-- huge credits to Christopher Wallis for the original
 //     https://www.shadertoy.com/view/tsScDG
 

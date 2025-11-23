@@ -1,3 +1,4 @@
+#version 300 es
 // Raytracing in one weekend, chapter 12: Where next? Created by Reinder Nijhoff 2018
 // @reindernijhoff
 //
@@ -49,9 +50,6 @@
 //
 // [1] http://in1weekend.blogspot.com/2016/01/ray-tracing-in-one-weekend.html
 //
-
-
-#version 300 es
 precision highp float;
 out vec4 frag_color;
 

@@ -133,6 +133,7 @@ const createInputControlElements = (control) => {
         min: document.createElement("label"),
         max: document.createElement("label"),
         reset: createSmallButton("reset", "reset"),
+        description: null,
     };
     if (control) {
         elements.value.dataset.id = control.name;
@@ -432,9 +433,21 @@ function updateVecLabel(labelElement, state, control) {
 }
 
 export const asBoolInput = (elements, state, control) => {
+    if (control.group) {
+        elements.control.type = "radio";
+        elements.control.name = control.group;
+        elements.control.dataset.name = control.name;
+    } else {
+        elements.control.type = "checkbox";
+    }
+    elements.control.id = `check.${control.name}`;
+    elements.description =
+        createElement("label", control.description ?? "", "bool-description");
+    elements.description.htmlFor = elements.control.id;
+
     control.defaultValue ??= false;
-    elements.control.type = "checkbox";
     elements.reset.textContent = `reset: ${control.defaultValue}`;
+
     update();
 
     elements.control.addEventListener("change", event => {
@@ -448,7 +461,8 @@ export const asBoolInput = (elements, state, control) => {
     return elements;
 
     function update(value = undefined) {
-        if (value !== undefined) {
+        const manuallyChanged = value !== undefined;
+        if (manuallyChanged) {
             state[control.name] = value;
             sessionStoreControlState(state, control);
         } else {
@@ -456,6 +470,34 @@ export const asBoolInput = (elements, state, control) => {
         }
         elements.control.checked = value;
         elements.value.textContent = `= ${value}`;
+
+        if (control.group && manuallyChanged) {
+            updateOthersInGroup();
+        }
+    }
+
+    function updateOthersInGroup() {
+        const others = document.querySelectorAll(
+            `input[name="${control.group}"]`
+        )
+        for (const input of others) {
+            if (input.dataset.name === control.name) {
+                continue;
+            }
+            input.checked = false;
+            const valueLabel = input.previousElementSibling;
+            if (valueLabel.dataset.id !== input.dataset.name) {
+                console.warn("Value Label doesn't match to the adjacent Input, wtf?");
+                continue;
+            }
+            valueLabel.textContent = `= ${input.checked}`;
+        }
+        for (const otherControl of control.groupedControls) {
+            if (otherControl.name !== control.name) {
+                state[otherControl.name] = false;
+                sessionStoreControlState(state, otherControl);
+            }
+        }
     }
 };
 

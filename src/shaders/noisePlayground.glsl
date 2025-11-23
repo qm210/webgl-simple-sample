@@ -81,8 +81,8 @@ float perlin2D(vec2 p)
     return ym;
 }
 
-float noiseStack(vec2 p){
-    // das Verfahren heißt auch "fBM" = "fractional Brownian Motion",
+float noiseStackA(vec2 p){
+    // das grundlegende Verfahren hier heißt "fBM" = "fractional Brownian Motion",
     // weil es ähnlich ist zu Diffusionsprozessen in der Natur
     // (https://de.wikipedia.org/wiki/Brownsche_Bewegung)
     // Diese Gegebenheiten sind aber für unsere Anwendungen nicht relevant,
@@ -97,7 +97,8 @@ float noiseStack(vec2 p){
     for (int i=0; i < iFractionSteps; i++) {
         noise = perlin2D(p);
 
-        // Hier könnte Platz zur Variation sein ;)
+        // Direkt über "noise" zu summieren ist das wirkliche FBM-Rauschen.
+        // Aber hier ist Platz zur Variation, siehe die andere Noisefunktion.
         sum += a * noise;
 
         s += a;
@@ -111,7 +112,7 @@ float noiseStack(vec2 p){
     return (sum / s + iMeanOffsetForNoiseA) * iNormFactorForNoiseA;
 }
 
-float noiseAbsoluteStack(vec2 p){
+float noiseStackB(vec2 p){
     // fast gleich zu noiseStack(p), nur dass hier abs(noise) pro Schicht genommen wird.
     // Es gibt aber noch etliche weitere Varianten dieses Vorgehens.
     float a = 1., s = 0., sum = 0.;
@@ -122,17 +123,14 @@ float noiseAbsoluteStack(vec2 p){
         // Hier könnte Platz zur Variation sein ;)
         sum += a * abs(noise);
         // z.B. mal auf die Suche machen:
-        // "Rigged FBM"?
-        // "Billowed FBM"?
+        // "Rigged FBM". "Billowed FBM", "Stratified FBM"?
+        // s. z.B. auch https://www.shadertoy.com/view/3flyDs
 
         s += a;
         p *= iFractionScale;
         a *= iFractionAmplitude;
     }
-    // Ausgabewert soll in [0, 1] liegen
-    // (wobei ungünstige Kombinationen iFractionScale / iFractionAmplitude auch > 1. summieren KÖNNTEN)
-    // erstmal frei einstellbar, siehe Kommentar in noiseStack()
-    sum = pow(sum / s, 12.);
+    // Normierung analog zu, aber unabhängig von der Noisefunktion oben.
     return (sum / s + iMeanOffsetForNoiseB) * iNormFactorForNoiseB;
 }
 
@@ -174,9 +172,9 @@ void main() {
     // Hier also nur zur erstbesten Unterscheidung gewählt,
     // im Kontext macht das Farb-/Beleuchtungsmodell den richtigen Unterschied ;)
     float noiseClouds =
-        symmetricalMix(1., noiseStack(uv), iNoiseLevelA);
+        symmetricalMix(1., noiseStackA(uv), iNoiseLevelA);
     float noiseTurbulence =
-        symmetricalMix(1., noiseAbsoluteStack(uv), iNoiseLevelB);
+        symmetricalMix(1., noiseStackB(uv), iNoiseLevelB);
 
     // Obacht: Auch mit wenigen Iterationen ("Oktaven") kann ein FBM-Noise über
     // die geschachtelte Struktur zur Performancesenke werden.

@@ -131,6 +131,8 @@ export const addControlsToPage = (elements, state, controls, autoRenderOnLoad) =
         });
     }
 
+    const groups = collectGroups(controls);
+
     for (const control of controls.uniforms ?? []) {
 
         if (control.type === "label") {
@@ -163,17 +165,25 @@ export const addControlsToPage = (elements, state, controls, autoRenderOnLoad) =
             continue;
         }
 
+        if (control.group) {
+            control.groupedControls = groups[control.group];
+        }
+
         const input = createInputElements(state, control);
         if (!input) {
             continue;
         }
         elements.controls.appendChild(input.name);
         elements.controls.appendChild(input.value);
-        elements.controls.appendChild(input.min);
-        elements.controls.appendChild(input.control);
-        elements.controls.appendChild(input.max);
-        elements.controls.appendChild(input.reset);
-
+        if (control.type === "bool") {
+            elements.controls.appendChild(input.control);
+            elements.controls.appendChild(input.description);
+        } else {
+            elements.controls.appendChild(input.min);
+            elements.controls.appendChild(input.control);
+            elements.controls.appendChild(input.max);
+            elements.controls.appendChild(input.reset);
+        }
         elements.uniforms[control.name] = input;
     }
 
@@ -382,4 +392,18 @@ function openUniformInputHelper() {
 
     const combined = [glslDeclaration, glUniformCall, inputControl].join("\n\n");
     console.info(combined);
+}
+
+function collectGroups(controls) {
+    const result = {};
+    for (const control of controls.uniforms) {
+        if (!control.group) {
+            continue;
+        }
+        if (!result[control.group]) {
+            result[control.group] = [];
+        }
+        result[control.group].push(control);
+    }
+    return result;
 }

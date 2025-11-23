@@ -377,12 +377,22 @@ float sdNoiseMountains(vec3 p) {
 
 //------------------------------------------------------------------
 
+// opUnion ist eine der "Primitive combinations" für SDFs
+// https://iquilezles.org/articles/distfunctions/
+// i.e. einerseits könnt ihr damit aus einfacheren Geometrien komplexere zusammensetzen,
+//      aber auch aus separaten Objekten die gesamte Szene zusammensetzen.
+// -> Es gibt bei Herrn Quilezles auch opSubtraction, opIntersection, opXor,
+//    aber opUnion ist am einfachsten beschrieben:
+//    "Auf der Suche nach der geringsten SDF... nehmen wir von zwei SDFs die kleinere von beiden".
+// -> Wenn man dann noch im Ergebnis (MarchHit) etwas mitführt, das Aufschluss über den
+//    getroffenenen Körper gibt, können wir später Farbe, Textur, Beleuchtung dranmappen.
+
 vec2 opUnion( vec2 d1, vec2 d2 )
 {
     return (d1.x<d2.x) ? d1 : d2;
 }
 
-// Erweiterte Versionen von opUnion, bei der Gelegenheit gleich umbenannt:
+// Auf MarchHit erweiterte Versionen von opUnion, bei der Gelegenheit gleich umbenannt:
 
 MarchHit takeCloser(MarchHit d1, MarchHit d2)
 {
@@ -433,8 +443,8 @@ MarchHit map( in vec3 pos )
         MATERIAL_PYRAMID
     );
 
-    // Mal ein Beispiel einer ungewöhnlichen Transformation, die wir mit aktuellen Mitteln
-    // aber schon einigermaßen verstehen können
+    // Mal ein Beispiel einer ungewöhnlichen Transformation, die wir aber (behaupte ich)
+    // durchaus Stück für Stück verstehen können, da wir die Einzelteile schon alle hatten.
     {
         float sphereRadius = 0.25;
         vec3 spherePos = vec3(2., sphereRadius, 0.4);

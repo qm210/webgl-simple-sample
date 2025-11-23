@@ -5,12 +5,18 @@ out vec4 fragColor;
 
 uniform vec2 iResolution;
 uniform float iTime;
-uniform float iGamma;
+uniform float iSaturationOrChroma;
+uniform float iValueOrLightnessOrPerceptualBrightness;
 uniform vec3 palA;
 uniform vec3 palB;
 uniform vec3 palC;
 uniform vec3 palD;
-uniform float iWhatever;
+uniform float iGamma;
+uniform float iToneMapping;
+uniform bool demoHsvHsl;
+uniform bool demoHsvOklch;
+uniform bool demoCosinePalette;
+uniform bool demoRainbowRing;
 
 vec4 c = vec4(1., 0., -1., .5);
 const float pi = 3.141592;
@@ -164,10 +170,6 @@ void background(out vec3 col, vec2 uv) {
     col = mix(c.yyy, col, smoothstep(0., 0.001, d));
 }
 
-void gammaCorrection(inout vec3 col) {
-    col = pow(col, vec3(1./iGamma));
-}
-
 void drawRing(inout vec3 col, in vec3 colRing, vec2 uv) {
     float d = sdCircle(uv, 0.5);
     d = abs(d) - 0.2;
@@ -179,55 +181,88 @@ void drawPaletteRing(inout vec3 col, vec2 uv, float theta) {
     drawRing(col, colRing, uv);
 }
 
-#define CASE_STUDY_HSV_HSL 0
-#define CASE_STUDY_HSV_OKLCH 0
-#define DEMONSTRATE_COSINE_PALETTE 1
-#define RAINBOW_RING 1
+void gammaCorrection(inout vec3 col) {
+    col = pow(col, vec3(1./iGamma));
+}
+
+vec3 Uncharted2Tonemap(vec3 x) {
+    // Beispiel eines Tone-Mappings, das nicht nur aus Gamma besteht
+    float A = 0.15;
+    float B = 0.50;
+    float C = 0.10;
+    float D = 0.20;
+    float E = 0.02;
+    float F = 0.30;
+    return ((x * (A * x + C * B) + D * E) / (x * (A * x + B) + D * F)) - E / F;
+}
+
+vec3 filmicToneMap(vec3 color) {
+    const vec3 whitePoint = vec3(11.2);
+    vec3 mapped = Uncharted2Tonemap(color);
+    vec3 whiteScale = vec3(1.0) / Uncharted2Tonemap(whitePoint);
+    return mapped * whiteScale;
+}
+
+// Wir hatten diese #defines, aber das sind jetzt Bool-Uniforms
+// um im laufenden Betrieb viel direkter umschalten zu können
+// (erfordert kein neues Kompilieren des Shaders)
+//
+//#define CASE_STUDY_HSV_HSL 0
+//#define CASE_STUDY_HSV_OKLCH 0
+//#define DEMONSTRATE_COSINE_PALETTE 1
+//#define RAINBOW_RING 1
 
 void drawColors(inout vec3 col, vec2 uv, bool right) {
     // (*) was ist das hier anschaulich, welche Werte nimmt es an?
     float theta = polar(uv) / twoPi;
     float r = length(uv);
 
-    // just for seeing the "third dimension"
-    float wave = 0.5 - 0.5 * cos(twoPi * 0.1 * iTime);
-    vec3 colHSV = vec3(theta, r, wave);
+    // Wir sind hier mit den Begriffen zwar penibel, aber wollen jeweils
+    // denselben Uniform nutzen. Daher diese eigenartige Aufspaltung hier.
+    float value = iValueOrLightnessOrPerceptualBrightness;
+    float lightness = iValueOrLightnessOrPerceptualBrightness;
+    float perceptualBrightness = iValueOrLightnessOrPerceptualBrightness;
+    float saturation = iSaturationOrChroma;
+    float chroma = clamp(iSaturationOrChroma, 0., 0.37);
+
+    vec3 colHSV = vec3(theta, r, value);
     vec3 colHSL;
     col = hsv2rgb(colHSV);
 
-    #if CASE_STUDY_HSV_HSL
-        colHSL = vec3(theta, r, wave);
+    if (demoHsvHsl) {
+        colHSL = vec3(theta, r, lightness);
         if (right) {
             col = hsl2rgb(colHSL);
         }
         return;
-    #endif
+    }
 
-    #if CASE_STUDY_HSV_OKLCH
+    if (demoHsvOklch) {
         if (right) {
-            vec3 colOKLCH = vec3(wave, r, theta);
+            vec3 colOKLCH = vec3(perceptualBrightness, 0.3 * r, twoPi * theta);
             col = oklch2rgb(colOKLCH);
         }
         return;
-    #endif
+    }
 
-    #if DEMONSTRATE_COSINE_PALETTE
+    if (demoCosinePalette) {
         drawPaletteRing(col, uv, theta);
         if (right) {
+            col = mix(col, filmicToneMap(col), iToneMapping);
             gammaCorrection(col);
         }
         return;
-    #endif
+    }
 
     // Fallback: "Rainbow Ring"
-    #if RAINBOW_RING
+    if (demoRainbowRing) {
         col = c.xxx;
         applyGrid(col, uv);
         vec3 colRing = right
-            ? oklch2rgb(vec3(wave, .3, twoPi * theta))
-            : hsv2rgb(vec3(theta, 1., wave));
+            ? oklch2rgb(vec3(perceptualBrightness, chroma, twoPi * theta))
+            : hsv2rgb(vec3(theta, saturation, value));
         drawRing(col, colRing, uv);
-    #endif
+    }
 }
 
 void main() {

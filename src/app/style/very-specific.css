@@ -24,3 +24,11 @@
     margin-top: 0.5rem;
     font-style: italic;
 }
+
+.bool-description {
+    grid-column: span 3;
+    white-space: pre-line;
+    overflow-wrap: break-word;
+    font-size: small;
+    font-family: sans-serif;
+}
