@@ -1,4 +1,3 @@
-import {compile, createStaticVertexBuffer, initVertices} from "../webgl/setup.js";
 import {startRenderLoop} from "../webgl/render.js";
 
 import fragmentShaderSource from "../shaders/noisePlaygroundExtended.glsl";
@@ -227,7 +226,7 @@ function defineUniformControls(state) {
         name: "iColorCosineFreq",
         defaultValue: [11, 20, 30],
         min: 0,
-        max: 62.83,
+        max: 31.42,
         step: 0.01,
     }, {
         type: "vec3",

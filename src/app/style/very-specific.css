@@ -4,6 +4,24 @@
     opacity: 0.6;
 }
 
+.fps-box {
+    border: 1px solid silver;
+    text-align: center;
+    gap: 0;
+}
+
+.presets-selector {
+    opacity: 0;
+    position: absolute;
+    cursor: pointer;
+}
+
+.presets-hint {
+    font-size: smaller;
+    text-decoration: underline;
+    cursor: pointer;
+}
+
 .readout-stats {
     display: flex;
     flex-direction: column;

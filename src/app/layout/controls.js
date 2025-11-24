@@ -134,6 +134,7 @@ const createInputControlElements = (control) => {
         max: document.createElement("label"),
         reset: createSmallButton("reset", "reset"),
         description: null,
+        updateValue: null,
     };
     if (control) {
         elements.value.dataset.id = control.name;
@@ -144,6 +145,18 @@ const createInputControlElements = (control) => {
     elements.min.style.textAlign = "right";
     elements.max.style.fontSize = "small";
     elements.max.style.textAlign = "left";
+
+    if (control.type !== "bool") {
+        elements.value.addEventListener("dblclick", () => {
+            if (!elements.updateValue) {
+                return;
+            }
+            const value = window.prompt(`New Value for "${control.name}:"`);
+            if (value) {
+                elements.updateValue(value);
+            }
+        });
+    }
     return elements;
 };
 
@@ -153,35 +166,46 @@ export const asFloatInput = (elements, state, control) => {
     asSlider(elements.control, control);
     updateSlider(elements, state, control, true);
 
+    elements.updateValue = (value = undefined) => {
+        if (value !== undefined) {
+            value = parseFloat(value);
+            if (isNaN(value)) {
+                return;
+            }
+            state[control.name] = value;
+        }
+        updateSlider(elements, state, control, true);
+        sessionStoreControlState(state, control);
+    };
+
     elements.control.addEventListener("input", event => {
         state[control.name] = valueFrom(event, control);
         updateSlider(elements, state, control, false);
     });
     elements.control.addEventListener("change", event => {
-        state[control.name] = valueFrom(event, control);
-        updateSlider(elements, state, control, true);
-        sessionStoreControlState(state, control);
+        elements.updateValue(
+            valueFrom(event, control)
+        );
     });
-
     elements.reset.addEventListener("click", () => {
-        state[control.name] = control.defaultValue;
-        updateSlider(elements, state, control,true);
-        sessionStoreControlState(state, control);
+        elements.updateValue(
+            control.defaultValue
+        );
     });
 
     return elements;
-
-    function valueFrom(event, control) {
-        let value = parseFloat(event.target.value);
-        if (control.log) {
-            value = Math.pow(10, value);
-        }
-        if (control.integer) {
-            value = Math.round(value);
-        }
-        return value;
-    }
 };
+
+function valueFrom(event, control) {
+    let value = parseFloat(event.target.value);
+    if (control.log) {
+        value = Math.pow(10, value);
+    }
+    if (control.integer) {
+        value = Math.round(value);
+    }
+    return value;
+}
 
 function asSlider(inputElement, control) {
     control.step ??=
@@ -249,7 +273,8 @@ const randomVec = (control) =>
     Array(control.dim).fill(null)
         .map((_, i) => {
             const random = (control.max[i] - control.min[i]) * Math.random();
-            return round(control.min[i] + random, control.step[i]);
+            const result = round(control.min[i] + random, control.step[i]);;
+            return result;
         });
 
 export const asVecInput = (elements, state, control) => {
@@ -290,17 +315,17 @@ export const asVecInput = (elements, state, control) => {
         elementsForComponent.push(forComponent);
         sliders.push(forComponent.control);
         asSlider(forComponent.control, componentControl);
+        control.step[index] ??= componentControl.step;
         state[control.name][index] *= maybeNormFactor;
         forComponent.control.value =
             updateSlider(forComponent, state, componentControl, true, state[control.name][index]);
         forComponent.control.addEventListener("input", event => {
             updateSlider(forComponent, state, componentControl, false, event.target.value);
-            updateAll();
+            updateVector();
         });
         forComponent.control.addEventListener("change", event => {
             updateSlider(forComponent, state, componentControl, true, event.target.value);
-            updateAll();
-            sessionStoreControlState(state, componentControl);
+            updateVector();
         });
     }
     elements.min = elementsForComponent[0].min;
@@ -317,38 +342,42 @@ export const asVecInput = (elements, state, control) => {
     }
 
     elements.reset.addEventListener("click", (event) => {
-        state[control.name] =
-            event.ctrlKey
-                ? randomVec(control)
-                : control.defaultValue;
-        sliders.forEach((input, index) => {
-            input.value = state[control.name][index];
-        });
-        updateAll();
-        sessionStoreControlState(state, control);
+        const value = event.ctrlKey
+            ? randomVec(control)
+            : control.defaultValue;
+        updateVector(value);
     });
 
-    updateAll();
+    elements.updateValue = (value) => {
+        if (typeof value === "string") {
+            value = value.split(",").map(parseFloat);
+        }
+        if (!(value instanceof Array)
+            || value.some(Number.isNaN)
+            || value.length !== control.dim
+        ) {
+            console.warn(`Bad input for ${control.type} ${control.name}: ${value}`);
+            return;
+        }
+        state[control.name] = value;
+        updateVector(value);
+    };
+
+    updateVector();
 
     return elements;
 
-    function updateAll() {
-        if (control.normalize) {
-            const norm =
-                squareNorm(sliders.map(s => s.value));
-            //     Math.sqrt(
-            //     sliders.reduce(
-            //         (sum, slider) =>
-            //             sum + (slider.value * slider.value),
-            //         0
-            //     )
-            // );
-            sliders.forEach(slider => {
-                slider.value /= norm;
-            });
-        }
-        state[control.name] = sliders.map(s => +s.value);
+    function updateVector(givenVector) {
+        const vector = givenVector ?? sliders.map(s => s.value);
+        const norm = control.normalize
+            ? squareNorm(vector)
+            : 1;
+        state[control.name] = vector.map(v => v / norm);
+        sliders.forEach((slider, i) => {
+            slider.value = state[control.name][i];
+        });
         updateVecLabel(elements.value, state, control);
+        sessionStoreControlState(state, control);
     }
 };
 
@@ -374,7 +403,6 @@ const asCursorInput = (elements, state, control) => {
 
     document.addEventListener("keydown", event => {
         if (!document.activeElement.matches("body")) {
-            // something else focussed? then ignore key input here.
             return;
         }
         switch (event.key.toUpperCase()) {
@@ -413,6 +441,9 @@ const asCursorInput = (elements, state, control) => {
     }
 
     function shiftComponent(index, shift) {
+        if (index >= state[control.name].length) {
+            return;
+        }
         state[control.name] = state[control.name].map((value, i) =>
             index !== i ? value :
                 value + shift

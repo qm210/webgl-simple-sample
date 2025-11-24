@@ -54,29 +54,42 @@ export default {
             max: 1,
         }, {
             type: "bool",
-            name: "demoRainbowRing",
-            group: "demo",
-            description: "HSV-Rainbow left, OkLCh right (use uniforms above)",
-            defaultValue: true,
-        }, {
-            type: "bool",
             name: "demoHsvHsl",
             group: "demo",
-            description: "H = Polarwinkel, S = Abstand von Mitte. V/L über Uniform iLightnessEquivalent",
-            defaultValue: false,
+            description: "Hue = Polarwinkel, S & V/L über entsprechende Uniforms",
+            defaultValue: true,
         }, {
             type: "bool",
             name: "demoHsvOklch",
             group: "demo",
-            description: "Links HSV, rechts OkLCh. Chroma ist ähnlich Sättigung " +
-                "(referenziert den \"Farbgehalt\" vgl. zu Weiß), geht aber nur bis 0.37",
+            description: "Analog zu demoHsvHsl mit OKLCh. Chroma ist ähnlich Sättigung " +
+                "(referenziert den \"Farbgehalt\" vgl. zu Weiß), über ca. 0.37 meist durch Monitor limitiert",
             defaultValue: false,
+        }, {
+            type: "bool",
+            name: "demoToneMapping",
+            group: "demo",
+            description: "2x HSV (S = Radius), Rechts inkl. ACES-Tonemap & Gammakorrektur",
+            defaultValue: false,
+        }, {
+            type: "float",
+            name: "iMixToneMapping",
+            defaultValue: 0,
+            min: 0,
+            max: 1,
+        }, {
+            type: "float",
+            name: "iGamma",
+            defaultValue: 1.0,
+            min: 0.001,
+            max: 10.,
+            step: 0.001
         }, {
             type: "bool",
             name: "demoCosinePalette",
             group: "demo",
             description: "die Palette wird dann durch die 12 Einträge in palA...palD gebildet.\n" +
-                " Links direkt, Rechts mit Tone Mapping + Gammakorrektur.",
+                " Links direkt, Rechts wieder mit Tone Mapping + Gammakorrektur.",
             defaultValue: false,
         }, {
             type: "vec3",
@@ -95,32 +108,13 @@ export default {
             name: "palC",
             defaultValue: [0.5, 0.5, 0.5],
             min: 0,
-            max: 1
+            max: 3
         }, {
             type: "vec3",
             name: "palD",
             defaultValue: [0.5, 0.5, 0.5],
             min: 0,
             max: 1
-        }, {
-            type: "float",
-            name: "iToneMapping",
-            defaultValue: 0,
-            min: 0,
-            max: 1,
-        }, {
-            type: "float",
-            name: "iToneExposure",
-            defaultValue: 1,
-            min: 0,
-            max: 10,
-        }, {
-            type: "float",
-            name: "iGamma",
-            defaultValue: 1.0,
-            min: 0.001,
-            max: 10.,
-            step: 0.001
         }]
     })
 }
@@ -137,12 +131,11 @@ function render(gl, state) {
     gl.uniform3fv(state.location.palC, state.palC);
     gl.uniform3fv(state.location.palD, state.palD);
     gl.uniform1f(state.location.iGamma, state.iGamma);
-    gl.uniform1f(state.location.iToneMapping, state.iToneMapping);
-    gl.uniform1f(state.location.iToneExposure, state.iToneExposure);
+    gl.uniform1f(state.location.iMixToneMapping, state.iMixToneMapping);
     gl.uniform1i(state.location.demoHsvHsl, state.demoHsvHsl);
     gl.uniform1i(state.location.demoHsvOklch, state.demoHsvOklch);
+    gl.uniform1i(state.location.demoToneMapping, state.demoToneMapping);
     gl.uniform1i(state.location.demoCosinePalette, state.demoCosinePalette);
-    gl.uniform1i(state.location.demoRainbowRing, state.demoRainbowRing);
 
     gl.drawArrays(gl.TRIANGLES, 0, 6);
 }

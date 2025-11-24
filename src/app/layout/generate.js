@@ -7,7 +7,8 @@ import {shiftTime} from "../../webgl/render.js";
 import {setCanvasResolution} from "../../webgl/setup.js";
 import {updateResolutionInState} from "../../webgl/helpers.js";
 import {addCanvasMouseInteraction} from "../mouse.js";
-import {createClipboardButtons, createPresetSelector} from "../exchange.js";
+import {createClipboardButtons, createPresetSelector, refreshPresets} from "../exchange.js";
+import {initializePresetStore} from "../database.js";
 
 
 const generatePage = (glContext, elements, state, controls, autoRenderOnLoad = true) => {
@@ -67,6 +68,14 @@ const generatePage = (glContext, elements, state, controls, autoRenderOnLoad = t
     addControlsToPage(elements, state, controls, autoRenderOnLoad);
     addDisplayControls(elements, state, glContext);
 
+    state.selectedPreset = null;
+    elements.db = undefined;
+    initializePresetStore()
+        .then(db => {
+            elements.db = db;
+            refreshPresets(elements, state);
+        });
+
     elements.pageLoadingMs = performance.now() - elements.initialMs;
 };
 
@@ -101,7 +110,6 @@ export const addControlsToPage = (elements, state, controls, autoRenderOnLoad) =
         valuePrefix: "=",
         content: [
             createDiv("", "full-spacer"),
-            ...createPresetSelector(elements, state),
             ...createClipboardButtons(elements, state),
             createDiv("", "spacer"),
             createResetAllButton(elements, state, controls)
@@ -291,7 +299,7 @@ function addDisplayControls(elements, state, glContext) {
     appendElement(fontControls, "font", "label");
     pageFontInitialize();
 
-    const info = appendElement(elements.displayControls, "", "div");
+    const info = appendElement(elements.displayControls, "", "div", "fps-box");
     elements.fps = {
         label: createElement("label", "FPS"),
         display: createDiv("", "fps"),
@@ -301,6 +309,9 @@ function addDisplayControls(elements, state, glContext) {
     info.addEventListener("click", () => {
         state.debugSignal = true;
     });
+
+    elements.presets = createPresetSelector(elements, state);
+    elements.displayControls.appendChild(elements.presets.container);
 
     function canvasResize(factor) {
         return () => {

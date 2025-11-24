@@ -12,12 +12,11 @@ uniform vec3 palB;
 uniform vec3 palC;
 uniform vec3 palD;
 uniform float iGamma;
-uniform float iToneMapping;
-uniform float iToneExposure;
+uniform float iMixToneMapping;
 uniform bool demoHsvHsl;
 uniform bool demoHsvOklch;
 uniform bool demoCosinePalette;
-uniform bool demoRainbowRing;
+uniform bool demoToneMapping;
 
 vec4 c = vec4(1., 0., -1., .5);
 const float pi = 3.141592;
@@ -184,24 +183,6 @@ void gammaCorrection(inout vec3 col) {
     col = pow(col, vec3(1./iGamma));
 }
 
-vec3 Uncharted2Tonemap(vec3 x) {
-    // Beispiel eines Tone-Mappings, das nicht nur aus Gamma besteht
-    float A = 0.15;
-    float B = 0.50;
-    float C = 0.10;
-    float D = 0.20;
-    float E = 0.02;
-    float F = 0.30;
-    return ((x * (A * x + C * B) + D * E) / (x * (A * x + B) + D * F)) - E / F;
-}
-
-vec3 filmicToneMap(vec3 color, float exposure) {
-    const vec3 whitePoint = vec3(11.2);
-    vec3 mapped = Uncharted2Tonemap(exposure * color);
-    vec3 whiteScale = vec3(1.0) / Uncharted2Tonemap(whitePoint);
-    return mapped * whiteScale;
-}
-
 vec3 ACESFittedToneMap(vec3 color) {
     const float a = 2.51;
     const float b = 0.03;
@@ -245,7 +226,7 @@ void applyGrid(inout vec3 col, in vec2 uv) {
     float frame = step(thick, dMin) * step(dMax, gridSize - thick);
     // note: in 1D this is the same, but in 2D these differ:
     // frame = step(thick, dMin) - step(gridStep - thick, dMax);
-    col *= 0.5 + 0.5 * frame;
+    col *= 0.85 + 0.1 * frame;
 }
 
 float sdCircle( in vec2 p, in float r )
@@ -265,15 +246,15 @@ void background(out vec3 col, vec2 uv) {
     col = mix(c.yyy, col, smoothstep(0., 0.001, d));
 }
 
-void drawRing(inout vec3 col, in vec3 colRing, vec2 uv) {
+vec3 drawRing(vec3 colBg, vec3 colRing, vec2 uv) {
     float d = sdCircle(uv, 0.5);
-    d = abs(d) - 0.2;
-    col = mix(col, colRing, smoothstep(0.01, 0., d));
+    d = abs(d) - 0.25;
+    return mix(colBg, colRing, smoothstep(0.01, 0., d));
 }
 
 void drawPaletteRing(inout vec3 col, vec2 uv, float theta) {
     vec3 colRing = uniformPalette(theta);
-    drawRing(col, colRing, uv);
+    col = drawRing(col, colRing, uv);
 }
 
 // Wir hatten diese #defines, aber das sind jetzt Bool-Uniforms
@@ -298,49 +279,56 @@ void drawColors(inout vec3 col, vec2 uv, bool right) {
     float saturation = iSaturationOrChroma;
     float chroma = iSaturationOrChroma; // clamp(iSaturationOrChroma, 0., 0.37);
 
-    vec3 colHSV = vec3(theta, r, value);
-    vec3 colHSL;
+    vec3 colBg = c.xxx;
+    applyGrid(colBg, uv);
+
+    vec3 colHSV = vec3(theta, saturation, value);
     col = hsv2rgb(colHSV);
 
     if (demoHsvHsl) {
-        colHSL = vec3(theta, r, lightness);
         if (right) {
+            vec3 colHSL = vec3(theta, saturation, lightness);
             col = hsl2rgb(colHSL);
         }
+        col = drawRing(colBg, col, uv);
         return;
     }
 
     if (demoHsvOklch) {
         if (right) {
-            vec3 colOKLCH = vec3(perceptualBrightness, 0.3 * r, twoPi * theta);
+            vec3 colOKLCH = vec3(perceptualBrightness, chroma, twoPi * theta);
             col = oklch2rgb(colOKLCH);
         }
+        col = drawRing(colBg, col, uv);
         return;
     }
 
-    if (demoCosinePalette) {
-        drawPaletteRing(col, uv, theta);
+    if (demoToneMapping) {
+        col = hsv2rgb(vec3(theta, r, value));
         if (right) {
             col = mix(
                 col,
-                // ACESFittedToneMap(col),
-                filmicToneMap(col, iToneExposure),
-                iToneMapping
+                ACESFittedToneMap(col),
+                iMixToneMapping
+            );
+            gammaCorrection(col);
+        }
+    }
+
+    if (demoCosinePalette) {
+         col = colBg;
+         drawPaletteRing(col, uv, theta);
+        if (right) {
+            col = mix(
+                col,
+                ACESFittedToneMap(col),
+                iMixToneMapping
             );
             gammaCorrection(col);
         }
         return;
     }
 
-    // Fallback: "Rainbow Ring"
-    if (demoRainbowRing) {
-        col = c.xxx;
-        applyGrid(col, uv);
-        vec3 colRing = right
-            ? oklch2rgb(vec3(perceptualBrightness, chroma, twoPi * theta))
-            : hsv2rgb(vec3(theta, saturation, value));
-        drawRing(col, colRing, uv);
-    }
 }
 
 void main() {

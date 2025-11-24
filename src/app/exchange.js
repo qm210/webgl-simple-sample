@@ -1,5 +1,6 @@
 import {createSmallButton} from "./layout/controls.js";
 import {createPreset, deletePreset, initializePresetStore, loadPresets} from "./database.js";
+import {createDiv} from "./layout/dom.js";
 
 const HEADER = {
     IDENTIFIER: "qm210.uniforms",
@@ -108,7 +109,6 @@ export function createClipboardButtons(elements, state) {
 }
 
 const OPTION = {
-    PLACEHOLDER: "__PLACEHOLDER__",
     NEW: "__STORE_NEW__",
     DELETE: "__DELETE_CURRENT__",
 };
@@ -119,25 +119,15 @@ function queryOption(selector, value) {
     );
 }
 
-const weHasPresets =
-    new URLSearchParams(window.location.search).has("presets");
-
 export function createPresetSelector(elements, state) {
-    if (!weHasPresets) {
-        return [];
-    }
-
     const selector = document.createElement("select");
+    selector.classList.add("presets-selector");
     addOption(selector, "Loading Presets...");
     selector.disabled = true;
 
-    state.selectedPreset = null;
-    elements.db = undefined;
-    initializePresetStore()
-        .then(db => {
-            elements.db = db;
-            void refreshPresets(db, state, selector);
-        });
+    const container = document.createElement("div");
+    container.appendChild(selector);
+    container.appendChild(createDiv("Presets...", "presets-hint"));
 
     let ignoreChangeEvent = false;
     selector.addEventListener("change", async event => {
@@ -159,7 +149,7 @@ export function createPresetSelector(elements, state) {
                 return;
             }
             await createPreset(db, bundleUniforms(state), name);
-            return refreshPresets(db, state, selector);
+            return refreshPresetsFor(db, state, selector);
         }
 
         const deleteOption = queryOption(selector, OPTION.DELETE);
@@ -173,7 +163,7 @@ export function createPresetSelector(elements, state) {
                 return;
             }
             await deletePreset(db, state.selectedPreset);
-            return refreshPresets(db, state, selector);
+            return refreshPresetsFor(db, state, selector);
         }
 
         state.selectedPreset = +event.target.value;
@@ -181,50 +171,42 @@ export function createPresetSelector(elements, state) {
         deleteOption.disabled = !preset;
         if (preset) {
             updateFromBundle(preset, state, elements);
-            setPlaceholder(preset.name);
-        } else {
-            setPlaceholder("");
         }
     });
 
-    return [selector];
+    return {selector, container};
 
     function selectedPreset() {
         return elements.db.presets.find(p =>
             p.id === state.selectedPreset
         );
     }
-
-    function setPlaceholder(name) {
-        ignoreChangeEvent = true;
-        selector.value = null;
-        ignoreChangeEvent = false;
-
-        const placeholder = queryOption(selector, OPTION.PLACEHOLDER);
-        placeholder.textContent = name;
-        placeholder.selected = true;
-    }
 }
 
 function addOption(parent, label, value = undefined, visible = true) {
     const option = document.createElement("option");
     option.value = value;
+    if (value === undefined) {
+        option.disabled = true;
+    }
     option.text = label;
     option.hidden = !visible;
     parent.append(option);
     return option;
 }
 
-async function refreshPresets(db, state, selector) {
+async function refreshPresetsFor(db, state, selector) {
     db.presets = await loadPresets(db);
 
     selector.disabled = false;
     selector.innerHTML = "";
-    addOption(selector, "", OPTION.PLACEHOLDER, false);
-    addOption(selector, "");
-    addOption(selector, "Store as new Preset", OPTION.NEW);
+    addOption(selector, "Store as new preset", OPTION.NEW);
+    const deleteOption = addOption(selector, "Delete last selected", OPTION.DELETE);
+    deleteOption.disabled = !state.selectedPreset;
+    addOption(selector, "\u2014\u2014\u2014\u2014\u2014\u2014\u2014\u2014\u2014");
+
     const group = document.createElement("optgroup");
-    group.label = "\u2014Presets\u2014"
+    group.label = "\u2014Stored Presets\u2014"
     for (const preset of db.presets) {
         addOption(group, preset.name, preset.id);
     }
@@ -233,6 +215,8 @@ async function refreshPresets(db, state, selector) {
         group.disabled = true;
     }
     selector.append(group);
-    const deleteOption = addOption(selector, "Delete current", OPTION.DELETE);
-    deleteOption.disabled = !state.selectedPreset;
+}
+
+export function refreshPresets(elements, state) {
+    void refreshPresetsFor(elements.db, state, elements.presets.selector);
 }

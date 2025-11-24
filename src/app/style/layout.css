@@ -219,8 +219,3 @@ button.render-button {
     text-align: center;
 }
 
-#display-controls > div:last-of-type {
-    border: 1px solid silver;
-    text-align: center;
-    gap: 0;
-}
