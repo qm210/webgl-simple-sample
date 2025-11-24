@@ -12,6 +12,9 @@ export default {
             return state;
         }
 
+        // Denselben gleichen Setup-Code immer zu wiederholen, hat schon auch wenig didaktischen Nutzen
+        // -> daher jetzt in initBasicState() ausgelagert.
+
         return state;
     },
     generateControls: (gl, state, elements) => ({
@@ -23,8 +26,34 @@ export default {
             );
         },
         uniforms: [{
-            type: "label",
-            name: "iTime",
+            type: "bool",
+            name: "showJustASphere",
+            description: "Bei Bedarf einfach mal ein bisschen Komplexität reduzieren...",
+            defaultValue: false,
+        }, {
+            type: "float",
+            name: "iSphereSize",
+            defaultValue: 0.25,
+            min: 0.05,
+            max: 1.,
+        }, {
+            type: "int",
+            name: "iMarchingSteps",
+            defaultValue: 70,
+            min: 1,
+            max: 200,
+        }, {
+            type: "float",
+            name: "iMarchingPrecision",
+            defaultValue: 0.001,
+            min: 1e-5,
+            max: 0.2,
+            log: true,
+        }, {
+            type: "bool",
+            name: "useAdaptiveMarchingPrecision",
+            description: "Vergleicht beim Marching, ob wir auf längere Strecken die Treffergenauigkeit noch brauchen",
+            defaultValue: false,
         }, {
             type: "float",
             name: "iFocalLength",
@@ -88,6 +117,12 @@ export default {
             max: 100,
         }, {
             type: "float",
+            name: "iFree0",
+            defaultValue: 0,
+            min: -9.99,
+            max: +9.99,
+        }, {
+            type: "float",
             name: "iFree1",
             defaultValue: 0,
             min: -9.99,
@@ -149,6 +184,11 @@ function render(gl, state) {
     gl.uniform2fv(state.location.iResolution, state.resolution);
     gl.uniform4fv(state.location.iMouse, state.iMouse);
 
+    gl.uniform1f(state.location.iMarchingPrecision, state.iMarchingPrecision);
+    gl.uniform1i(state.location.iMarchingSteps, state.iMarchingSteps);
+    gl.uniform1i(state.location.useAdaptiveMarchingPrecision, state.useAdaptiveMarchingPrecision);
+    gl.uniform1i(state.location.showJustASphere, state.showJustASphere);
+    gl.uniform1f(state.location.iSphereSize, state.iSphereSize);
     gl.uniform1f(state.location.iFocalLength, state.iFocalLength);
     gl.uniform3fv(state.location.iCameraTargetOffset, state.iCameraTargetOffset);
     gl.uniform1f(state.location.iCameraCenterDistance, state.iCameraCenterDistance);

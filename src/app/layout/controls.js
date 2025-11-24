@@ -478,7 +478,7 @@ export const asBoolInput = (elements, state, control) => {
 
     control.defaultValue ??= false;
     elements.reset.textContent = `reset`;
-    if (!control.defaultValue) {
+    if (control.group && !control.defaultValue) {
         elements.description.classList.add("extra-column");
     }
 

@@ -23,7 +23,18 @@ uniform vec3 vecDirectionalLight;
 uniform float iDiffuseAmount;
 uniform float iSpecularAmount;
 uniform float iSpecularExponent;
-// for you to play around with, put 'em wherever you want:
+uniform float iMarchingPrecision;
+uniform int iMarchingSteps;
+uniform float iSphereSize;
+// ein paar bools als "Toggles" zum Direkt-Vergleich (besser als #define -> müsste neukompilieren).
+uniform bool showJustASphere;
+uniform bool useAdaptiveMarchingPrecision;
+// PS: hier liest sich die Konvention mit i<Verb><...> m.M.n. so dämlich, dass ich sie da nicht nutze.
+// Es gibt aber sowieso keinen offiziellen GLSL-Styleguide, ihr könnt eigene Ideen ausprobieren,
+// müsst dann aber selbst bewerten, ob ihr auf Dauer eure Shader noch versteht / angstfrei ändern könnt.
+
+// Die iFree* sind wieder definiert, für euch, schnell mal einen Effekt per Slider live zu regeln.
+// -> So lassen sich recht schnell einfache Vermutungen bestätigen / überprüfen.
 uniform float iFree0;
 uniform float iFree1;
 uniform float iFree2;
@@ -382,7 +393,7 @@ float sdU( in vec3 p, in float r, in float le, vec2 w )
 
 // wie vec2, aber erklärt uns mehr über die Bedeutung :)
 struct Marched {
-    float t;
+    float distance; // <-- das heißt wirklich oft einfach nur "t". Wir machen es _hier_mal_explizit_.
     float material;
 };
 
@@ -391,18 +402,46 @@ vec2 opUnion( vec2 d1, vec2 d2 )
     return (d1.x<d2.x) ? d1 : d2;
 }
 
+// Wir überladen opUnion (geht in GLSL wie z.B. in C/C++), weil wir Lesbarkeit vorziehen
+// und statt des "vec2" unser "struct Marched" eingeführt haben. Es drückt dasselbe aus.
+// Das Überladen hilft uns, dass wir nicht alles direkt übersetzen müssen, sondern
+// beide Beschreibungen als gewissermaßen kompatibel behandeln können.
+Marched opUnion( Marched d1, vec2 d2 )
+{
+    if (d1.distance < d2.x)
+        return d1;
+    return Marched(d2.x, d2.y);
+}
+
 Marched opUnion( Marched d1, Marched d2 )
 {
-    if (d1.t < d2.t)
+    // Randnotiz: bei eigenen structs unterstützt GLSL den
+    //            den ternären Operator (... ? ... : ...) nicht.
+    if (d1.distance < d2.distance)
         return d1;
     return d2;
 }
 
-vec2 map( in vec3 pos )
+Marched map( in vec3 pos )
 {
-    vec2 res = vec2( pos.y, 0.0 );
+    // Notiz:
+    Marched res = Marched(pos.y, 0.0);
 
-    // Anmerkung: Größere Szenen sollten mithilfe solcher Bounding Boxes unterteilt werden:
+    if (showJustASphere) {
+        float material = 1.0;
+
+        // ist ein händisches "opUnion" (== "Ist dieser Signed-Distance geringer, d.h. Objekt näher"?)
+        float sphereDistance = sdSphere(pos-vec3( 1.0,0.2,-1.0), iSphereSize );
+        if (sphereDistance < res.distance) {
+            res.distance = sphereDistance;
+            res.material = 1.5 + 0.1 * iTime;
+            // <-- wäre rotes Sphere-Material. Wir können hier aber entscheiden, was wir wollen.
+            res.material += pow(1.93 * pos.y, -1.01);
+        }
+        return res;
+    }
+
+    // Anmerkung: Größere Szenen können mithilfe solcher Bounding Boxes unterteilt werden:
 //    if( sdBox( pos-vec3(-2.0,0.3,0.25),vec3(0.3,0.3,1.0) )<res.x )
 //    {
 //        res = opUnion(... sdf(...) ...);
@@ -419,7 +458,7 @@ vec2 map( in vec3 pos )
     res = opUnion( res, vec2( sdSolidAngle(  pos-vec3( 0.0,0.00,-3.0), vec2(3,4)/5.0, 0.4 ), 49.13 ) );
     res = opUnion( res, vec2( sdTorus(      (pos-vec3( 1.0,0.30, 1.0)).xzy, vec2(0.25,0.05) ), 7.1 ) );
     res = opUnion( res, vec2( sdBox(         pos-vec3( 1.0,0.25, 0.0), vec3(0.3,0.25,0.1) ), 3.0 ) );
-    res = opUnion( res, vec2( sdSphere(      pos-vec3( 1.0,0.2,-1.0), 0.25 ), 26.9 ) );
+    res = opUnion( res, vec2( sdSphere(      pos-vec3( 1.0,0.2,-1.0), 0.2 + 0.3 * iSphereSize ), 26.9 ) );
     res = opUnion( res, vec2( sdCylinder(    rotZ(0.8*iTime)* (pos-vec3( 1.0,0.25,-2.0)), vec2(0.15,0.25) ), 8.0 ) );
     res = opUnion( res, vec2( sdCapsule(     pos-vec3( 1.0,0.00,-3.0),vec3(-0.1,0.1,-0.1), vec3(0.2,0.4,0.2), 0.1  ), 31.9 ) );
     res = opUnion( res, vec2( sdPyramid(    pos-vec3(-1.0,-0.6,-3.0), 1.0 ), 13.56 ) );
@@ -449,44 +488,6 @@ vec2 iBox( in vec3 ro, in vec3 rd, in vec3 rad )
     min( min( t2.x, t2.y ), t2.z ) );
 }
 
-Marched raycast( in vec3 ro, in vec3 rd )
-{
-    Marched res = Marched(-1.0,-1.0);
-
-    float tmin = 1.0;
-    float tmax = 20.0;
-
-    // raytrace floor plane
-    float tp1 = (0.0-ro.y)/rd.y;
-    if( tp1>0.0 )
-    {
-        tmax = min( tmax, tp1 );
-        res = Marched( tp1, 1.0 );
-    }
-
-    // raymarch primitives
-    vec2 tb = iBox( ro-vec3(0.0,0.4,-0.5), rd, vec3(2.5,0.41,3.0) );
-    if( tb.x<tb.y && tb.y>0.0 && tb.x<tmax)
-    {
-        //return vec2(tb.x,2.0);
-        tmin = max(tb.x,tmin);
-        tmax = min(tb.y,tmax);
-
-        float t = tmin;
-        for( int i=0; i<70 && t<tmax; i++ )
-        {
-            vec2 h = map( ro+rd*t );
-            if( abs(h.x)<(0.0001*t) )
-            {
-                res = Marched(t, h.y);
-                break;
-            }
-            t += h.x;
-        }
-    }
-    return res;
-}
-
 Marched raycastJustTheSphere( in vec3 ro, in vec3 rd )
 {
     Marched res = Marched(-1.0,-1.0);
@@ -510,7 +511,7 @@ Marched raycastJustTheSphere( in vec3 ro, in vec3 rd )
         tmax = min(tb.y,tmax);
 
         float t = tmin;
-        for( int i=0; i<70 && t<tmax; i++ )
+        for( int i=0; i< iMarchingSteps && t<tmax; i++ )
         {
             vec3 pos = ro + rd * t;
 
@@ -534,6 +535,59 @@ Marched raycastJustTheSphere( in vec3 ro, in vec3 rd )
     return res;
 }
 
+Marched raycast( in vec3 ro, in vec3 rd )
+{
+    Marched res = Marched(-1.0,-1.0);
+
+    float tmin = 1.0;
+    float tmax = 20.0;
+
+    // raytrace floor plane
+    float tp1 = (0.0-ro.y)/rd.y;
+    if( tp1>0.0 )
+    {
+        tmax = min( tmax, tp1 );
+        res = Marched( tp1, 1.0 );
+    }
+
+    // raymarch primitives
+    vec2 tb = iBox( ro-vec3(0.0,0.4,-0.5), rd, vec3(2.5,0.41,3.0) );
+    if( tb.x<tb.y && tb.y>0.0 && tb.x<tmax)
+    {
+        tmin = max(tb.x,tmin);
+        tmax = min(tb.y,tmax);
+
+        float t = tmin;
+        for( int i=0; i<iMarchingSteps && t<tmax; i++ )
+        {
+            vec3 pos = ro + rd * t;
+            Marched h = map(pos);
+
+            // hier eine leichte Variation "< epsilon * t", das nennt sich "adaptiv" - nach der Idee:
+            // bei größeren Marching-Strecken darf auch das Objekt ungenauer getroffen werden, weil
+            // - in der Ferne die Präzision mutmaßlich verschwendet ist
+            // - sich numerische Float-Rundungsfehler auch aufsummieren
+            // Gerade der erste Punkt solle im konkreten Fall aber auch mal gegengecheckt werden.
+            //
+            // ~ iMarchingPrecision bei 0.001 bis 0.01 ist oft fürs Ergebnis gut,
+            //   die Frage ist immer, in wie vielen Schleifen man erheblich Rechenzeit sparen könnte.
+            // ~ gilt auch für iMarchingSteps (war 70) oben -- wo kann man sparen?
+            float marchingPrecision = (
+                useAdaptiveMarchingPrecision
+                    ? iMarchingPrecision * 0.1 * t
+                    : iMarchingPrecision
+            );
+            if(abs(h.distance) < marchingPrecision)
+            {
+                res = Marched(t, h.material);
+                break;
+            }
+            t += h.distance;
+        }
+    }
+    return res;
+}
+
 // https://iquilezles.org/articles/rmshadows
 float calcSoftshadow( in vec3 ro, in vec3 rd, in float mint, in float tmax )
 {
@@ -544,7 +598,7 @@ float calcSoftshadow( in vec3 ro, in vec3 rd, in float mint, in float tmax )
     float t = mint;
     for( int i=0; i<80; i++ )
     {
-        float h = map( ro + rd*t ).x;
+        float h = map( ro + rd*t ).distance;
         float s = clamp(8.0*h/t,0.0,1.0);
         res = min( res, s );
         t += clamp( h, 0.01, 0.2 );
@@ -561,8 +615,9 @@ float calcAO( in vec3 pos, in vec3 nor )
     float sca = 1.0;
     for( int i=0; i<5; i++ )
     {
+        // Das ist eine Modifikation des
         float h = 0.01 + 0.12*float(i)/4.0;
-        float d = map( pos + h*nor ).x;
+        float d = map( pos + h*nor ).distance;
         occ += (h-d)*sca;
         sca *= 0.95;
         if( occ>0.35 ) break;
@@ -574,10 +629,10 @@ float calcAO( in vec3 pos, in vec3 nor )
 vec3 calcNormal( in vec3 pos )
 {
     vec2 e = vec2(1.0,-1.0)*0.5773*0.0005;
-    return normalize( e.xyy*map( pos + e.xyy ).x +
-    e.yyx*map( pos + e.yyx ).x +
-    e.yxy*map( pos + e.yxy ).x +
-    e.xxx*map( pos + e.xxx ).x );
+    return normalize( e.xyy*map( pos + e.xyy ).distance +
+    e.yyx*map( pos + e.yyx ).distance +
+    e.yxy*map( pos + e.yxy ).distance +
+    e.xxx*map( pos + e.xxx ).distance );
 }
 
 vec3 render(in vec3 rayOrigin, in vec3 rayDir)
@@ -587,7 +642,6 @@ vec3 render(in vec3 rayOrigin, in vec3 rayDir)
 
     // raycast scene
     Marched res = raycast(rayOrigin,rayDir);
-    // Marched res = raycastJustTheSphere(rayOrigin, rayDir);
     if( res.material > -0.5 )
     {
         // material
@@ -596,7 +650,7 @@ vec3 render(in vec3 rayOrigin, in vec3 rayDir)
         bool isFloor = res.material < 1.5;
 
         // ray evaluation
-        vec3 rayPos = rayOrigin + res.t * rayDir;
+        vec3 rayPos = rayOrigin + res.distance * rayDir;
         vec3 normal = isFloor ? vec3(0.0,1.0,0.0) : calcNormal(rayPos);
 
         if (isFloor)
@@ -626,7 +680,7 @@ vec3 render(in vec3 rayOrigin, in vec3 rayDir)
 
         // "Distanznebel", inwiefern macht dieser Begriff Sinn?
         const vec3 colFog = vec3(0.0, 0.0, 0.0);
-        float fogOpacity = 1.0 - exp( -0.0001 * pow(res.t, 3.0));
+        float fogOpacity = 1.0 - exp( -0.0001 * pow(res.distance, 3.0));
         col = mix(col, colFog, fogOpacity);
     }
 
