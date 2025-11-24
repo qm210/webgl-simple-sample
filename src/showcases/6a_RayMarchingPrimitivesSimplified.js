@@ -37,6 +37,11 @@ export default {
             min: 0.05,
             max: 1.,
         }, {
+            type: "bool",
+            name: "makeSphereColorful",
+            description: "Zeigt, dass manche Effekte keinen eindeutigen Platz im Shader haben müssen.",
+            defaultValue: false,
+        }, {
             type: "int",
             name: "iMarchingSteps",
             defaultValue: 70,
@@ -189,6 +194,7 @@ function render(gl, state) {
     gl.uniform1i(state.location.useAdaptiveMarchingPrecision, state.useAdaptiveMarchingPrecision);
     gl.uniform1i(state.location.showJustASphere, state.showJustASphere);
     gl.uniform1f(state.location.iSphereSize, state.iSphereSize);
+    gl.uniform1i(state.location.makeSphereColorful, state.makeSphereColorful);
     gl.uniform1f(state.location.iFocalLength, state.iFocalLength);
     gl.uniform3fv(state.location.iCameraTargetOffset, state.iCameraTargetOffset);
     gl.uniform1f(state.location.iCameraCenterDistance, state.iCameraCenterDistance);

@@ -27,8 +27,9 @@ uniform float iMarchingPrecision;
 uniform int iMarchingSteps;
 uniform float iSphereSize;
 // ein paar bools als "Toggles" zum Direkt-Vergleich (besser als #define -> müsste neukompilieren).
-uniform bool showJustASphere;
 uniform bool useAdaptiveMarchingPrecision;
+uniform bool showJustASphere;
+uniform bool makeSphereColorful;
 // PS: hier liest sich die Konvention mit i<Verb><...> m.M.n. so dämlich, dass ich sie da nicht nutze.
 // Es gibt aber sowieso keinen offiziellen GLSL-Styleguide, ihr könnt eigene Ideen ausprobieren,
 // müsst dann aber selbst bewerten, ob ihr auf Dauer eure Shader noch versteht / angstfrei ändern könnt.
@@ -434,9 +435,7 @@ Marched map( in vec3 pos )
         float sphereDistance = sdSphere(pos-vec3( 1.0,0.2,-1.0), iSphereSize );
         if (sphereDistance < res.distance) {
             res.distance = sphereDistance;
-            res.material = 1.5 + 0.1 * iTime;
-            // <-- wäre rotes Sphere-Material. Wir können hier aber entscheiden, was wir wollen.
-            res.material += pow(1.93 * pos.y, -1.01);
+            res.material = 1.6;
         }
         return res;
     }
@@ -458,7 +457,7 @@ Marched map( in vec3 pos )
     res = opUnion( res, vec2( sdSolidAngle(  pos-vec3( 0.0,0.00,-3.0), vec2(3,4)/5.0, 0.4 ), 49.13 ) );
     res = opUnion( res, vec2( sdTorus(      (pos-vec3( 1.0,0.30, 1.0)).xzy, vec2(0.25,0.05) ), 7.1 ) );
     res = opUnion( res, vec2( sdBox(         pos-vec3( 1.0,0.25, 0.0), vec3(0.3,0.25,0.1) ), 3.0 ) );
-    res = opUnion( res, vec2( sdSphere(      pos-vec3( 1.0,0.2,-1.0), 0.2 + 0.3 * iSphereSize ), 26.9 ) );
+    res = opUnion( res, vec2( sdSphere(      pos-vec3( 1.0,0.2,-1.0), 0.2 + 0.3 * iSphereSize ), 1.6 ) );
     res = opUnion( res, vec2( sdCylinder(    rotZ(0.8*iTime)* (pos-vec3( 1.0,0.25,-2.0)), vec2(0.15,0.25) ), 8.0 ) );
     res = opUnion( res, vec2( sdCapsule(     pos-vec3( 1.0,0.00,-3.0),vec3(-0.1,0.1,-0.1), vec3(0.2,0.4,0.2), 0.1  ), 31.9 ) );
     res = opUnion( res, vec2( sdPyramid(    pos-vec3(-1.0,-0.6,-3.0), 1.0 ), 13.56 ) );
@@ -486,53 +485,6 @@ vec2 iBox( in vec3 ro, in vec3 rd, in vec3 rad )
     vec3 t2 = -n + k;
     return vec2( max( max( t1.x, t1.y ), t1.z ),
     min( min( t2.x, t2.y ), t2.z ) );
-}
-
-Marched raycastJustTheSphere( in vec3 ro, in vec3 rd )
-{
-    Marched res = Marched(-1.0,-1.0);
-
-    float tmin = 1.0;
-    float tmax = 20.0;
-
-    // raytrace floor plane
-    float tp1 = (0.0-ro.y)/rd.y;
-    if( tp1>0.0 )
-    {
-        tmax = min( tmax, tp1 );
-        res = Marched( tp1, 1.0 );
-    }
-
-    // raymarch primitives
-    vec2 tb = iBox( ro-vec3(0.0,0.4,-0.5), rd, vec3(2.5,0.41,3.0) );
-    if( tb.x<tb.y && tb.y>0.0 && tb.x<tmax)
-    {
-        tmin = max(tb.x,tmin);
-        tmax = min(tb.y,tmax);
-
-        float t = tmin;
-        for( int i=0; i< iMarchingSteps && t<tmax; i++ )
-        {
-            vec3 pos = ro + rd * t;
-
-            /* best guess up to here: the floor is closest */
-            float minDistance = pos.y;
-            float material = 1.0;
-
-            float sphereDistance = sdSphere(pos-vec3( 1.0,0.2,-1.0), 0.25 );
-            if (sphereDistance < minDistance) {
-                minDistance = sphereDistance;
-                material = 1.5 + 0.1 * iTime; // rotes Sphere-Material
-            }
-            if( abs(minDistance) < (0.0001*t) )
-            {
-                res = Marched(t, material);
-                break;
-            }
-            t += minDistance;
-        }
-    }
-    return res;
 }
 
 Marched raycast( in vec3 ro, in vec3 rd )
@@ -644,20 +596,35 @@ vec3 render(in vec3 rayOrigin, in vec3 rayDir)
     Marched res = raycast(rayOrigin,rayDir);
     if( res.material > -0.5 )
     {
-        // material
-        col = 0.2 + 0.2*sin( res.material*2.0 + vec3(0.0,1.0,2.0) );
-        float specularCoeff = 0.4 + 0.5 *exp(0.03 * res.material);
         bool isFloor = res.material < 1.5;
 
-        // ray evaluation
         vec3 rayPos = rayOrigin + res.distance * rayDir;
         vec3 normal = isFloor ? vec3(0.0,1.0,0.0) : calcNormal(rayPos);
+
+        bool isSphere = res.material == 1.6;
+        if (makeSphereColorful && isSphere) {
+            // Notiz: das ist bewusst hier so "reingehackt". Weil es eben _möglich_ ist.
+            //        Ob das verständlich ist, und die Struktur zukunftsfähig passt,
+            //        müsst ihr immer im Einzelfall evaluieren. Manchmal macht auch
+            //        die Performance, dass man Code nicht beliebig "clean" bekommt.
+            res.material += 0.2 * iTime;
+            res.material += pow(1.93 * rayPos.y, -1.01);
+        }
+
+        col = 0.2 + 0.2*sin( res.material*2.0 + vec3(0.0,1.0,2.0) );
+        float specularCoeff = 0.4 + 0.5 *exp(0.03 * res.material);
 
         if (isFloor)
         {
             float f = 1. - abs(step(0.5, fract(1.5*rayPos.x)) - step(0.5, fract(1.5*rayPos.z)));
             col = 0.15 + f*vec3(0.05);
             specularCoeff = 0.4;
+        }
+
+        if (makeSphereColorful && isSphere) {
+            // Siehe Kommentar zu makeSphereColorful oben.
+            // Es ist Pfusch -- aber bunter Pfusch.
+            col.r = 0.4 + col.g * 0.3 * sin(29.2 * rayPos.x);
         }
 
         vec3 shade = vec3(0.0);
