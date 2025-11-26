@@ -196,7 +196,7 @@ export default {
             max: 10.,
         }, {
             type: "float",
-            name: "iFractionalLacunarity",
+            name: "iFractionalDecay",
             defaultValue: 0.5,
             min: 0.01,
             max: 2.,
@@ -274,7 +274,7 @@ function render(gl, state) {
     gl.uniform1f(state.location.iNoiseOffset, state.iNoiseOffset);
     gl.uniform1i(state.location.iFractionalOctaves, Math.floor(state.iFractionalOctaves));
     gl.uniform1f(state.location.iFractionalScale, state.iFractionalScale);
-    gl.uniform1f(state.location.iFractionalLacunarity, state.iFractionalLacunarity);
+    gl.uniform1f(state.location.iFractionalDecay, state.iFractionalDecay);
     gl.uniform1f(state.location.iCloudMorph, state.iCloudMorph);
     gl.uniform1f(state.location.iCloudVelX, state.iCloudVelX);
     gl.uniform3fv(state.location.iFree0, state.iFree0);

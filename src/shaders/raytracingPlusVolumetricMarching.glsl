@@ -52,7 +52,7 @@ uniform float iNoiseFreq;
 uniform float iNoiseOffset;
 uniform int iFractionalOctaves;
 uniform float iFractionalScale;
-uniform float iFractionalLacunarity;
+uniform float iFractionalDecay;
 uniform float iCalcNormalEpsilon;
 uniform int modeDebugRendering;
 
@@ -193,7 +193,7 @@ float fractalBrownianMotion(vec2 p) {
         v += a * perlin2D(p);
         s += a;
         p = p * iFractionalScale;
-        a *= iFractionalLacunarity;
+        a *= iFractionalDecay;
     }
     // return v;
     // <-- ist das eigentliche fbm(), aber führt hier schnell zu zu starken Werten

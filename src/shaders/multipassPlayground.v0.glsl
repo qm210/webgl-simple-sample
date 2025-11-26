@@ -24,7 +24,7 @@ uniform float iNoiseLevel;
 uniform float iNoiseOffset;
 uniform int iFractionalOctaves;
 uniform float iFractionalScale;
-uniform float iFractionalLacunarity;
+uniform float iFractionalDecay;
 uniform float iCloudMorph;
 uniform float iCloudVelX;
 uniform float iCloudVelY;
@@ -116,7 +116,7 @@ float fractionalNoiseSum(vec2 p) {
         r += a * noise;
         s += a;
         p *= iFractionalScale;
-        a *= iFractionalLacunarity;
+        a *= iFractionalDecay;
     }
     return r/s;
 }
@@ -441,7 +441,7 @@ float fbm(vec2 p, float seedShift) {
         v += a * snoise(p, seedShift);
         s += a;
         p = p * iFractionalScale;
-        a *= iFractionalLacunarity;
+        a *= iFractionalDecay;
     }
     return v / s;
 }

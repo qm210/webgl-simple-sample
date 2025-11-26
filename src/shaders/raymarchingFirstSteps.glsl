@@ -87,9 +87,9 @@ mat3 rotZ(float angle) {
     );
 }
 
-mat3 rodrigues(vec3 direction, float angle) {
+mat3 rodrigues(vec3 axis, float angle) {
     // huh?
-    vec3 v = normalize(direction);
+    vec3 v = normalize(axis);
     mat3 skewSymmetricCrossProduct = mat3(
         0, v.z, -v.y,
         -v.z, 0, v.x,

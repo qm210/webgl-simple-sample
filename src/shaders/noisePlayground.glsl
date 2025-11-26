@@ -14,7 +14,7 @@ uniform float iOverallHashOffset;
 uniform float iOverallHashMorphing;
 uniform int iFractionalOctaves;
 uniform float iFractionalScale;
-uniform float iFractionalLacunarity;
+uniform float iFractionalDecay;
 uniform float iMeanOffsetForNoiseA;
 uniform float iNormFactorForNoiseA;
 uniform float iMeanOffsetForNoiseB;
@@ -90,7 +90,7 @@ float noiseStackA(vec2 p){
     // Gewöhnliche Werte sind etwa
     //   iFractionalOctaves ~ 4-5
     //   iFractionalScale == 2
-    //   iFractionalLacunarity == 0.5
+    //   iFractionalDecay == 0.5
     // und ist auch meist konstant, aber hier mal zum Anschauen als Uniform definiert.
     float a = 1., s = 0., sum = 0.;
     float noise;
@@ -103,7 +103,7 @@ float noiseStackA(vec2 p){
 
         s += a;
         p *= iFractionalScale;
-        a *= iFractionalLacunarity;
+        a *= iFractionalDecay;
     }
     // Ausgabewert soll _etwa_ in [0, 1] liegen, mit 0.5 = neutral.
     // Es kann aber stark von den Fraktal-Parametern und der Hashfunktion abhängig sein,
@@ -128,7 +128,7 @@ float noiseStackB(vec2 p){
 
         s += a;
         p *= iFractionalScale;
-        a *= iFractionalLacunarity;
+        a *= iFractionalDecay;
     }
     // Normierung analog zu, aber unabhängig von der Noisefunktion oben.
     return (sum / s + iMeanOffsetForNoiseB) * iNormFactorForNoiseB;

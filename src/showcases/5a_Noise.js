@@ -49,7 +49,7 @@ function render(gl, state, elements) {
     gl.uniform1f(state.location.iNoiseLevelB, state.iNoiseLevelB);
     gl.uniform1i(state.location.iFractionalOctaves, Math.floor(state.iFractionalOctaves));
     gl.uniform1f(state.location.iFractionalScale, state.iFractionalScale);
-    gl.uniform1f(state.location.iFractionalLacunarity, state.iFractionalLacunarity);
+    gl.uniform1f(state.location.iFractionalDecay, state.iFractionalDecay);
     gl.uniform1f(state.location.iNormFactorForNoiseA, state.iNormFactorForNoiseA);
     gl.uniform1f(state.location.iMeanOffsetForNoiseA, state.iMeanOffsetForNoiseA);
     gl.uniform1f(state.location.iNormFactorForNoiseB, state.iNormFactorForNoiseB);
@@ -130,7 +130,7 @@ function defineUniformControls(state) {
         max: 10.,
     }, {
         type: "float",
-        name: "iFractionalLacunarity",
+        name: "iFractionalDecay",
         defaultValue: 0.5,
         min: 0.01,
         max: 0.99,

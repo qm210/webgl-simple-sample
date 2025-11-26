@@ -20,7 +20,7 @@ uniform float iNoiseMorphingB;
 uniform float iNoiseMorphingC;
 uniform int iFractionalOctaves;
 uniform float iFractionalScale;
-uniform float iFractionalLacunarity;
+uniform float iFractionalDecay;
 uniform float iTurbulenceNormFactor;
 uniform float iTurbulenceMeanOffset;
 uniform vec2 iMarbleSqueeze;
@@ -104,12 +104,12 @@ float noiseStack(vec2 p){
 
         s += a;
         p *= iFractionalScale;
-        a *= iFractionalLacunarity;
+        a *= iFractionalDecay;
     }
     // Ausgabewert soll in [0, 1] liegen, mit 0.5 = neutral.
     // Der Faktor 1.5 ist nach einigen Versuchen so gewählt,
     // man könnte ihn auch konfigurierbar machen, weil manche Kombinationen aus
-    // iFractionalScale & iFractionalLacunarity das Intervall dennoch verlassen könnten.
+    // iFractionalScale & iFractionalDecay das Intervall dennoch verlassen könnten.
     return 0.5 + 0.5 * (sum / s * 1.5);
 }
 
@@ -125,10 +125,10 @@ float noiseAbsoluteStack(vec2 p){
 
         s += a;
         p *= iFractionalScale;
-        a *= iFractionalLacunarity;
+        a *= iFractionalDecay;
     }
     // Ausgabewert soll in [0, 1] liegen
-    // (wobei ungünstige Kombinationen iFractionalScale / iFractionalLacunarity auch > 1. summieren KÖNNTEN)
+    // (wobei ungünstige Kombinationen iFractionalScale / iFractionalDecay auch > 1. summieren KÖNNTEN)
     // Auslesen der Werte über gl.readPixels() für verschiedene Kombinationen legt nahe,
     // dass wir erstmal flexibel sein wollen (...das geht aber auch in die Marble-Funktion ein!)
     return (sum / s - iTurbulenceMeanOffset) / iTurbulenceNormFactor;

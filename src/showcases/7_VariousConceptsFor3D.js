@@ -52,8 +52,8 @@ export default {
 function render(gl, state) {
     gl.uniform1f(state.location.iTime, state.time);
     gl.uniform2fv(state.location.iResolution, state.resolution);
-    gl.uniform4fv(state.location.iMouse, state.iMouse);
-
+    gl.uniform4fv(state.location.iMouseDrag, state.iMouseDrag);
+    // <-- PS: habe mir ausgedacht, dass das neue iMouseDrag nützlicher ist als das iMouse wie auf Shadertoy.
     gl.uniform3fv(state.location.iCamOffset, state.iCamOffset);
     gl.uniform3fv(state.location.iCamLookOffset, state.iCamLookOffset);
     gl.uniform1f(state.location.iCamRoll, state.iCamRoll);
@@ -64,6 +64,9 @@ function render(gl, state) {
     gl.uniform1f(state.location.iLightPointPaletteColor, state.iLightPointPaletteColor);
     gl.uniform1f(state.location.iPathSpeed, state.iPathSpeed);
     gl.uniform1f(state.location.iPathOffset, state.iPathOffset);
+    gl.uniform1i(state.location.useCentripetalCatmullRomSplines, state.useCentripetalCatmullRomSplines);
+    gl.uniform1i(state.location.useLinearSplines, state.useLinearSplines);
+    gl.uniform1i(state.location.tryLinearSplineSpeedApproximation, state.tryLinearSplineSpeedApproximation);
     gl.uniform1f(state.location.iDiffuseAmount, state.iDiffuseAmount);
     gl.uniform1f(state.location.iSpecularAmount, state.iSpecularAmount);
     gl.uniform1f(state.location.iSpecularExponent, state.iSpecularExponent);
@@ -86,6 +89,7 @@ function render(gl, state) {
     gl.uniform1i(state.location.doUseCameraTargetPath, state.doUseCameraTargetPath);
     gl.uniform1i(state.location.doShowPointLightSource, state.doShowPointLightSource);
 
+    gl.uniform1f(state.location.iDistanceFogExponent, state.iDistanceFogExponent);
     gl.uniform1f(state.location.iToneMapExposure, state.iToneMapExposure);
     gl.uniform1f(state.location.iToneMapACESMixing, state.iToneMapACESMixing);
     gl.uniform1f(state.location.iGammaExponent, state.iGammaExponent);
@@ -94,7 +98,7 @@ function render(gl, state) {
     gl.uniform1f(state.location.iNoiseOffset, state.iNoiseOffset);
     gl.uniform1i(state.location.iFractionalOctaves, Math.floor(state.iFractionalOctaves));
     gl.uniform1f(state.location.iFractionalScale, state.iFractionalScale);
-    gl.uniform1f(state.location.iFractionalLacunarity, state.iFractionalLacunarity);
+    gl.uniform1f(state.location.iFractionalDecay, state.iFractionalDecay);
 
     gl.uniform1f(state.location.iFree0, state.iFree0);
     gl.uniform1f(state.location.iFree1, state.iFree1);
@@ -136,8 +140,9 @@ function defineUniformControlsBelow() {
         type: "float",
         name: "iCamRoll",
         defaultValue: 0,
-        min: -6.283,
-        max: +6.283,
+        min: -3.141,
+        max: +3.141,
+        step: 0.001,
     }, {
         type: "float",
         name: "iCamFocalLength",
@@ -171,6 +176,23 @@ function defineUniformControlsBelow() {
         defaultValue: 0,
         min: 0.,
         max: 14.,
+    }, {
+        type: "bool",
+        name: "useCentripetalCatmullRomSplines",
+        defaultValue: false,
+        description: "Vergleich: Zentripetale Catmull-Rom-Splines für Kamera-Pfad.\n" +
+            ""
+    }, {
+        type: "bool",
+        name: "useLinearSplines",
+        defaultValue: false,
+        description: "Vergleich: Lineare Interpolation für Kamera-Pfad.\n",
+    }, {
+        type: "bool",
+        name: "tryLinearSplineSpeedApproximation",
+        defaultValue: false,
+        description: "Kamera-Geschwindigkeit näherungsweise konstant anpassen.\n" +
+            "(weil die Gesamtlänge des Pfads vereinfacht nur linear bestimmt wird...)",
     }, {
         type: "bool",
         name: "justTheBoxes",
@@ -269,24 +291,27 @@ function defineUniformControlsBelow() {
         type: "bool",
         name: "showPyramidTextureGrid",
         defaultValue: false,
-        description: "Um das Mapping der Texturkoordinaten \"st\" auf jede Pyramidenseite zu sehen:\n" +
-            ""
+        description: "Um die Bereiche Texturkoordinaten \"st\" auf jede Pyramidenseite zu sehen:\n" +
+            "Cyan (st.x → 0), Orange (st.x → 1), Grün (st.y → 0), Magenta (st.y → 1),\n" +
+            "Blaue Linie (st.x == 0.5) und Rotes Gitter in Schritten von je 0.1"
     }, {
         type: "bool",
         name: "applyPyramidTextureSkewing",
         defaultValue: false,
-        description: "Pyramiden-Textur mit ihrem linken Rand an Pyramidenkanten ausrichten."
+        description: "Pyramidentextur mit linkem Rand (st.x = 0) an Pyramidenkanten ausrichten,\n" +
+            "anstatt beidseitig um die Mittellinie abschneiden."
     }, {
         type: "bool",
         name: "applyPyramidTextureNarrowing",
         defaultValue: false,
-        description: "Pyramiden-Textur nach oben hin verschmälern, um nichts abzuschneiden."
+        description: "Pyramidentextur zur Spitze hin immer weiter verschmälern.\n" +
+            "Schneidet nichts ab, verzerrt aber entsprechend stark."
     }, {
         type: "bool",
         name: "applyPyramidTextureTopDown",
         defaultValue: false,
         description: "Andere Idee: Die Texturkoordinaten schlicht Grundriss gleichsetzen.\n" +
-            "(Das interpretiert die Textur also als Draufsicht, wird zur Spitze verzerrt.)"
+            "(entspricht Interpretation als Draufsicht; wird auch stark verzerrt.)"
     }, {
         type: "bool",
         name: "usePyramidTextureFromBoxes",
@@ -299,6 +324,12 @@ function defineUniformControlsBelow() {
         defaultValue: 1,
         min: -1.,
         max: 3.,
+    }, {
+        type: "float",
+        name: "iDistanceFogExponent",
+        defaultValue: 2.9,
+        min: 0,
+        max: 5,
     }, {
         type: "float",
         name: "iToneMapACESMixing",
@@ -341,14 +372,7 @@ function defineUniformControlsBelow() {
         step: 1,
     }, {
         type: "float",
-        name: "iFractionalScale",
-        defaultValue: 2.,
-        min: 0.1,
-        max: 4.,
-        hidden: true, // wenig lehrreich, den zu ändern
-    }, {
-        type: "float",
-        name: "iFractionalLacunarity",
+        name: "iFractionalDecay",
         defaultValue: 0.5,
         min: 0.01,
         max: 2.,
