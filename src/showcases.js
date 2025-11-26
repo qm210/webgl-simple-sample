@@ -16,9 +16,9 @@ import showcase10b from "./showcases/10b_RayTracingPlusVolumetric.js"
 import showcase11 from "./showcases/11_FluidSimulation.js";
 import showcaseFb210 from "./showcases/11b_MoreFramebufferProcessing.js";
 import showcase12 from "./showcases/12_PerformancePlayground.js";
-import showcaseRIOW from "./showcases/retired/10_StochasticRayTracing.js";
-import showcaseOld8 from "./showcases/retired/8_Multipass.js";
-import showcaseOld11 from "./showcases/retired/11_Volumetric.js";
+import showcaseRIOW from "./showcases/retired/old10_StochasticRayTracing.js";
+import showcaseOld8 from "./showcases/retired/old8_Multipass.js";
+import showcaseOld11 from "./showcases/retired/old11_Volumetric.js";
 import showcaseX from "./showcases/X_SimulationPlayground.js";
 import showcaseZClouds from "./showcases/Z_NR4_Clouds.js";
 

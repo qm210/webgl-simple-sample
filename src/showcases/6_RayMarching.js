@@ -39,8 +39,8 @@ export default {
         }, {
             type: "bool",
             name: "makeSphereColorful",
-            description: "Ein Beispiel einer individuellen Farbgebung für die Kugel. Aber man sieht\n" +
-                "dem Code an, dass das dem bisherigen Design etwas zuwidergeht.",
+            description: "Individuelle Einfärbung der Kugel. An dem Beispiel sieht man\n" +
+                "dem Code aber an, dass das eher nicht ins bisherige Konzept passt.",
             defaultValue: false,
         }, {
             type: "int",

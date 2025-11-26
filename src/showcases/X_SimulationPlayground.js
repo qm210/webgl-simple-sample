@@ -101,9 +101,9 @@ export default {
         state.location.iNoiseLevel = gl.getUniformLocation(state.program, "iNoiseLevel");
         state.location.iNoiseFreq = gl.getUniformLocation(state.program, "iNoiseFreq");
         state.location.iNoiseOffset = gl.getUniformLocation(state.program, "iNoiseOffset");
-        state.location.iFractionSteps = gl.getUniformLocation(state.program, "iFractionSteps");
-        state.location.iFractionScale = gl.getUniformLocation(state.program, "iFractionScale");
-        state.location.iFractionAmplitude = gl.getUniformLocation(state.program, "iFractionAmplitude");
+        state.location.iFractionalOctaves = gl.getUniformLocation(state.program, "iFractionalOctaves");
+        state.location.iFractionalScale = gl.getUniformLocation(state.program, "iFractionalScale");
+        state.location.iFractionalLacunarity = gl.getUniformLocation(state.program, "iFractionalLacunarity");
         state.location.iCloudMorph = gl.getUniformLocation(state.program, "iCloudMorph");
         state.location.iCloudVelX = gl.getUniformLocation(state.program, "iCloudVelX");
         state.location.iFree0 = gl.getUniformLocation(state.program, "iFree0");
@@ -153,20 +153,20 @@ export default {
             max: 1,
         }, {
             type: "float",
-            name: "iFractionSteps",
+            name: "iFractionalOctaves",
             defaultValue: 1,
             min: 1,
             max: 10.,
             step: 1,
         }, {
             type: "float",
-            name: "iFractionScale",
+            name: "iFractionalScale",
             defaultValue: 2.,
             min: 0.01,
             max: 10.,
         }, {
             type: "float",
-            name: "iFractionAmplitude",
+            name: "iFractionalLacunarity",
             defaultValue: 0.5,
             min: 0.01,
             max: 2.,
@@ -219,9 +219,9 @@ function render(gl, state) {
     gl.uniform1f(state.location.iNoiseLevel, state.iNoiseLevel);
     gl.uniform1f(state.location.iNoiseFreq, state.iNoiseFreq);
     gl.uniform1f(state.location.iNoiseOffset, state.iNoiseOffset);
-    gl.uniform1i(state.location.iFractionSteps, Math.floor(state.iFractionSteps));
-    gl.uniform1f(state.location.iFractionScale, state.iFractionScale);
-    gl.uniform1f(state.location.iFractionAmplitude, state.iFractionAmplitude);
+    gl.uniform1i(state.location.iFractionalOctaves, Math.floor(state.iFractionalOctaves));
+    gl.uniform1f(state.location.iFractionalScale, state.iFractionalScale);
+    gl.uniform1f(state.location.iFractionalLacunarity, state.iFractionalLacunarity);
     gl.uniform1f(state.location.iCloudMorph, state.iCloudMorph);
     gl.uniform1f(state.location.iCloudVelX, state.iCloudVelX);
     gl.uniform3fv(state.location.iFree0, state.iFree0);

@@ -1,4 +1,4 @@
-import standardSetup from "./3_SimpleGeometry.js";
+import standardSetup from "./old3_SimpleGeometry.js";
 import {startRenderLoop} from "../../webgl/render.js";
 import {createTextureFromImage} from "../../webgl/helpers.js";
 
@@ -51,7 +51,7 @@ export default {
         state.location.texture2 = gl.getUniformLocation(state.program, "iTexture2");
         state.location.texture3 = gl.getUniformLocation(state.program, "iBumpMap");
 
-        // <-- up to here, known from 6_TexturesIn3D.js
+        // <-- up to here, known from old6_TexturesIn3D.js
 
         state.post = standardSetup.init(gl, postFragmentShaderSource);
 

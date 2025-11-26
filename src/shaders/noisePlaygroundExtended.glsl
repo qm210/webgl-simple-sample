@@ -18,9 +18,9 @@ uniform float iOverallHashOffset;
 uniform float iNoiseMorphingA;
 uniform float iNoiseMorphingB;
 uniform float iNoiseMorphingC;
-uniform int iFractionSteps;
-uniform float iFractionScale;
-uniform float iFractionAmplitude;
+uniform int iFractionalOctaves;
+uniform float iFractionalScale;
+uniform float iFractionalLacunarity;
 uniform float iTurbulenceNormFactor;
 uniform float iTurbulenceMeanOffset;
 uniform vec2 iMarbleSqueeze;
@@ -98,18 +98,18 @@ float noiseStack(vec2 p){
     // es ist hier nur erwähnt, um den Namen zu begründen.
     float a = 1., s = 0., noise;
     float sum = 0.;
-    for (int i=0; i < iFractionSteps; i++) {
+    for (int i=0; i < iFractionalOctaves; i++) {
         noise = modulatedPerlin2D(iNoiseScaleA * p, iNoiseMorphingA * iTime);
         sum += a * noise;
 
         s += a;
-        p *= iFractionScale;
-        a *= iFractionAmplitude;
+        p *= iFractionalScale;
+        a *= iFractionalLacunarity;
     }
     // Ausgabewert soll in [0, 1] liegen, mit 0.5 = neutral.
     // Der Faktor 1.5 ist nach einigen Versuchen so gewählt,
     // man könnte ihn auch konfigurierbar machen, weil manche Kombinationen aus
-    // iFractionScale & iFractionAmplitude das Intervall dennoch verlassen könnten.
+    // iFractionalScale & iFractionalLacunarity das Intervall dennoch verlassen könnten.
     return 0.5 + 0.5 * (sum / s * 1.5);
 }
 
@@ -119,16 +119,16 @@ float noiseAbsoluteStack(vec2 p){
     // und deswegen das Result am Ende auch anders normiert werden muss.
     float a = 1., s = 0., noise;
     float sum = 0.;
-    for (int i=0; i < iFractionSteps; i++) {
+    for (int i=0; i < iFractionalOctaves; i++) {
         noise = modulatedPerlin2D(iNoiseScaleB * p, iNoiseMorphingB * iTime);
         sum += a * abs(noise);
 
         s += a;
-        p *= iFractionScale;
-        a *= iFractionAmplitude;
+        p *= iFractionalScale;
+        a *= iFractionalLacunarity;
     }
     // Ausgabewert soll in [0, 1] liegen
-    // (wobei ungünstige Kombinationen iFractionScale / iFractionAmplitude auch > 1. summieren KÖNNTEN)
+    // (wobei ungünstige Kombinationen iFractionalScale / iFractionalLacunarity auch > 1. summieren KÖNNTEN)
     // Auslesen der Werte über gl.readPixels() für verschiedene Kombinationen legt nahe,
     // dass wir erstmal flexibel sein wollen (...das geht aber auch in die Marble-Funktion ein!)
     return (sum / s - iTurbulenceMeanOffset) / iTurbulenceNormFactor;

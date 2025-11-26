@@ -22,9 +22,9 @@ uniform sampler2D iPrevData;
 uniform float iNoiseFreq;
 uniform float iNoiseLevel;
 uniform float iNoiseOffset;
-uniform int iFractionSteps;
-uniform float iFractionScale;
-uniform float iFractionAmplitude;
+uniform int iFractionalOctaves;
+uniform float iFractionalScale;
+uniform float iFractionalLacunarity;
 uniform float iCloudMorph;
 uniform float iCloudVelX;
 uniform float iCloudVelY;
@@ -125,12 +125,12 @@ float perlin2D(vec2 p)
 float fractionalNoiseSum(vec2 p) {
     p *= 4.;
     float a = 1., r = 0., s = 0., noise;
-    for (int i=0; i < iFractionSteps; i++) {
+    for (int i=0; i < iFractionalOctaves; i++) {
         noise = perlin2D(p * iNoiseFreq);
         r += a * noise;
         s += a;
-        p *= iFractionScale;
-        a *= iFractionAmplitude;
+        p *= iFractionalScale;
+        a *= iFractionalLacunarity;
     }
     return r/s;
 }
@@ -451,11 +451,11 @@ float fbm(vec2 p, float seedShift) {
     float v = 0.;
     float a = 1.;
     float s = 0.;
-    for (int i = 0; i < iFractionSteps; i++) {
+    for (int i = 0; i < iFractionalOctaves; i++) {
         v += a * snoise(p, seedShift);
         s += a;
-        p = p * iFractionScale;
-        a *= iFractionAmplitude;
+        p = p * iFractionalScale;
+        a *= iFractionalLacunarity;
     }
     return v / s;
 }

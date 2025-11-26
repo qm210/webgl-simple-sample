@@ -47,9 +47,9 @@ function render(gl, state, elements) {
     gl.uniform1f(state.location.iOverallHashMorphing, state.iOverallHashMorphing);
     gl.uniform1f(state.location.iNoiseLevelA, state.iNoiseLevelA);
     gl.uniform1f(state.location.iNoiseLevelB, state.iNoiseLevelB);
-    gl.uniform1i(state.location.iFractionSteps, Math.floor(state.iFractionSteps));
-    gl.uniform1f(state.location.iFractionScale, state.iFractionScale);
-    gl.uniform1f(state.location.iFractionAmplitude, state.iFractionAmplitude);
+    gl.uniform1i(state.location.iFractionalOctaves, Math.floor(state.iFractionalOctaves));
+    gl.uniform1f(state.location.iFractionalScale, state.iFractionalScale);
+    gl.uniform1f(state.location.iFractionalLacunarity, state.iFractionalLacunarity);
     gl.uniform1f(state.location.iNormFactorForNoiseA, state.iNormFactorForNoiseA);
     gl.uniform1f(state.location.iMeanOffsetForNoiseA, state.iMeanOffsetForNoiseA);
     gl.uniform1f(state.location.iNormFactorForNoiseB, state.iNormFactorForNoiseB);
@@ -118,19 +118,19 @@ function defineUniformControls(state) {
         max: 6.28,
     }, {
         type: "int",
-        name: "iFractionSteps",
+        name: "iFractionalOctaves",
         defaultValue: 1,
         min: 1,
         max: 20.,
     }, {
         type: "float",
-        name: "iFractionScale",
+        name: "iFractionalScale",
         defaultValue: 2.,
         min: 0.01,
         max: 10.,
     }, {
         type: "float",
-        name: "iFractionAmplitude",
+        name: "iFractionalLacunarity",
         defaultValue: 0.5,
         min: 0.01,
         max: 0.99,

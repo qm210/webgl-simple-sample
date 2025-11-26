@@ -59,7 +59,8 @@ function render(gl, state) {
     gl.uniform1f(state.location.iCamRoll, state.iCamRoll);
     gl.uniform1f(state.location.iCamFocalLength, state.iCamFocalLength);
     gl.uniform3fv(state.location.vecDirectionalLight, state.vecDirectionalLight);
-    gl.uniform1f(state.location.iLightSourceMix, state.iLightSourceMix);
+    gl.uniform1f(state.location.iDirectionalLightStrength, state.iDirectionalLightStrength);
+    gl.uniform1f(state.location.iPointLightStrength, state.iPointLightStrength);
     gl.uniform1f(state.location.iLightPointPaletteColor, state.iLightPointPaletteColor);
     gl.uniform1f(state.location.iPathSpeed, state.iPathSpeed);
     gl.uniform1f(state.location.iPathOffset, state.iPathOffset);
@@ -74,6 +75,11 @@ function render(gl, state) {
     gl.uniform1f(state.location.iAmbientOcclusionSamples, state.iAmbientOcclusionSamples);
     gl.uniform1i(state.location.justTheBoxes, state.justTheBoxes);
     gl.uniform1i(state.location.drawGridOnFloor, state.drawGridOnFloor);
+    gl.uniform1i(state.location.showPyramidTextureGrid, state.showPyramidTextureGrid);
+    gl.uniform1i(state.location.applyPyramidTextureSkewing, state.applyPyramidTextureSkewing);
+    gl.uniform1i(state.location.applyPyramidTextureNarrowing, state.applyPyramidTextureNarrowing);
+    gl.uniform1i(state.location.applyPyramidTextureTopDown, state.applyPyramidTextureTopDown);
+    gl.uniform1i(state.location.usePyramidTextureFromBoxes, state.usePyramidTextureFromBoxes);
 
     gl.uniform1i(state.location.doUseCameraPath, state.doUseCameraPath);
     gl.uniform1i(state.location.doShowCameraPathPoints, state.doShowCameraPathPoints);
@@ -86,9 +92,9 @@ function render(gl, state) {
     gl.uniform1f(state.location.iNoiseLevel, state.iNoiseLevel);
     gl.uniform1f(state.location.iNoiseFreq, state.iNoiseFreq);
     gl.uniform1f(state.location.iNoiseOffset, state.iNoiseOffset);
-    gl.uniform1i(state.location.iFractionSteps, Math.floor(state.iFractionSteps));
-    gl.uniform1f(state.location.iFractionScale, state.iFractionScale);
-    gl.uniform1f(state.location.iFractionAmplitude, state.iFractionAmplitude);
+    gl.uniform1i(state.location.iFractionalOctaves, Math.floor(state.iFractionalOctaves));
+    gl.uniform1f(state.location.iFractionalScale, state.iFractionalScale);
+    gl.uniform1f(state.location.iFractionalLacunarity, state.iFractionalLacunarity);
 
     gl.uniform1f(state.location.iFree0, state.iFree0);
     gl.uniform1f(state.location.iFree1, state.iFree1);
@@ -124,8 +130,8 @@ function defineUniformControlsBelow() {
         type: "vec3",
         name: "iCamLookOffset",
         defaultValue: [0, 0, 0],
-        min: -2,
-        max: +2,
+        min: -20,
+        max: +20,
     }, {
         type: "float",
         name: "iCamRoll",
@@ -138,12 +144,6 @@ function defineUniformControlsBelow() {
         defaultValue: 2.5,
         min: 0.001,
         max: 20,
-    }, {
-        type: "vec3",
-        name: "vecDirectionalLight",
-        defaultValue: [-0.2, 1.4, -0.4],
-        min: -2,
-        max: 2,
     }, {
         type: "bool",
         name: "doUseCameraPath",
@@ -183,21 +183,33 @@ function defineUniformControlsBelow() {
         description: "Für die Orientierung (Abstand je 0.5 in Richtung X/Z\)",
     }, {
         type: "float",
-        name: "iLightSourceMix",
-        defaultValue: 0.3,
+        name: "iDirectionalLightStrength",
+        defaultValue: 1,
         min: 0,
-        max: 1,
+        max: 2,
+    }, {
+        type: "float",
+        name: "iPointLightStrength",
+        defaultValue: 1,
+        min: 0,
+        max: 2,
+    }, {
+        type: "bool",
+        name: "doShowPointLightSource",
+        defaultValue: false,
+        description: "Die Quelle des Punktlichts ist nur sichtbar, wenn wir sie eigens rendern."
+    }, {
+        type: "vec3",
+        name: "vecDirectionalLight",
+        defaultValue: [-0.2, 1.4, -0.4],
+        min: -2,
+        max: 2,
     }, {
         type: "float",
         name: "iLightPointPaletteColor",
         defaultValue: 0,
         min: 0.,
         max: 10.,
-    }, {
-        type: "bool",
-        name: "doShowPointLightSource",
-        defaultValue: false,
-        description: "Die Punktlichtquelle selbst ist nur sichtbar, wenn wir sie gezielt rendern."
     }, {
         type: "float",
         name: "iDiffuseAmount",
@@ -254,6 +266,34 @@ function defineUniformControlsBelow() {
         min: 0.,
         max: 1.,
     }, {
+        type: "bool",
+        name: "showPyramidTextureGrid",
+        defaultValue: false,
+        description: "Um das Mapping der Texturkoordinaten \"st\" auf jede Pyramidenseite zu sehen:\n" +
+            ""
+    }, {
+        type: "bool",
+        name: "applyPyramidTextureSkewing",
+        defaultValue: false,
+        description: "Pyramiden-Textur mit ihrem linken Rand an Pyramidenkanten ausrichten."
+    }, {
+        type: "bool",
+        name: "applyPyramidTextureNarrowing",
+        defaultValue: false,
+        description: "Pyramiden-Textur nach oben hin verschmälern, um nichts abzuschneiden."
+    }, {
+        type: "bool",
+        name: "applyPyramidTextureTopDown",
+        defaultValue: false,
+        description: "Andere Idee: Die Texturkoordinaten schlicht Grundriss gleichsetzen.\n" +
+            "(Das interpretiert die Textur also als Draufsicht, wird zur Spitze verzerrt.)"
+    }, {
+        type: "bool",
+        name: "usePyramidTextureFromBoxes",
+        defaultValue: false,
+        description: "Zum Vergleich der Wahl in Texturkoordinaten: Textur aus Bilddatei anbringen\n" +
+            "(die im unverzerrten Fall auf den Quadern auch zu sehen ist)",
+    }, {
         type: "float",
         name: "iToneMapExposure",
         defaultValue: 1,
@@ -294,21 +334,21 @@ function defineUniformControlsBelow() {
         max: 1,
     }, {
         type: "float",
-        name: "iFractionSteps",
+        name: "iFractionalOctaves",
         defaultValue: 1,
         min: 1,
         max: 20.,
         step: 1,
     }, {
         type: "float",
-        name: "iFractionScale",
+        name: "iFractionalScale",
         defaultValue: 2.,
         min: 0.1,
         max: 4.,
         hidden: true, // wenig lehrreich, den zu ändern
     }, {
         type: "float",
-        name: "iFractionAmplitude",
+        name: "iFractionalLacunarity",
         defaultValue: 0.5,
         min: 0.01,
         max: 2.,

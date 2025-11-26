@@ -1,4 +1,4 @@
-import standardSetup from "./retired/3_SimpleGeometry.js";
+import standardSetup from "./retired/old3_SimpleGeometry.js";
 import {startRenderLoop} from "../webgl/render.js";
 import {createFramebufferWithTexture, createTextureFromImage, takePingPongFramebuffers} from "../webgl/helpers.js";
 

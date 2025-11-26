@@ -322,21 +322,21 @@ export default {
             max: 1,
         }, {
             type: "float",
-            name: "iFractionSteps",
+            name: "iFractionalOctaves",
             defaultValue: 1,
             min: 1,
             max: 20.,
             step: 1,
         }, {
             type: "float",
-            name: "iFractionScale",
+            name: "iFractionalScale",
             defaultValue: 2.,
             min: 0.01,
             max: 10.,
             hidden: true, // wenig lehrreich, den zu ändern
         }, {
             type: "float",
-            name: "iFractionAmplitude",
+            name: "iFractionalLacunarity",
             defaultValue: 0.5,
             min: 0.01,
             max: 2.,
@@ -430,9 +430,9 @@ function render(gl, state) {
     gl.uniform1f(state.location.iNoiseLevel, state.iNoiseLevel);
     gl.uniform1f(state.location.iNoiseFreq, state.iNoiseFreq);
     gl.uniform1f(state.location.iNoiseOffset, state.iNoiseOffset);
-    gl.uniform1i(state.location.iFractionSteps, state.iFractionSteps);
-    gl.uniform1f(state.location.iFractionScale, state.iFractionScale);
-    gl.uniform1f(state.location.iFractionAmplitude, state.iFractionAmplitude);
+    gl.uniform1i(state.location.iFractionalOctaves, state.iFractionalOctaves);
+    gl.uniform1f(state.location.iFractionalScale, state.iFractionalScale);
+    gl.uniform1f(state.location.iFractionalLacunarity, state.iFractionalLacunarity);
     gl.uniform1f(state.location.iCalcNormalEpsilon, state.iCalcNormalEpsilon);
     gl.uniform1i(state.location.modeDebugRendering, state.modeDebugRendering);
     gl.uniform1f(state.location.iFree0, state.iFree0);

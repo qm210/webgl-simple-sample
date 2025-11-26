@@ -19,6 +19,8 @@ uniform float iCamFocalLength;
 uniform float iPathSpeed;
 uniform float iPathOffset;
 uniform vec3 vecDirectionalLight;
+uniform float iDirectionalLightStrength;
+uniform float iPointLightStrength;
 uniform float iLightSourceMix;
 uniform float iLightPointPaletteColor;
 uniform float iDiffuseAmount;
@@ -36,9 +38,8 @@ uniform float iGammaExponent;
 uniform float iNoiseLevel;
 uniform float iNoiseFreq;
 uniform float iNoiseOffset;
-uniform int iFractionSteps;
-uniform float iFractionScale;
-uniform float iFractionAmplitude;
+uniform int iFractionalOctaves;
+uniform float iFractionalLacunarity;
 // toggle options
 uniform bool doShowPointLightSource;
 uniform bool doUseCameraPath;
@@ -46,6 +47,11 @@ uniform bool doShowCameraPathPoints;
 uniform bool doUseCameraTargetPath; // try it :)
 uniform bool drawGridOnFloor;
 uniform bool justTheBoxes;
+uniform bool showPyramidTextureGrid;
+uniform bool applyPyramidTextureNarrowing;
+uniform bool applyPyramidTextureSkewing;
+uniform bool applyPyramidTextureTopDown;
+uniform bool usePyramidTextureFromBoxes;
 // and for you to play around with:
 uniform float iFree0;
 uniform float iFree1;
@@ -153,6 +159,8 @@ vec2 hash22(vec2 p) {
 }
 
 float voronoiPattern(vec2 uv, bool returnCellBorders) {
+    const float scale = 10.;
+    uv *= scale;
     vec2 uvInt = floor(uv);
     vec2 uvFrac = fract(uv);
     float dMin = 1.0;
@@ -199,20 +207,26 @@ float fractalBrownianMotion(vec2 p) {
     float v = 0.;
     float a = 1.;
     float s = 0.;
-    for (int i = 0; i < iFractionSteps; i++) {
+    const float iFractionalScale = 2.;
+    // Gewöhnliche Parameter:
+    // iFractionalOctaves ~ 3-6
+    // iFractionalLacunarity = 0.5;
+    // ihr könnt auch iFractionalScale mal durchvariieren (z.B. mal 3.)
+    // aber da sind viele Werte nicht zu viel zu gebrauchen.
+    for (int i = 0; i < iFractionalOctaves; i++) {
         v += a * perlin2D(p);
         s += a;
-        // Gewöhnliche Parameter:
-        // iFractionScale = 2.;
-        // iFractionAmplitude = 0.5;
-        // mit "iFractionScale == 2" spricht man oft auch von "Oktaven"
-        p = p * iFractionScale;
-        a *= iFractionAmplitude;
+        p = p * iFractionalScale;
+        a *= iFractionalLacunarity;
     }
-    // return v;
-    // <-- fBM() wird oft ohne die folgende Normierung geschrieben,
-    //     aber normalerweise lässt man da die Parameter auch fix  verschiedene Wahl der Unifosm
     return v / s;
+}
+
+float gridPattern(vec2 p, float gridStep) {
+    p /= gridStep;
+    const float lineWidth = 0.6;
+    float threshold = 1. - gridStep * lineWidth;
+    return 1. - abs(step(threshold, fract(p.x)) - step(threshold, fract(p.y)));
 }
 
 float bounceParabola(float h, float g, float T, float t) {
@@ -348,16 +362,14 @@ MarchHit texturedSdBox( vec3 p, vec3 b, float rounding) {
     vec3 a = 0.5 * p / b;
     // damit geht der Würfel in jeder Dimension von einer Wand bei -0.5 zu einer bei +0.5
 
-    vec2 uv;
-    // Um Zuordnung zu verstehen:
-    // mal auskommentieren oder sign()-Abhängigkeit entfernen,
-    // oder mit uv = vec2(0); die Textur auf der Seite deaktiveren.
+    vec2 st;
+    // Um Zuordnung zu verstehen, könnt ihr hier mal Teile auskommentieren und vergleichen.
     if (abs(a.z) > 0.5) {
-        uv = vec2(0.5 + a.x * sign(a.z), 0.5 - a.y);
+        st = vec2(0.5 + a.x * sign(a.z), 0.5 - a.y);
     } else if (abs(a.y) > 0.5) {
-        uv = vec2(0.5 + a.x, 0.5 + a.z * sign(a.y));
+        st = vec2(0.5 + a.x, 0.5 + a.z * sign(a.y));
     } else if (abs(a.x) > 0.5) {
-        uv = vec2(0.5 - a.z * sign(a.x), 0.5 - a.y);
+        st = vec2(0.5 - a.z * sign(a.x), 0.5 - a.y);
     }
     // Reminder: if() generell überdenken, aber das reicht auch,
     // wenn irgendwo konkret ein Performanceproblem vorliegt.
@@ -373,7 +385,7 @@ MarchHit texturedSdBox( vec3 p, vec3 b, float rounding) {
     //        step(0.5, abs(a.x))
     //    );
 
-    return MarchHit(d, MATERIAL_BOX, uv);
+    return MarchHit(d, MATERIAL_BOX, st);
 }
 
 float sdCylinder( vec3 p, vec2 h )
@@ -438,7 +450,8 @@ MarchHit takeCloser( MarchHit d1, float d2, float material2)
     return MarchHit(d2, material2, c.yy);
 }
 
-const vec4 pyramidPosAndHeight = vec4(-1.0, 0.0, -2.6, 1.1);
+const vec3 pyramidPos = vec3(-1.0, 0.0, -2.6);
+const float pyramidHeight = 1.1;
 
 MarchHit map( in vec3 pos )
 {
@@ -481,7 +494,7 @@ MarchHit map( in vec3 pos )
     // <-- man beachte die 90°-Drehung über das Vektor-Swizzling (= Richtungen vertauschen)
 
     res = takeCloser(res,
-        sdPyramid(pos - pyramidPosAndHeight.xyz, pyramidPosAndHeight.a),
+        sdPyramid(pos - pyramidPos.xyz, pyramidHeight),
         MATERIAL_PYRAMID
     );
 
@@ -727,19 +740,83 @@ void render(in vec3 rayOrigin, in vec3 rayDir)
     else if (res.material == MATERIAL_PYRAMID) {
         // hier z.B.: Farbverlauf an y-Achse
         col = materialPalette(13.56 + 1.1 * rayPos.y);
-
         specularCoeff = 0.6;
+
         // s.o. die Pyramiden-SDF wurde aufgerufen mit:
         // sdPyramid(pos - pyramidPosAndHeight.xyz, pyramidPosAndHeight.a)
         // -> kann Mapping "einer Textur" (= eines vec2-Felds) auch erst hier machen.
-        // Dann müssen wir die Geometrie eben neu auswerten. s.o.: Ist ja aber möglich :)
-        vec3 pos = (rayPos - pyramidPosAndHeight.xyz) / pyramidPosAndHeight.a;
-        // Einfach mal die Wände des umschließenden Würfels auswerten:
-        vec3 n = abs(normal);
-        vec2 st = n.x > n.y && n.x > n.z ? pos.zy : pos.xy;
-        float pattern = voronoiPattern(10. * st, true);
-        pattern = smoothstep(0.0, 0.5, pattern);
-        col = mix(col, pattern * col, 1. - pos.y);
+        // Wir müssen uns aber überlegen, wie wir die Aufprallkoordinaten (vec3 pos, wo SDF == 0)
+        // in Texturkoordinaten (vec2 st, normiert auf [0, 1]) umrechnen.
+        // Wir vereinfachen das, indem wir uns erstmal in den umgebenden Würfel denken:
+        vec3 pos = rayPos - pyramidPos.xyz;
+        // Nach der verwendeten SDF sdPyramid() läuft .y bisher von [0..pyramidHeight]:
+        pos.y = pos.y / pyramidHeight - 0.5;
+        // und wir spiegeln z, weil das "nach vorne" der Welt / Kamera als "-z" gewählt wurde
+        // pos ist jetzt auf [-0.5; 0.5] normiert.
+        // Damit können wir anwenden, was wir aus VL2 für 2D (dem Quadrat) kennen.
+        // Wir brauchen nur die Seitenwände, also können y ignorieren, und prüfen,
+        // wer von +x, -x, +z oder -z jeweils maximal ist. Zusammengefasst:
+        vec2 st = abs(pos.z) > abs(pos.x) ? pos.xy : pos.zy;
+        // links/rechts und vorne/hinten haben jetzt dieselbe Orientierung,
+        // wir spiegeln also jeweils eins davon, damit die Texturen an den
+        // Kanten von beiden Seiten denselben Wert haben (d.h. stetig sind).
+        if (pos.z < -pos.x) {
+            st.x *= -1.;
+        }
+        // [-0.5; 0.5] war sinnvoll für diese Vergleiche, st braucht aber [0; 1]:
+        st += 0.5;
+        // Um dann vom Würfel auf die Pyramide zu kommen, also für jede Würfelseite [0; 1]
+        // das entsprechende Dreieck aus den Punkten (0,0), (1,0) und (0.5, 1) zu beschreiben
+        // haben wir drei einfache Optionen:
+        // a) wir lassen st einfach so, schneiden also einfach ab, was nicht aufs Dreieck passt
+        // b) wir verschieben st.x nach oben entlang der Kantensteigung, so dass
+        //    "ganz links" der Textur immer auf jeder Seite ist,
+        //    aber die Teile Richtung "rechts oben" abgeschnitten werden.
+        // c) ähnlich b), aber wir verjüngen den Bereich von st.x immer weiter zu einem Punkt,
+        //    verzerren also die Textur zur Spitze hin, aber schneiden nichts ab.
+        if (applyPyramidTextureSkewing) {
+            st.x -= st.y * 0.5;
+        }
+        if (applyPyramidTextureNarrowing) {
+            st.x /= 1. - st.y;
+        }
+        // Und zum Vergleich gäbe es da dann noch die "stumpfe" Version,
+        // einfach die Koordinaten des Bodens zu übernehmen, also des Grundriss.
+        if (applyPyramidTextureTopDown) {
+            st = pos.xz + 0.5;
+        }
+
+        if (usePyramidTextureFromBoxes) {
+            col = texture(texFrame, st).rgb;
+        }
+        else {
+            float pattern = voronoiPattern(st, true);
+            pattern = smoothstep(0.0, 0.5, pattern);
+            col = mix(col, pattern * col, 1. - pos.y);
+        }
+        if (showPyramidTextureGrid) {
+            specularCoeff = 0.;
+            // Gitter um Schritte von 0.1 in beide Richtungen von st zu sehen
+            // (damit das auf jeder Textur sichtbar ist, invertieren wir deren Rotwert)
+            col.r = mix(col.r, 1. - col.r, 1. - gridPattern(st, 0.1));
+            if (st.y > 0.9) {
+                // Rand Oben: Magenta
+                col.rgb = c.xyx;
+            } else if (st.y < 0.099) {
+                // Rand Unten: Grün
+                col.rgb = c.yxy;
+            }
+            if (st.x < 0.1) {
+                // Rand Links: cyan
+                col = c.yxx;
+            } else if (abs(st.x - 0.5) < 0.005) {
+                // Mittelsenkrechte: Blau
+                col = c.yyx;
+            } else if (st.x > 0.9) {
+                // Rechter Rand: Orange
+                col = c.xwy;
+            }
+        }
     }
     else if (res.material == MATERIAL_PATH_POINT) {
         // einfache Visualisierung von Punkten im Raum (z.B: unserer Kamerapfad, falls aktiv)
@@ -751,11 +828,6 @@ void render(in vec3 rayOrigin, in vec3 rayDir)
     }
     else if (isFloor || res.material == MATERIAL_MOUNTAINS)
     {
-        // war: Schachbrettmuster
-        // float checkerboard = 1. - abs(step(0.5, fract(1.5*rayPos.x)) - step(0.5, fract(1.5*rayPos.z)));
-        // col = 0.15 + f*vec3(0.05);
-        float grid = 1. - abs(step(0.97, fract(2. * rayPos.x)) - step(0.97, fract(2.*rayPos.z)));
-
         // jetzt: Textur.
         // hier kommen wir mit einfacher Geometrie an die richtige Koordinate "st":
         // wir projizieren einfach den Strahl auf die y-Ebene (Boden y == 0); skalieren nach Laune
@@ -765,7 +837,8 @@ void render(in vec3 rayOrigin, in vec3 rayDir)
         specularCoeff = 0.12;
 
         if (drawGridOnFloor) {
-            col *= 0.3 + 0.7 * vec3(grid);
+//            float grid = 1. - abs(step(0.97, fract(2. * rayPos.x)) - step(0.97, fract(2.*rayPos.z)));
+            col *= 0.3 + 0.7 * vec3(gridPattern(rayPos.xz, 0.5));
         }
     }
 
@@ -783,25 +856,32 @@ void render(in vec3 rayOrigin, in vec3 rayDir)
     // Wir addieren erstmal einfach.
     // --> Probiert hier einfach mal an allen Konstanten rum.
     //
-    // FÜr den Vergleich Richtungslicht vs. Punktlicht bauen wir einfach mal beide zusammen ein:
+    // FÜr den Vergleich Richtungslicht vs. Punktlicht bauen wir einfach mal beide zusammen ein,
+    // mit iLightSourceMix so, dass
+    // ~ 0 -> nur Richtungslicht
+    // ~ 0.5 -> beide Quellen
+    // ~ 1 -> nur Punktlicht
     for (int light = 0; light < 2; light++) {
 
         if (light == 0) {
             // Reines Richtungslicht (ähnlich letztes Mal, nur jetzt als uniform für Flexibilität):
             // aber immer noch aufpassen mit dem Vorzeichen: Richtung ZUM Licht!
             lightDirection = normalize(vecDirectionalLight);
-            lightSourceColor = vec3(1.30, 1.00, 0.70);
-            // iLightSourceMix vermittelt ähnlich einem mix() zwischen den beiden Quellen.
-            lightSourceColor *= max(0., 1. - iLightSourceMix);
+            lightSourceColor = normalize(vec3(1.30, 1.00, 0.70));
+            lightSourceColor *= iDirectionalLightStrength;
         }
         else {
-            // lightPointSource = vec3(-1., 1.1, -2.6);
-            vec3 lightPointSource = vec3(-.8 * cos(0.56 * iTime), 1.1 + 0.1 * cos(0.4 * iTime + 0.2), -1.5 -sin(0.8 * iTime) );
+            // Auch ein "automatisierter Pfad", aber ohne Interpolation zwischen Punkten.
+            // -- geht natürlich auch, kann man aber nur schwer kontrollieren :)
+            vec3 lightPointSource = vec3(
+                -.8 * cos(0.56 * iTime),
+                1.1 + 0.1 * cos(0.4 * iTime + 0.2),
+                -1.5 -sin(0.8 * iTime)
+            );
             // Punktlicht: Richtung unterschiedlich je nach Strahl, es geht um die Differenz:
             lightDirection = normalize(lightPointSource - rayDir);
-            lightSourceColor = mix(c.xxx, materialPalette(14.5 + iLightPointPaletteColor), 0.7);
-            // iLightSourceMix vermittelt ähnlich einem mix() zwischen den beiden Quellen. (s.o.)
-            lightSourceColor *= max(0., iLightSourceMix);
+            lightSourceColor = mix(c.xxx, 2. * materialPalette(14.5 + iLightPointPaletteColor), 0.7);
+            lightSourceColor *= iPointLightStrength;
 
             // um die Punktquelle SELBST zu sehen, müssen wir sie aber extra zeichnen
             if (doShowPointLightSource) {
@@ -971,9 +1051,14 @@ void main()
     // ray direction via screen coordinate and "screen distance" ~ focal length ("field of view")
     vec3 rayDirection = camMatrix * normalize(vec3(uv, iCamFocalLength));
 
-    // iCamOffset: freie Verschiebung der Kamera, soll aber im Kamera-Koordinatensystem passieren
+    // iCamOffset: freie Verschiebung der Kamera, soll aber,
+    // bei Verwendung des Pfads, konsistent im Kamera-Koordinatensystem passieren
     // d.h. (0,0,1) soll "1 nach vorne" heißen, nicht "1 in Welt-Z-Koordinate".
-    camOrigin += camMatrix * iCamOffset;
+    if (doUseCameraPath) {
+        camOrigin += camMatrix * iCamOffset;
+    } else {
+        camOrigin += iCamOffset;
+    }
 
     render(camOrigin, rayDirection);
 

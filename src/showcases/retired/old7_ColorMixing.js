@@ -1,12 +1,10 @@
-import standardSetup from "./3_SimpleGeometry.js";
+import standardSetup from "./old3_SimpleGeometry.js";
 import {startRenderLoop} from "../../webgl/render.js";
 
-import fragmentShaderSource from "../../shaders/specific/volumetricClouds.glsl";
-// <-- huge credits to Christopher Wallis for the original
-//     https://www.shadertoy.com/view/tsScDG
+import fragmentShaderSource from "../../shaders/spring-2025/colorMixing.glsl";
 
 export default {
-    title: "Volumetric Clouds",
+    title: "Color Mixing",
     init: (gl) => {
         const state = standardSetup.init(gl, fragmentShaderSource);
 
@@ -17,12 +15,17 @@ export default {
         return state;
     },
     generateControls: (gl, state, elements) => ({
-        onRender: () =>
-            startRenderLoop(state => render(gl, state), state, elements),
+        onRender: () => {
+            startRenderLoop(
+                state => render(gl, state),
+                state,
+                elements
+            );
+        },
         uniforms: [{
             type: "label",
             name: "iTime",
-        }]
+        }],
     })
 };
 
@@ -33,4 +36,5 @@ function render(gl, state) {
     gl.uniform2fv(state.location.iResolution, state.resolution);
 
     gl.drawArrays(gl.TRIANGLES, 0, 6);
+
 }

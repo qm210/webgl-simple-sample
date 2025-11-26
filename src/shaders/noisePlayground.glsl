@@ -12,9 +12,9 @@ uniform vec2 iOverallNoiseShift;
 uniform float iOverallScale;
 uniform float iOverallHashOffset;
 uniform float iOverallHashMorphing;
-uniform int iFractionSteps;
-uniform float iFractionScale;
-uniform float iFractionAmplitude;
+uniform int iFractionalOctaves;
+uniform float iFractionalScale;
+uniform float iFractionalLacunarity;
 uniform float iMeanOffsetForNoiseA;
 uniform float iNormFactorForNoiseA;
 uniform float iMeanOffsetForNoiseB;
@@ -88,13 +88,13 @@ float noiseStackA(vec2 p){
     // Diese Gegebenheiten sind aber für unsere Anwendungen nicht relevant,
     // es ist hier nur erwähnt, um den Namen zu begründen.
     // Gewöhnliche Werte sind etwa
-    //   iFractionSteps ~ 4-5
-    //   iFractionScale == 2
-    //   iFractionAmplitude == 0.5
+    //   iFractionalOctaves ~ 4-5
+    //   iFractionalScale == 2
+    //   iFractionalLacunarity == 0.5
     // und ist auch meist konstant, aber hier mal zum Anschauen als Uniform definiert.
     float a = 1., s = 0., sum = 0.;
     float noise;
-    for (int i=0; i < iFractionSteps; i++) {
+    for (int i=0; i < iFractionalOctaves; i++) {
         noise = perlin2D(p);
 
         // Direkt über "noise" zu summieren ist das wirkliche FBM-Rauschen.
@@ -102,8 +102,8 @@ float noiseStackA(vec2 p){
         sum += a * noise;
 
         s += a;
-        p *= iFractionScale;
-        a *= iFractionAmplitude;
+        p *= iFractionalScale;
+        a *= iFractionalLacunarity;
     }
     // Ausgabewert soll _etwa_ in [0, 1] liegen, mit 0.5 = neutral.
     // Es kann aber stark von den Fraktal-Parametern und der Hashfunktion abhängig sein,
@@ -117,7 +117,7 @@ float noiseStackB(vec2 p){
     // Es gibt aber noch etliche weitere Varianten dieses Vorgehens.
     float a = 1., s = 0., sum = 0.;
     float noise;
-    for (int i=0; i < iFractionSteps; i++) {
+    for (int i=0; i < iFractionalOctaves; i++) {
         noise = perlin2D(p);
 
         // Hier könnte Platz zur Variation sein ;)
@@ -127,8 +127,8 @@ float noiseStackB(vec2 p){
         // s. z.B. auch https://www.shadertoy.com/view/3flyDs
 
         s += a;
-        p *= iFractionScale;
-        a *= iFractionAmplitude;
+        p *= iFractionalScale;
+        a *= iFractionalLacunarity;
     }
     // Normierung analog zu, aber unabhängig von der Noisefunktion oben.
     return (sum / s + iMeanOffsetForNoiseB) * iNormFactorForNoiseB;
