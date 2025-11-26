@@ -100,6 +100,8 @@ export function createInputElements(state, control) {
         case "cursorInput":
             return asCursorInput(input, state, control);
         case "bool":
+        case "boolean":
+            control.boolean = true;
             return asBoolInput(input, state, control);
         default:
             console.warn("Control type has no elements definition (yet)", control);
@@ -146,7 +148,7 @@ const createInputControlElements = (control) => {
     elements.max.style.fontSize = "small";
     elements.max.style.textAlign = "left";
 
-    if (control.type !== "bool") {
+    if (!control.boolean) {
         elements.value.addEventListener("dblclick", () => {
             if (!elements.updateValue) {
                 return;
@@ -480,6 +482,7 @@ export const asBoolInput = (elements, state, control) => {
     elements.reset.textContent = `reset`;
     if (control.group && !control.defaultValue) {
         elements.description.classList.add("extra-column");
+        delete elements.reset;
     }
 
     update();

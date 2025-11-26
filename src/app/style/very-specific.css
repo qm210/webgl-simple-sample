@@ -17,7 +17,7 @@
 }
 
 .presets-hint {
-    font-size: smaller;
+    font-size: small;
     text-decoration: underline;
     cursor: pointer;
 }
@@ -49,6 +49,7 @@
     overflow-wrap: break-word;
     font-size: small;
     font-family: sans-serif;
+    user-select: none;
 }
 
 .bool-description.extra-column {

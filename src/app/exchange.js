@@ -17,7 +17,8 @@ function bundleUniforms(state) {
     const result = {
         ...HEADER,
         name: undefined,
-        uniforms: []
+        uniforms: [],
+        showcaseId: state.showcaseId,
     };
     for (const uniform of state.expectedUniforms) {
         const value = state[uniform.name] ?? state[uniformNameMap[uniform.name]]
@@ -35,11 +36,16 @@ function unpackBundle(state, json) {
         throw Error(`This is JSON, but bad IDENTIFIER ${json.IDENTIFIER}`);
     } else if (json.VERSION !== 1) {
         throw Error(`This is JSON, but unknown VERSION ${json.VERSION}`);
+    } else if (json.showcaseId !== state.showcaseId) {
+        throw Error(`This does not match required showcaseId "${state.showcaseId}"`)
     }
     const loaded = Object.fromEntries(
         json.uniforms.map(obj => [obj.name, obj])
     );
     for (const uniform of state.expectedUniforms) {
+        if (!loaded[uniform.name]) {
+            continue;
+        }
         if (uniform.type !== loaded[uniform.name].type) {
             console.warn("Uniform doesn't match type, ignore:", loaded[uniform.name]);
             continue;
@@ -196,14 +202,15 @@ function addOption(parent, label, value = undefined, visible = true) {
 }
 
 async function refreshPresetsFor(db, state, selector) {
-    db.presets = await loadPresets(db);
+    db.presets = await loadPresets(db, state.showcaseId);
 
     selector.disabled = false;
     selector.innerHTML = "";
+    addOption(selector, "").selected = true;
     addOption(selector, "Store as new preset", OPTION.NEW);
     const deleteOption = addOption(selector, "Delete last selected", OPTION.DELETE);
     deleteOption.disabled = !state.selectedPreset;
-    addOption(selector, "\u2014\u2014\u2014\u2014\u2014\u2014\u2014\u2014\u2014");
+    addOption(selector, "\u2014\u2014\u2014\u2014\u2014\u2014\u2014\u2014\u2014\u2014\u2014");
 
     const group = document.createElement("optgroup");
     group.label = "\u2014Stored Presets\u2014"

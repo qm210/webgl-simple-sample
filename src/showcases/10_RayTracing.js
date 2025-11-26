@@ -222,6 +222,7 @@ export default {
             defaultValue: 2.,
             min: 0.01,
             max: 10.,
+            hidden: true, // wenig lehrreich, den zu ändern
         }, {
             type: "float",
             name: "iFractionAmplitude",

@@ -183,7 +183,7 @@ export const addControlsToPage = (elements, state, controls, autoRenderOnLoad) =
         }
         elements.controls.appendChild(input.name);
         elements.controls.appendChild(input.value);
-        if (control.type === "bool") {
+        if (control.boolean) {
             elements.controls.appendChild(input.control);
             elements.controls.appendChild(input.description);
         } else {
@@ -191,7 +191,7 @@ export const addControlsToPage = (elements, state, controls, autoRenderOnLoad) =
             elements.controls.appendChild(input.control);
             elements.controls.appendChild(input.max);
         }
-        if (input.control.type !== "radio" || control.defaultValue === true) {
+        if (input.reset) {
             elements.controls.appendChild(input.reset);
         }
         elements.uniforms[control.name] = input;

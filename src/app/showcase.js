@@ -7,6 +7,7 @@ export function prepareShowcase(showcase, glContext) {
 
     const state = showcase.init(glContext);
     state.title = showcase.title;
+    state.showcaseId = showcase.path;
 
     if (showcase.title) {
         document.title = showcase.title;

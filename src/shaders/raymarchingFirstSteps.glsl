@@ -23,6 +23,9 @@ uniform vec3 vecDirectionalLight;
 uniform float iDiffuseAmount;
 uniform float iSpecularAmount;
 uniform float iSpecularExponent;
+uniform float iFloorSpecularCoefficient;
+uniform float iShadowHardness;
+uniform int iShadowMarchingSteps;
 uniform float iMarchingPrecision;
 uniform int iMarchingSteps;
 uniform float iSphereSize;
@@ -30,6 +33,7 @@ uniform float iSphereSize;
 uniform bool useAdaptiveMarchingPrecision;
 uniform bool showJustASphere;
 uniform bool makeSphereColorful;
+uniform bool useBlinnPhongSpecular;
 // PS: hier liest sich die Konvention mit i<Verb><...> m.M.n. so dämlich, dass ich sie da nicht nutze.
 // Es gibt aber sowieso keinen offiziellen GLSL-Styleguide, ihr könnt eigene Ideen ausprobieren,
 // müsst dann aber selbst bewerten, ob ihr auf Dauer eure Shader noch versteht / angstfrei ändern könnt.
@@ -81,6 +85,19 @@ mat3 rotZ(float angle) {
          -s,   c, 0.0,
         0.0, 0.0, 1.0
     );
+}
+
+mat3 rodrigues(vec3 direction, float angle) {
+    // huh?
+    vec3 v = normalize(direction);
+    mat3 skewSymmetricCrossProduct = mat3(
+        0, v.z, -v.y,
+        -v.z, 0, v.x,
+        v.y, -v.x, 0
+    );
+    float c = cos(angle * twoPi);
+    float s = sin(angle * twoPi);
+    return mat3(c) + (1. - c) * outerProduct(v, v) + s * skewSymmetricCrossProduct;
 }
 
 //------------------------------------------------------------------
@@ -457,7 +474,7 @@ Marched map( in vec3 pos )
     res = opUnion( res, vec2( sdSolidAngle(  pos-vec3( 0.0,0.00,-3.0), vec2(3,4)/5.0, 0.4 ), 49.13 ) );
     res = opUnion( res, vec2( sdTorus(      (pos-vec3( 1.0,0.30, 1.0)).xzy, vec2(0.25,0.05) ), 7.1 ) );
     res = opUnion( res, vec2( sdBox(         pos-vec3( 1.0,0.25, 0.0), vec3(0.3,0.25,0.1) ), 3.0 ) );
-    res = opUnion( res, vec2( sdSphere(      pos-vec3( 1.0,0.2,-1.0), 0.2 + 0.3 * iSphereSize ), 1.6 ) );
+    res = opUnion( res, vec2( sdSphere(      pos-vec3( 1.0,0.2,-1.0), 0.2 + 0.2 * iSphereSize ), 1.6 ) );
     res = opUnion( res, vec2( sdCylinder(    rotZ(0.8*iTime)* (pos-vec3( 1.0,0.25,-2.0)), vec2(0.15,0.25) ), 8.0 ) );
     res = opUnion( res, vec2( sdCapsule(     pos-vec3( 1.0,0.00,-3.0),vec3(-0.1,0.1,-0.1), vec3(0.2,0.4,0.2), 0.1  ), 31.9 ) );
     res = opUnion( res, vec2( sdPyramid(    pos-vec3(-1.0,-0.6,-3.0), 1.0 ), 13.56 ) );
@@ -471,7 +488,6 @@ Marched map( in vec3 pos )
     res = opUnion( res, vec2( sdCappedCone(  pos-vec3( 2.0,0.09,-1.0), vec3(0.1,0.0,0.0), vec3(-0.2,0.40,0.1), 0.15, 0.05), 46.1 ) );
     res = opUnion( res, vec2( sdRoundCone(   pos-vec3( 2.0,0.15, 0.0), vec3(0.1,0.0,0.0), vec3(-0.1,0.35,0.1), 0.15, 0.05), 51.7 ) );
     res = opUnion( res, vec2( sdRoundCone(   pos-vec3( 2.0,0.20, 1.0), 0.2, 0.1, 0.3 ), 37.0 ) );
-
     return res;
 }
 
@@ -544,14 +560,15 @@ Marched raycast( in vec3 ro, in vec3 rd )
 float calcSoftshadow( in vec3 ro, in vec3 rd, in float mint, in float tmax )
 {
     // bounding volume
-    float tp = (0.8-ro.y)/rd.y; if( tp>0.0 ) tmax = min( tmax, tp );
+    float tp = (0.8-ro.y)/rd.y;
+    if( tp>0.0 ) tmax = min( tmax, tp );
 
     float res = 1.0;
     float t = mint;
-    for( int i=0; i<80; i++ )
+    for( int i=0; i<iShadowMarchingSteps; i++ )
     {
         float h = map( ro + rd*t ).distance;
-        float s = clamp(8.0*h/t,0.0,1.0);
+        float s = clamp(iShadowHardness * h/t, 0.0, 1.0);
         res = min( res, s );
         t += clamp( h, 0.01, 0.2 );
         if( res<0.004 || t>tmax ) break;
@@ -603,10 +620,13 @@ vec3 render(in vec3 rayOrigin, in vec3 rayDir)
 
         bool isSphere = res.material == 1.6;
         if (makeSphereColorful && isSphere) {
-            // Notiz: das ist bewusst hier so "reingehackt". Weil es eben _möglich_ ist.
-            //        Ob das verständlich ist, und die Struktur zukunftsfähig passt,
-            //        müsst ihr immer im Einzelfall evaluieren. Manchmal macht auch
-            //        die Performance, dass man Code nicht beliebig "clean" bekommt.
+            // Beispiel für individuelle Farbgebung für ein einzelnes Objekt.
+            // Das steht jetzt hier, weil es hier den Effekt erfüllt.
+            // Wir haben aber so verschiedene im Shader verstreute Stellen,
+            // die irgendwie die Grundfarbe eines Materials (vor dem Beleuchtungsmodell)
+            // entscheiden -- das ist nur begrenzt zukunftsfähig, kann oder muss
+            // muss man aber manchmal hinter anderen Anforderungen zurückstecken
+            // -> pro Einzelfall evaluieren.
             res.material += 0.2 * iTime;
             res.material += pow(1.93 * rayPos.y, -1.01);
         }
@@ -618,12 +638,11 @@ vec3 render(in vec3 rayOrigin, in vec3 rayDir)
         {
             float f = 1. - abs(step(0.5, fract(1.5*rayPos.x)) - step(0.5, fract(1.5*rayPos.z)));
             col = 0.15 + f*vec3(0.05);
-            specularCoeff = 0.4;
+            specularCoeff = iFloorSpecularCoefficient;
         }
 
         if (makeSphereColorful && isSphere) {
             // Siehe Kommentar zu makeSphereColorful oben.
-            // Es ist Pfusch -- aber bunter Pfusch.
             col.r = 0.4 + col.g * 0.3 * sin(29.2 * rayPos.x);
         }
 
@@ -631,12 +650,24 @@ vec3 render(in vec3 rayOrigin, in vec3 rayDir)
 
         // Licht: reines Richtungslicht (passt zu einer Sonne, die weit weg ist, im Gegensatz zu Punktlicht)
         {
-            vec3  lightDirection = normalize( vecDirectionalLight ); // Vorsicht, Vorzeichenkonvention
-            vec3  halfway = normalize(lightDirection - rayDir); // was ist das, geometrisch?
+            // Vorsicht, Vorzeichenkonvention ist gerne Fehlerquelle.
+            // lightDirection geht ZUR Lichtquelle.
+            vec3  lightDirection = normalize( vecDirectionalLight );
             float diffuse = clamp( dot(normal, lightDirection), 0.0, 1.0); // dot(normal, lightSource) <-- diffus (warum?)
             diffuse *= calcSoftshadow(rayPos, lightDirection, 0.02, 2.5); // warum hier *= ...?
 
-            float specular = pow( clamp( dot( normal, halfway ), 0.0, 1.0), iSpecularExponent); // <-- glänzend (warum?)
+            float specular, shininess;
+            if (useBlinnPhongSpecular) {
+                vec3 halfway = normalize(lightDirection - rayDir); // was ist das, geometrisch?
+                specular = dot(normal, halfway);
+                shininess = iSpecularExponent * 3.;
+            } else {
+                vec3 reflected = reflect(lightDirection, normal);
+                specular = dot(rayDir, reflected);
+                shininess = iSpecularExponent;
+            }
+            // warum wird der Exponent hier wohl auch gerne als "Shininess" bezeichnet?
+            specular = pow( clamp( specular, 0.0, 1.0), shininess);
 
             const vec3 sourceCol = vec3(1.30,1.00,0.70);
             shade += col * iDiffuseAmount * sourceCol * diffuse;

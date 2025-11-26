@@ -1,7 +1,7 @@
 #version 300 es
 
 // based on: https://www.shadertoy.com/view/Xds3zN
-// simplified for our lecture (cf. raymarchingPrimitivesSimplified.glsl)
+// simplified for our lecture (cf. raymarchingFirstSteps.glsl)
 // then put some more basic concepts for 3D in here.
 
 precision highp float;
@@ -26,11 +26,12 @@ uniform float iSpecularAmount;
 uniform float iSpecularExponent;
 uniform float iBacklightAmount;
 uniform float iSubsurfaceAmount;
+uniform float iSubsurfaceExponent;
 uniform float iAmbientOcclusionScale;
 uniform float iAmbientOcclusionStep;
 uniform float iAmbientOcclusionSamples;
 uniform float iToneMapExposure;
-uniform float iToneCompressedGain;
+uniform float iToneMapACESMixing;
 uniform float iGammaExponent;
 uniform float iNoiseLevel;
 uniform float iNoiseFreq;
@@ -43,6 +44,8 @@ uniform bool doShowPointLightSource;
 uniform bool doUseCameraPath;
 uniform bool doShowCameraPathPoints;
 uniform bool doUseCameraTargetPath; // try it :)
+uniform bool drawGridOnFloor;
+uniform bool justTheBoxes;
 // and for you to play around with:
 uniform float iFree0;
 uniform float iFree1;
@@ -68,8 +71,6 @@ const float MATERIAL_PYRAMID = 13.0;
 const float MATERIAL_MOUNTAINS = 2.0;
 const float MATERIAL_PATH_POINT = 1.4;
 
-// global shader options
-const bool DRAW_GRID_ON_FLOOR = true;
 /////////////////////////
 
 const int nPath = 7;
@@ -84,7 +85,7 @@ vec3 camPosPath[nPath] = vec3[nPath](
 );
 
 vec4 targetPath[nPath] = vec4[nPath](
-    vec4(-0.3, 0.35, 1.05, 0.),
+    vec4(-0.3, 1., 1.7, 0.),
     vec4(-0.3, 0.35, 1.05, 0.),
     vec4(-0.3, 0.65, -3.3, -.2),
     vec4(-2.,0.73, -1.3, 2.),
@@ -151,7 +152,7 @@ vec2 hash22(vec2 p) {
     return fract(vec2(n, n * 1.2154));
 }
 
-float voronoiPattern(vec2 uv) {
+float voronoiPattern(vec2 uv, bool returnCellBorders) {
     vec2 uvInt = floor(uv);
     vec2 uvFrac = fract(uv);
     float dMin = 1.0;
@@ -169,9 +170,12 @@ float voronoiPattern(vec2 uv) {
             }
         }
     }
-    // return dMin;
-    // <-- würde die Voronoi-Zellen ausgeben, wir wollen aber die Bereichgrenzen:
-    return dSecondMin - dMin;
+    // Manchmal will man die Voronoi-Zellen selbst, manchmal ihre Grenzen:
+    return (
+        returnCellBorders
+            ? dSecondMin - dMin
+            : dMin
+    );
 }
 
 float perlin2D(vec2 p)
@@ -198,11 +202,16 @@ float fractalBrownianMotion(vec2 p) {
     for (int i = 0; i < iFractionSteps; i++) {
         v += a * perlin2D(p);
         s += a;
+        // Gewöhnliche Parameter:
+        // iFractionScale = 2.;
+        // iFractionAmplitude = 0.5;
+        // mit "iFractionScale == 2" spricht man oft auch von "Oktaven"
         p = p * iFractionScale;
         a *= iFractionAmplitude;
     }
     // return v;
-    // <-- ist das eigentliche fbm(), aber führt hier schnell zu zu starken Werten
+    // <-- fBM() wird oft ohne die folgende Normierung geschrieben,
+    //     aber normalerweise lässt man da die Parameter auch fix  verschiedene Wahl der Unifosm
     return v / s;
 }
 
@@ -213,14 +222,34 @@ float bounceParabola(float h, float g, float T, float t) {
     return t;
 }
 
-void applyToneMapping(inout vec3 col, float exposure, float mixReinhard) {
-    vec3 exposureTone = c.xxx - exp(-col * exposure);
-    vec3 reinhardMapping = col / (col + c.xxx);
-    col = mix(exposureTone, reinhardMapping, mixReinhard);
+void applyToneMapping(inout vec3 col) {
+    // "Tone Mapping" ist der allgemeine Begriff des nachträglichen Verschiebens der
+    // RGB-Werte (auf alle Farbkanäle gleichermaßen oder auch unterschiedlich).
+    // Oft dient das dazu, die Werte erstmal in den Bereich [0..1] zu bekommen;
+    // eine Gammakorrektur wird dann danach ausgeführt weil deren Potenzfunktion dann
+    // innerhalb dieses Bereichs das Minimum (0) und Maximum (1) unverändert lässt.
+    // ... ob man "Gamma" auch als "Tone Mapping" betrachtet oder nicht, ist streitbar.
+    // Es hängt m.E. davon ab, ob man es aus künstlerischer Entscheidung macht,
+    // oder ob man den Verlauf des darstellenden Bildschirms / Beamers kompensieren will.
+
+    // Beispiel: "ACES Filmic Curve" ist eine Wahl einer allgemeinen Form
+    // col = (a * col² + b * col + c) / (d * col² + e * col + f)
+    vec3 col2 = col * col;
+    vec3 acesToneMapped = (2.51*col2 + 0.03*col) / (2.43*col2 + 0.59*col + 0.14);
+    col = mix(col, acesToneMapped, iToneMapACESMixing);
+
+    // "Exposure Mapping" wäre auch eine relativ simple Form von Tone Mapping
+    // col = c.xxx - exp(-col * iToneMapExposure);
+
+    // Zum Veranschaulichen:
+    // https://graphtoy.com/?f1(x,t)=(x*(2.51*x%20+%200.03))%20/%20(x*(2.43*x%20+%200.59)%20+%200.14)&v1=true&f2(x,t)=pow(x,%201/2.2)&v2=true&f3(x,t)=&v3=true&f4(x,t)=&v4=false&f5(x,t)=&v5=false&f6(x,t)=&v6=false&grid=1&coords=1.0460698031714766,0.8942233204121067,2.158305478910581
+
+    // Andere Mappings findet man z.B. leicht unter den Namen
+    // - Reinhard Tone Mapping
+    // - John Hable Uncharted 2 Filmic Mapping
 }
 
 void applyGammaCorrection(inout vec3 col) {
-    // const float gamma = 2.2;
     col = pow(col, vec3(1./iGammaExponent));
 }
 
@@ -421,6 +450,19 @@ MarchHit map( in vec3 pos )
         MarchHit(floorY, MATERIAL_MOUNTAINS, fract(pos.xz))
     );
 
+    // texturedSdBox: sdBox erweitert um die Aufprallkoordinate des Strahls,
+    // um später die Textur abbilden zu können. Lässt sich beim Quader noch überschauen...
+    res = takeCloser(res,
+        texturedSdBox(pos-vec3( -.5,0.2, 0.0), vec3(0.5,0.2,0.5), 0.02)
+    );
+    res = takeCloser(res,
+        texturedSdBox(rotY(0.1 * iTime)*(pos-vec3(1.32,0.4,-0.8)), vec3(0.5,0.4,0.3), 0.0)
+    );
+
+    if (justTheBoxes) {
+        return res;
+    }
+
     // das hier ist im Kern weiterhin die "Kette an opUnion(...)" von letztem Mal,
     // aber weniger Objekte, und umformuliert, weil MarchHit() jetzt mehr ist als "vec2":
 
@@ -472,16 +514,6 @@ MarchHit map( in vec3 pos )
         // Außerdem geben wir den "squeeze"-Wert über den Material-Parameter in die Farbe
     }
 
-    // texturedSdBox: sdBox erweitert um die Aufprallkoordinate des Strahls,
-    // um später die Textur abbilden zu können. Lässt sich beim Quader noch überschauen...
-
-    res = takeCloser(res,
-        texturedSdBox(pos-vec3( -.5,0.2, 0.0), vec3(0.5,0.2,0.5), 0.02)
-    );
-
-    res = takeCloser(res,
-        texturedSdBox(rotY(0.1 * iTime)*(pos-vec3(1.32,0.4,-0.8)), vec3(0.5,0.4,0.3), 0.0)
-    );
     vec3 cylinderPos = (pos-vec3( 1.0,0.35,-2.0));
     // Eulerwinkel-Drehung am Beispiel des Zylinders:
     // (sieht man gut, wenn man den Pfad mit iPathOffset so wählt
@@ -672,8 +704,9 @@ void render(in vec3 rayOrigin, in vec3 rayDir)
 
     vec3 col = materialPalette(res.material);
 
+    // Gewichtungsfaktoren für manche der Beleuchtungsbeiträge,
+    // um bei Bedarf Materialien unterschiedlich behandeln zu können.
     float specularCoeff = 1.0;
-
     float subSurfaceCoefficient = 1.0;
 
     // berechneten Strahl rekonstruieren
@@ -704,7 +737,7 @@ void render(in vec3 rayOrigin, in vec3 rayDir)
         // Einfach mal die Wände des umschließenden Würfels auswerten:
         vec3 n = abs(normal);
         vec2 st = n.x > n.y && n.x > n.z ? pos.zy : pos.xy;
-        float pattern = voronoiPattern(10. * st);
+        float pattern = voronoiPattern(10. * st, true);
         pattern = smoothstep(0.0, 0.5, pattern);
         col = mix(col, pattern * col, 1. - pos.y);
     }
@@ -728,18 +761,10 @@ void render(in vec3 rayOrigin, in vec3 rayDir)
         // wir projizieren einfach den Strahl auf die y-Ebene (Boden y == 0); skalieren nach Laune
         res.texCoord = rayPos.xz * 0.3;
         col = texture(texRock, res.texCoord).rgb;
-        // "Fraktale" Verfeinerung ähnlich "fractal Brownian motion" - kann auch ausbleiben
-        /*
-        col += (
-            0.66 * texture(texRock, 2. * res.texCoord).rgb +
-            0.44 * texture(texRock, 4. * res.texCoord).rgb
-        );
-        col /= 2.1;
-        */
         col = pow(col, vec3(2.8));
         specularCoeff = 0.12;
 
-        if (DRAW_GRID_ON_FLOOR && isFloor) {
+        if (drawGridOnFloor) {
             col *= 0.3 + 0.7 * vec3(grid);
         }
     }
@@ -820,14 +845,18 @@ void render(in vec3 rayOrigin, in vec3 rayDir)
             * clamp(1.0 - rayPos.y, 0.0, 1.0);
         shade += col * iBacklightAmount * backlightIllumination * vec3(0.25, 0.25, 0.25);
 
-        // "Sub-Surface Scattering"-Nachahmung nach, i.e. Lichtstrahlen, die das Material nach etwas
-        // Verweilzeit  wieder verlassen (man stelle sich seine Finger hinter einer Taschenlampe vor)
-        // Das ist physikalisch ein Diffusionseffekt und sieht generell weich aus, oder wachs-artig.
+        // "Subsurface Scattering" / "Volumenstreuung" - Nahmt Licht nach, das ins Material geht,
+        // sich da etwas verteilt und wieder verlässt, was zu einem wachsartig weichen Leuchten
+        // führt (man stelle sich seine Finger hinter einer Taschenlampe vor.)
+        // Das ist physikalisch ein Diffusionseffekt, wir wollen die Strahlen aber hier
+        // nicht aufwändig berechnen, sondern überlegen auch hier empirisch:
+        //
         // Das hängt am Ambient-Occlusion-Faktor aufgrund der Annahme, dass die Lichtstrahlen, die
         // in diesen Ecken bzw. Materialien etc. "verdeckt" werden, ja irgendwo hin müssen.
         // Hat dann einen specular-artigen Beitrag wie dot(normal, rayDir), weil das Licht das Material
         // am ehesten senkrecht verlässt und dann also entlang der Blickrichtung liegen muss.
-        float subsurfaceScattering = occ * pow(clamp(1.0+dot(normal, rayDir), 0.0, 1.0), 2.0);
+        float subsurfaceScattering = occ * pow(clamp(1.0+dot(normal, rayDir), 0.0, 1.0), iSubsurfaceExponent);
+        subsurfaceScattering = occ * pow(subsurfaceScattering, iSubsurfaceExponent);
         shade += col * iSubsurfaceAmount * subsurfaceScattering * c.xxx;
     }
 
@@ -836,7 +865,6 @@ void render(in vec3 rayOrigin, in vec3 rayDir)
         return;
     }
 
-    applyToneMapping(shade, iToneMapExposure, iToneCompressedGain);
     col = shade;
     applyDistanceFog(col, res.t, vec3(0.001,0.,0.004), 0.002, 3.0);
     fragColor = vec4(col, 1.);
@@ -949,6 +977,7 @@ void main()
 
     render(camOrigin, rayDirection);
 
+    applyToneMapping(fragColor.rgb);
     applyGammaCorrection(fragColor.rgb);
 
     // (==>) jetzt haben wir fragColor als "unabhängige Ebene" behandelt und können

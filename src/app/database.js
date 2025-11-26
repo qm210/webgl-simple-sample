@@ -27,8 +27,11 @@ export async function initializePresetStore() {
     return db;
 }
 
-export async function loadPresets(db) {
-    return db.getAll(STORE.PRESETS);
+export async function loadPresets(db, showcaseId) {
+    return db.getAll(STORE.PRESETS)
+        .then(presets =>
+            presets.filter(p => p.showcaseId === showcaseId)
+        );
 }
 
 export async function createPreset(db, bundle, name = undefined) {

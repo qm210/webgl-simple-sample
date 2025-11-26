@@ -1,6 +1,6 @@
 import {startRenderLoop} from "../webgl/render.js";
 import {initBasicState} from "./common.js";
-import fragmentShaderSource from "../shaders/raymarchingPrimitivesSimplified.glsl";
+import fragmentShaderSource from "../shaders/raymarchingFirstSteps.glsl";
 
 export default {
     title: "Ray Marching: Primitives",
@@ -28,7 +28,7 @@ export default {
         uniforms: [{
             type: "bool",
             name: "showJustASphere",
-            description: "Bei Bedarf einfach mal ein bisschen Komplexität reduzieren...",
+            description: "Bei Bedarf erstmal ein bisschen Übersicht verschaffen...",
             defaultValue: false,
         }, {
             type: "float",
@@ -39,7 +39,8 @@ export default {
         }, {
             type: "bool",
             name: "makeSphereColorful",
-            description: "Zeigt, dass manche Effekte keinen eindeutigen Platz im Shader haben müssen.",
+            description: "Ein Beispiel einer individuellen Farbgebung für die Kugel. Aber man sieht\n" +
+                "dem Code an, dass das dem bisherigen Design etwas zuwidergeht.",
             defaultValue: false,
         }, {
             type: "int",
@@ -58,7 +59,8 @@ export default {
             type: "bool",
             name: "useAdaptiveMarchingPrecision",
             description: "Vergleicht beim Marching, ob wir auf längere Strecken die Treffergenauigkeit noch brauchen",
-            defaultValue: false,
+            defaultValue: true,
+            hidden: true
         }, {
             type: "float",
             name: "iFocalLength",
@@ -117,9 +119,33 @@ export default {
         }, {
             type: "float",
             name: "iSpecularExponent",
-            defaultValue: 20,
-            min: 0.01,
-            max: 100,
+            defaultValue: 25,
+            min: 0.1,
+            max: 40,
+        }, {
+            type: "bool",
+            name: "useBlinnPhongSpecular",
+            defaultValue: false,
+            description: "specular ~ \"dot(normal, halfway)\" statt \"dot(rayDir, reflected)\"\n" +
+                "Skaliert außerdem noch den Exponenten * 3, dass es vergleichbar bleibt.",
+        }, {
+            type: "float",
+            name: "iFloorSpecularCoefficient",
+            defaultValue: 0.4,
+            min: 0.,
+            max: 2.,
+        }, {
+            type: "float",
+            name: "iShadowHardness",
+            defaultValue: 8,
+            min: 0.,
+            max: 20.,
+        }, {
+            type: "int",
+            name: "iShadowMarchingSteps",
+            defaultValue: 80,
+            min: 0.,
+            max: 200.,
         }, {
             type: "float",
             name: "iFree0",
@@ -202,10 +228,13 @@ function render(gl, state) {
     gl.uniform1f(state.location.iCameraRotationFrequency, state.iCameraRotationFrequency);
     gl.uniform1f(state.location.iCameraRotationAngle, state.iCameraRotationAngle);
     gl.uniform3fv(state.location.vecDirectionalLight, state.vecDirectionalLight);
-
     gl.uniform1f(state.location.iDiffuseAmount, state.iDiffuseAmount);
     gl.uniform1f(state.location.iSpecularAmount, state.iSpecularAmount);
     gl.uniform1f(state.location.iSpecularExponent, state.iSpecularExponent);
+    gl.uniform1i(state.location.useBlinnPhongSpecular, state.useBlinnPhongSpecular);
+    gl.uniform1f(state.location.iFloorSpecularCoefficient, state.iFloorSpecularCoefficient);
+    gl.uniform1f(state.location.iShadowHardness, state.iShadowHardness);
+    gl.uniform1i(state.location.iShadowMarchingSteps, state.iShadowMarchingSteps);
 
     gl.uniform1f(state.location.iFree0, state.iFree0);
     gl.uniform1f(state.location.iFree1, state.iFree1);

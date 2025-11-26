@@ -33,45 +33,6 @@ export default {
             minFilter: gl.LINEAR,
         });
 
-        state.location.texFrame = gl.getUniformLocation(state.program, "texFrame");
-        state.location.texSpace = gl.getUniformLocation(state.program, "texSpace");
-        state.location.texRock = gl.getUniformLocation(state.program, "texRock");
-        state.location.iCamOffset = gl.getUniformLocation(state.program, "iCamOffset");
-        state.location.iCamLookOffset = gl.getUniformLocation(state.program, "iCamLookOffset");
-        state.location.iCamRoll = gl.getUniformLocation(state.program, "iCamRoll");
-        state.location.iCamFocalLength = gl.getUniformLocation(state.program, "iCamFocalLength");
-        state.location.iPathSpeed = gl.getUniformLocation(state.program, "iPathSpeed");
-        state.location.iPathOffset = gl.getUniformLocation(state.program, "iPathOffset");
-        state.location.vecDirectionalLight = gl.getUniformLocation(state.program, "vecDirectionalLight");
-        state.location.iLightPointPaletteColor = gl.getUniformLocation(state.program, "iLightPointPaletteColor");
-        state.location.iLightSourceMix = gl.getUniformLocation(state.program, "iLightSourceMix");
-        state.location.iDiffuseAmount = gl.getUniformLocation(state.program, "iDiffuseAmount");
-        state.location.iSpecularAmount = gl.getUniformLocation(state.program, "iSpecularAmount");
-        state.location.iSpecularExponent = gl.getUniformLocation(state.program, "iSpecularExponent");
-        state.location.iBacklightAmount = gl.getUniformLocation(state.program, "iBacklightAmount");
-        state.location.iSubsurfaceAmount = gl.getUniformLocation(state.program, "iSubsurfaceAmount");
-        state.location.iAmbientOcclusionScale = gl.getUniformLocation(state.program, "iAmbientOcclusionScale");
-        state.location.iAmbientOcclusionStep = gl.getUniformLocation(state.program, "iAmbientOcclusionStep");
-        state.location.iAmbientOcclusionSamples = gl.getUniformLocation(state.program, "iAmbientOcclusionSamples");
-        state.location.iToneMapExposure = gl.getUniformLocation(state.program, "iToneMapExposure");
-        state.location.iToneCompressedGain = gl.getUniformLocation(state.program, "iToneCompressedGain");
-        state.location.iGammaExponent = gl.getUniformLocation(state.program, "iGammaExponent");
-        state.location.iNoiseLevel = gl.getUniformLocation(state.program, "iNoiseLevel");
-        state.location.iNoiseFreq = gl.getUniformLocation(state.program, "iNoiseFreq");
-        state.location.iNoiseOffset = gl.getUniformLocation(state.program, "iNoiseOffset");
-        state.location.iFractionSteps = gl.getUniformLocation(state.program, "iFractionSteps");
-        state.location.iFractionScale = gl.getUniformLocation(state.program, "iFractionScale");
-        state.location.iFractionAmplitude = gl.getUniformLocation(state.program, "iFractionAmplitude");
-        state.location.iFree0 = gl.getUniformLocation(state.program, "iFree0");
-        state.location.iFree1 = gl.getUniformLocation(state.program, "iFree1");
-        state.location.iFree2 = gl.getUniformLocation(state.program, "iFree2");
-        state.location.iFree3 = gl.getUniformLocation(state.program, "iFree3");
-        state.location.iFree4 = gl.getUniformLocation(state.program, "iFree4");
-        state.location.iFree5 = gl.getUniformLocation(state.program, "iFree5");
-        state.location.vecFree0 = gl.getUniformLocation(state.program, "vecFree0");
-        state.location.vecFree1 = gl.getUniformLocation(state.program, "vecFree1");
-        state.location.vecFree2 = gl.getUniformLocation(state.program, "vecFree2");
-
         gl.useProgram(state.program);
 
         return state;
@@ -107,9 +68,12 @@ function render(gl, state) {
     gl.uniform1f(state.location.iSpecularExponent, state.iSpecularExponent);
     gl.uniform1f(state.location.iBacklightAmount, state.iBacklightAmount);
     gl.uniform1f(state.location.iSubsurfaceAmount, state.iSubsurfaceAmount);
+    gl.uniform1f(state.location.iSubsurfaceExponent, state.iSubsurfaceExponent);
     gl.uniform1f(state.location.iAmbientOcclusionScale, state.iAmbientOcclusionScale);
     gl.uniform1f(state.location.iAmbientOcclusionStep, state.iAmbientOcclusionStep);
     gl.uniform1f(state.location.iAmbientOcclusionSamples, state.iAmbientOcclusionSamples);
+    gl.uniform1i(state.location.justTheBoxes, state.justTheBoxes);
+    gl.uniform1i(state.location.drawGridOnFloor, state.drawGridOnFloor);
 
     gl.uniform1i(state.location.doUseCameraPath, state.doUseCameraPath);
     gl.uniform1i(state.location.doShowCameraPathPoints, state.doShowCameraPathPoints);
@@ -117,7 +81,7 @@ function render(gl, state) {
     gl.uniform1i(state.location.doShowPointLightSource, state.doShowPointLightSource);
 
     gl.uniform1f(state.location.iToneMapExposure, state.iToneMapExposure);
-    gl.uniform1f(state.location.iToneCompressedGain, state.iToneCompressedGain);
+    gl.uniform1f(state.location.iToneMapACESMixing, state.iToneMapACESMixing);
     gl.uniform1f(state.location.iGammaExponent, state.iGammaExponent);
     gl.uniform1f(state.location.iNoiseLevel, state.iNoiseLevel);
     gl.uniform1f(state.location.iNoiseFreq, state.iNoiseFreq);
@@ -183,15 +147,18 @@ function defineUniformControlsBelow() {
     }, {
         type: "bool",
         name: "doUseCameraPath",
+        description: "Kamera auf Spline-Pfad bewegen",
         defaultValue: true,
     }, {
         type: "bool",
         name: "doShowCameraPathPoints",
-        defaultValue: true,
+        description: "Spline-Kamera-Kontrollpunkte als kleine Kugeln rendern",
+        defaultValue: false,
     }, {
         type: "bool",
         name: "doUseCameraTargetPath",
         defaultValue: false,
+        description: "Kamera-Blickpunkt auf (eigenem) Spline-Pfad bewegen"
     }, {
         type: "float",
         name: "iPathSpeed",
@@ -204,6 +171,16 @@ function defineUniformControlsBelow() {
         defaultValue: 0,
         min: 0.,
         max: 14.,
+    }, {
+        type: "bool",
+        name: "justTheBoxes",
+        defaultValue: false,
+        description: "Szene auf die beiden Quader reduzieren (für weniger Ablenkung)"
+    }, {
+        type: "bool",
+        name: "drawGridOnFloor",
+        defaultValue: false,
+        description: "Für die Orientierung (Abstand je 0.5 in Richtung X/Z\)",
     }, {
         type: "float",
         name: "iLightSourceMix",
@@ -219,7 +196,8 @@ function defineUniformControlsBelow() {
     }, {
         type: "bool",
         name: "doShowPointLightSource",
-        defaultValue: true,
+        defaultValue: false,
+        description: "Die Punktlichtquelle selbst ist nur sichtbar, wenn wir sie gezielt rendern."
     }, {
         type: "float",
         name: "iDiffuseAmount",
@@ -252,6 +230,12 @@ function defineUniformControlsBelow() {
         max: 100.,
     }, {
         type: "float",
+        name: "iSubsurfaceExponent",
+        defaultValue: 2,
+        min: 0.1,
+        max: 10.,
+    }, {
+        type: "float",
         name: "iAmbientOcclusionSamples",
         defaultValue: 5,
         min: 0.,
@@ -273,11 +257,11 @@ function defineUniformControlsBelow() {
         type: "float",
         name: "iToneMapExposure",
         defaultValue: 1,
-        min: 0.,
-        max: 10.,
+        min: -1.,
+        max: 3.,
     }, {
         type: "float",
-        name: "iToneCompressedGain",
+        name: "iToneMapACESMixing",
         defaultValue: 0,
         min: -1.,
         max: 2.,
@@ -285,21 +269,22 @@ function defineUniformControlsBelow() {
         type: "float",
         name: "iGammaExponent",
         defaultValue: 2.2,
-        min: 0.,
-        max: 10.,
+        min: 0.25,
+        max: 4.,
+        log: true,
     }, {
         type: "float",
         name: "iNoiseLevel",
         defaultValue: 0.,
         min: 0.,
-        max: 0.2,
-        step: 0.001
+        max: 1,
+        step: 0.01
     }, {
         type: "float",
         name: "iNoiseFreq",
         defaultValue: 1,
         min: 0.001,
-        max: 0.5,
+        max: 1,
         step: 0.001,
     }, {
         type: "float",
@@ -318,8 +303,9 @@ function defineUniformControlsBelow() {
         type: "float",
         name: "iFractionScale",
         defaultValue: 2.,
-        min: 0.01,
-        max: 10.,
+        min: 0.1,
+        max: 4.,
+        hidden: true, // wenig lehrreich, den zu ändern
     }, {
         type: "float",
         name: "iFractionAmplitude",

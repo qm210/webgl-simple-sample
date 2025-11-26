@@ -6,7 +6,7 @@ import showcase3 from "./showcases/3_Textures.js";
 import showcase4 from "./showcases/4_ColorPlayground.js";
 import showcase5 from "./showcases/5a_Noise.js";
 import showcase5b from "./showcases/5b_NoiseExtended.js";
-import showcase6 from "./showcases/6a_RayMarchingPrimitivesSimplified.js";
+import showcase6 from "./showcases/6_RayMarching.js";
 import showcaseIQ from "./showcases/6b_RayMarchingPrimitives.js";
 import showcase7 from "./showcases/7_VariousConceptsFor3D.js";
 import showcase8 from "./showcases/8_MultiPassAndExtraData.js";
@@ -24,7 +24,7 @@ import showcaseZClouds from "./showcases/Z_NR4_Clouds.js";
 
 const defaultShowcase = showcase12;
 
-const BY_PATH = {
+const MAP_PATH = {
     // Zum Anfang ein sehr, sehr langweiliger Anfang.
     "1": showcase1,
     // SDF in 2D, mit "2b" Vertiefung auf die Quadrat-SDF, "2c" zum Kontext der Gitter-Diskussion
@@ -76,10 +76,13 @@ const BY_PATH = {
 
 export function selectShowcase() {
     const path = window.location.pathname.slice(1);
-    const showcase = BY_PATH[path]
+    const showcase = MAP_PATH[path];
     if (showcase) {
         showcase.path = path;
         return showcase;
+    }
+    if (path) {
+        window.alert(`Kein Showcase \"${path}\" definiert ='(`);
     }
     return defaultShowcase;
 }
