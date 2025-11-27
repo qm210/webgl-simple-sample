@@ -172,6 +172,13 @@ export const addControlsToPage = (elements, state, controls, autoRenderOnLoad) =
                 })
             continue;
         }
+        else if (control.type === "separator") {
+            elements[control.name] =
+                addFreeRow({
+                    parent: elements.controls,
+                    content: createDiv(control.title, "separator"),
+                })
+        }
 
         if (control.group) {
             control.groupedControls = groups[control.group];

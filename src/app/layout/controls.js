@@ -27,6 +27,13 @@ export function addButton({parent, onClick, onRightClick, title = "", className 
 export const addFreeRow = ({parent, label, id, content, valuePrefix}) => {
     const name = createElement("label", label);
     const container = createDiv("", "free-row");
+    if (label) {
+        parent.appendChild(name);
+    } else {
+        container.classList.add("extra-column");
+    }
+    parent.appendChild(container);
+
     container.dataset.id = id;
     const value = createDiv("", "value-label");
     if (valuePrefix) {
@@ -40,8 +47,6 @@ export const addFreeRow = ({parent, label, id, content, valuePrefix}) => {
     } else if (content) {
         container.appendChild(content);
     }
-    parent.appendChild(name);
-    parent.appendChild(container);
     return {container, name, value, content};
 };
 

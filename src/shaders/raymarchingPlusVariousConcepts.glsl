@@ -82,6 +82,7 @@ const float MATERIAL_CYLINDER = 8.0;
 const float MATERIAL_PYRAMID = 13.0;
 const float MATERIAL_MOUNTAINS = 2.0;
 const float MATERIAL_PATH_POINT = 1.4;
+const float MATERIAL_PATH_TARGET_POINT = 1.41;
 const float MATERIAL_ARROW = 50.;
 
 #define ZERO min(0, iFrame)
@@ -557,13 +558,22 @@ const vec3 pyramidPos = vec3(-1.0, 0.0, -2.6);
 const float pyramidHeight = 1.1;
 
 void displayDevelopmentHelpers(inout Hit res, in vec3 pos) {
-    // render the path points for debugging
+
     if (displayCameraPathPoints) {
+        // einfache Visualisierung von Punkten im Raum (z.B: unserer Kamerapfad, falls aktiv)
+        // Nutzt hier das sporadisch eingeführte customArg, um die Pfadpunkte durchzunummerieren.
         for (int p = ZERO; p < nPath; p++) {
+            float pathRatio = float(p) / float(nPath - 1);
             res = takeCloser(res, Hit(
                 sdSphere(pos - camPosPath[p].xyz, 0.015 - 0.005 * cos(12. * iTime)),
-                MATERIAL_PATH_POINT, c.yy, float(p)
+                MATERIAL_PATH_POINT, c.yy, pathRatio
             ));
+            if (doUseCameraTargetPath) {
+                res = takeCloser(res, Hit(
+                    sdSphere(pos - targetPath[p].xyz, 0.015 + 0.005 * cos(12. * iTime)),
+                    MATERIAL_PATH_TARGET_POINT, c.yy, pathRatio
+                ));
+            }
         }
     }
 
@@ -576,8 +586,8 @@ void displayDevelopmentHelpers(inout Hit res, in vec3 pos) {
     const float colorArgForward = 19.19;
     const float worldAxesThickness = 0.002;
     const float axesSize = 0.13;
-    vec3 axesOrigin = cam.origin + cam.forward - 0.55 * cam.right - 0.3 * cam.up;
 
+    vec3 axesOrigin = cam.origin + cam.forward - 0.55 * cam.right - 2. * axesSize * cam.up;
     vec3 axisRight = axesSize * cam.right;
     vec3 axisUp= axesSize * cam.up;
     vec3 axisForward = axesSize * cam.forward;
@@ -989,11 +999,11 @@ vec4 render(in vec3 rayOrigin, in vec3 rayDir)
         }
     }
     else if (res.material == MATERIAL_PATH_POINT) {
-        // einfache Visualisierung von Punkten im Raum (z.B: unserer Kamerapfad, falls aktiv)
-        // Hier eine Verwendung vom (freien) customArg, um die Pfadpunkte durchzunummerieren
-        float partOfPath = res.customArg/float(nPath - 1);
-        // partOfPath geht also von 0.0 = erster Punkt bis 1.0 = letzter Punkt.
-        col = vec3(0., partOfPath, 1. - partOfPath);
+        col = vec3(0., res.customArg, 1. - res.customArg);
+        specularCoeff = 0.1;
+    }
+    else if (res.material == MATERIAL_PATH_TARGET_POINT) {
+        col = vec3(1. - res.customArg, 0.5 * res.customArg, 0.);
         specularCoeff = 0.1;
     }
     else if (isFloor || res.material == MATERIAL_MOUNTAINS)
@@ -1262,15 +1272,17 @@ void setupCameraMatrix(inout Camera cam, float rollAngle, vec2 pan)
     cam.up = cross(cam.right, cam.forward);
     cam.matrix = mat3(cam.right, cam.up, cam.forward);
 
-    // Die Extra-Rotationen wollen wir hier dann auf die rotierten Koordinaten
+    // Unsere Extra-Rotationen wollen wir auf die rotierten Koordinaten anwenden,
+    // der Rollwinkel wird gewöhnlich auch um die finale Blickrichtung verstanden.
     mat3 extraYaw = rotAround(cam.up, pan.x);
-    mat3 extraPitch = rotAround(cam.right, -pan.y + 0.4 * sin(iTime));
-    // Der Rollwinkel wird so eigentlich stets um die finale Blickrichtung bezeichnet.
+    mat3 extraPitch = rotAround(cam.right, -pan.y);
     mat3 roll = rotAround(cam.forward, rollAngle);
     cam.matrix = roll * (extraPitch * extraYaw * cam.matrix);
-    /// <- BUG in GLSL??: Diese Klammer spielt ominöserweise eine Rolle!
-    ///    Mathematisch ist die Klammer überflüssig (Assoziativität). Sehr mysteriös.
-    ///    Ohne sie führt extraPitch zu einer Roll-Bewegung, auch wenn extraYaw und roll je mat3(1.) sind.
+    // VORSICHT, POTENTIELLER BUG in GLSL / Grafiktreiber:
+    // <- Diese Klammer nach roll * (...) spielt eine Rolle. Mathematisch ist das nicht so,
+    //    die Matrixmultiplikation ist assoziativ. Sehr mysteriös.
+    //    Ohne Klammer führt extraPitch _auf_manchen_Rechnern_ (!) zu einer Roll-Bewegung,
+    //    selbst in Fällen, wo extraYaw und roll keinen Effekt haben (identisch zur Einheitsmatrix sind).
 
     /* Globale "struct Camera": Wir brauchen weiter eigentlich nur "cam.origin" und "cam.matrix".
     Wir speichern die uns nur hier, um sie selbst in der map() veranschaulichen zu können. */

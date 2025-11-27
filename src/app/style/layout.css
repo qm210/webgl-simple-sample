@@ -136,16 +136,6 @@ button.render-button {
     gap: 0.5rem;
 }
 
-#shader-controls > div.free-row {
-    grid-column: 2 / -1;
-    font-size: var(--font-size-large);
-    display: flex;
-    flex-direction: row;
-    align-items: stretch;
-    padding-left: 0.25rem;
-    width: 100%;
-}
-
 #shader-controls > div.value-label {
     padding-left: 0.25rem;
     padding-right: 0.5rem;
@@ -159,6 +149,20 @@ button.render-button {
 
 #shader-controls .unused {
     opacity: 0.5;
+}
+
+.free-row {
+    grid-column: 2 / -1;
+    font-size: var(--font-size-large);
+    display: flex;
+    flex-direction: row;
+    align-items: stretch;
+    padding-left: 0.25rem;
+    width: 100%;
+}
+
+.free-row.extra-column {
+    grid-column: 1 / -1;
 }
 
 .free-row button {
@@ -219,3 +223,30 @@ button.render-button {
     text-align: center;
 }
 
+.separator {
+    display: flex;
+    gap: 0.5rem;
+    align-items: baseline;
+    width: 100%;
+    margin: 0.3rem 0;
+    color: darkgray;
+    font-weight: bold;
+}
+
+.separator::before,
+.separator::after {
+    content: '';
+    height: 2px;
+    flex-basis: 1vw;
+    background-color: currentColor;
+    transform: translateY(-2px);
+}
+
+.separator::after {
+    flex: 1;
+}
+
+.separator span {
+    padding: 0 1rem;
+    white-space: nowrap;
+}

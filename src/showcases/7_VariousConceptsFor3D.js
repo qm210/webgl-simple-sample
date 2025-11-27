@@ -128,6 +128,9 @@ function render(gl, state) {
 
 function defineUniformControlsBelow() {
     return [{
+        type: "separator",
+        title: "Kamera - Transformation"
+    }, {
         type: "cursorInput",
         name: "iCamOffset",
         keys: ["w", "a", "s", "d", "r", "f", "q"],
@@ -152,6 +155,9 @@ function defineUniformControlsBelow() {
         defaultValue: 2.5,
         min: 0.001,
         max: 20,
+    }, {
+        type: "separator",
+        title: "Kamera - Pfad-Automatisierung"
     }, {
         type: "bool",
         name: "doUseCameraPath",
@@ -202,6 +208,9 @@ function defineUniformControlsBelow() {
         description: "Kamera-Geschwindigkeit näherungsweise konstant anpassen.\n" +
             "(weil die Gesamtlänge des Pfads vereinfacht nur linear bestimmt wird...)",
     }, {
+        type: "separator",
+        title: "Szene - Troubleshooting"
+    }, {
         type: "bool",
         name: "justTheBoxes",
         defaultValue: false,
@@ -211,6 +220,9 @@ function defineUniformControlsBelow() {
         name: "drawGridOnFloor",
         defaultValue: false,
         description: "Für die Orientierung (Abstand je 0.5 in Richtung X/Z\)",
+    }, {
+        type: "separator",
+        title: "Beleuchtungsmodell"
     }, {
         type: "float",
         name: "iDirectionalLightStrength",
@@ -296,6 +308,9 @@ function defineUniformControlsBelow() {
         min: 0.,
         max: 1.,
     }, {
+        type: "separator",
+        title: "Textur Pyramide"
+    }, {
         type: "bool",
         name: "showPyramidTextureGrid",
         defaultValue: false,
@@ -327,17 +342,20 @@ function defineUniformControlsBelow() {
         description: "Zum Vergleich der Wahl in Texturkoordinaten: Textur aus Bilddatei anbringen\n" +
             "(die im unverzerrten Fall auf den Quadern auch zu sehen ist)",
     }, {
-        type: "float",
-        name: "iToneMapExposure",
-        defaultValue: 1,
-        min: -1.,
-        max: 3.,
+        type: "separator",
+        title: "Post-Processing"
     }, {
         type: "float",
         name: "iDistanceFogExponent",
         defaultValue: 2.9,
         min: 0,
         max: 5,
+    }, {
+        type: "float",
+        name: "iToneMapExposure",
+        defaultValue: 1,
+        min: -1.,
+        max: 3.,
     }, {
         type: "float",
         name: "iToneMapACESMixing",
@@ -351,6 +369,9 @@ function defineUniformControlsBelow() {
         min: 0.25,
         max: 4.,
         log: true,
+    }, {
+        type: "separator",
+        title: "Pseudo-Noise-Berge"
     }, {
         type: "float",
         name: "iNoiseLevel",
@@ -384,6 +405,9 @@ function defineUniformControlsBelow() {
         defaultValue: 0.5,
         min: 0.01,
         max: 2.,
+    }, {
+        type: "separator",
+        title: "Zur freien Verwendung"
     }, {
         type: "float",
         name: "iFree0",
