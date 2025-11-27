@@ -8,6 +8,7 @@ precision highp float;
 out vec4 fragColor;
 uniform vec2 iResolution;
 uniform float iTime;
+uniform int iFrame;
 uniform vec4 iMouseDrag;
 uniform sampler2D texFrame;
 uniform sampler2D texSpace;
@@ -80,6 +81,9 @@ const float MATERIAL_CYLINDER = 8.0;
 const float MATERIAL_PYRAMID = 13.0;
 const float MATERIAL_MOUNTAINS = 2.0;
 const float MATERIAL_PATH_POINT = 1.4;
+const float MATERIAL_ARROW = 50.;
+
+#define ZERO min(0, iFrame)
 
 /////////////////////////
 
@@ -93,7 +97,7 @@ vec3 camPosPath[nPath] = vec3[nPath](
     vec3(1.7, 0.4, -3.0),
     vec3(1.5, 0.8, 2.1)
 );
-float linearCamPathLength; // = 22.0278, currently
+float linearCamPathLength;
 
 vec4 targetPath[nPath] = vec4[nPath](
     vec4(-0.3, 1., 1.7, 0.),
@@ -104,6 +108,23 @@ vec4 targetPath[nPath] = vec4[nPath](
     vec4(0.1, 0.0, 0.1, 0.),
     vec4(-0.75, 1.5, 3., -1.)
 );
+
+// machen wir hier nur global, um die Richtungen in der Szene anschauen zu können.
+struct Camera {
+    vec3 origin;
+    vec3 forward;
+    vec3 right;
+    vec3 up;
+    mat3 matrix;
+
+    vec3 target;
+    vec3 originalForward;
+    vec3 originalRight;
+    vec3 originalUp;
+};
+Camera cam;
+
+/////////////////////////
 
 mat3 rotX(float angle) {
     float c = cos(angle);
@@ -234,7 +255,7 @@ float fractalBrownianMotion(vec2 p) {
     // <-- heißt auch oft "lacunarity" bei Fraktalen...
     // ihr könnt auch iFractionalScale mal durchvariieren (z.B. mal 3.)
     // aber da sind viele Werte nicht zu viel zu gebrauchen.
-    for (int i = 0; i < iFractionalOctaves; i++) {
+    for (int i = ZERO; i < iFractionalOctaves; i++) {
         v += a * perlin2D(p);
         s += a;
         p = p * iFractionalScale;
@@ -295,7 +316,7 @@ float sdPlane( vec3 p )
 
 float sdSphere( vec3 p, float s )
 {
-    return length(p)-s;
+    return length(p) - s;
 }
 
 float sdBox( vec3 p, vec3 b )
@@ -337,7 +358,7 @@ float sdPyramid( in vec3 p, in float h )
     float d2 = min(q.y,-q.x*m2-q.y*0.5) > 0.0 ? 0.0 : min(a,b);
 
     // recover 3D and scale, and add sign
-    return sqrt( (d2+q.z*q.z)/m2 ) * sign(max(q.z,-p.y));;
+    return sqrt( (d2+q.z*q.z)/m2 ) * sign(max(q.z,-p.y));
 }
 
 float sdU( in vec3 p, in float r, in float le, vec2 w )
@@ -354,6 +375,7 @@ struct Hit {
     float t;
     float material;
     vec2 texCoord;
+    float customArg;
 };
 
 Hit texturedSdSphere(vec3 p, float s)
@@ -364,7 +386,7 @@ Hit texturedSdSphere(vec3 p, float s)
         atan(p.z, p.x) / twoPi + 0.5,
         p.y / 2. + 0.5
     );
-    return Hit(d, UNKNOWN_MATERIAL, surfaceCoord);
+    return Hit(d, UNKNOWN_MATERIAL, surfaceCoord, 0.);
 }
 
 Hit texturedSdBox( vec3 p, vec3 b, float rounding) {
@@ -406,14 +428,59 @@ Hit texturedSdBox( vec3 p, vec3 b, float rounding) {
     //        step(0.5, abs(a.x))
     //    );
 
-    return Hit(d, MATERIAL_BOX, st);
+    return Hit(d, MATERIAL_BOX, st, 0.);
 }
 
-float sdCylinder( vec3 p, vec2 h )
+float sdCylinder(vec3 p, vec2 h)
 {
     // vertical ~ along y-axis
     vec2 d = abs(vec2(length(p.xz),p.y)) - h;
     return min(max(d.x,d.y),0.0) + length(max(d,0.0));
+}
+
+float sdCone( vec3 p, vec2 c, float h )
+{
+    vec2 q = h*vec2(c.x/c.y,-1.0);
+    vec2 w = vec2( length(p.xz), p.y );
+    vec2 a = w - q*clamp( dot(w,q)/dot(q,q), 0.0, 1.0 );
+    vec2 b = w - q*vec2( clamp( w.x/q.x, 0.0, 1.0 ), 1.0 );
+    float k = sign( q.y );
+    float d = min(dot( a, a ),dot(b, b));
+    float s = max( k*(w.x*q.y-w.y*q.x),k*(w.y-q.y)  );
+    return sqrt(d)*sign(s);
+}
+
+float sdCapsule(vec3 p, vec3 a, vec3 b, float r)
+{
+    vec3 pa = p - a, ba = b - a;
+    float h = clamp(dot(pa,ba) / dot(ba,ba), 0.0, 1.0 );
+    return length(pa - ba*h) - r;
+}
+
+float opSmoothUnion( float d1, float d2, float k )
+{
+    k *= 4.0;
+    float h = max(k-abs(d1-d2),0.0);
+    return min(d1, d2) - h*h*0.25/k;
+}
+
+float sdArrow(vec3 p, vec3 target, vec3 vec, float offset) {
+    target += offset * vec;
+    vec3 start = target - vec;
+    float hHead = 0.12;
+    float rLine = 0.02;
+    // sdCone schaut intrinsisch nach c.yxy (Spitze Richtung +y).
+    // Wir konstruieren die Matrix, um c.yxy auf "dir" zu drehen, allgemein so:
+    vec = normalize(vec);
+    vec3 axis = cross(c.yxy, vec);
+    float theta = acos(dot(c.yxy, vec));
+    mat3 rot = rotAround(axis, -theta);
+
+    float dHead = sdCone(rot * (p - target), vec2(0.06, 0.1), hHead);
+    float dLine = sdCapsule(p, start, target - hHead * vec, rLine);
+    return opSmoothUnion(dLine, dHead, -1.);
+    // Anmerkung zur -1:
+    // das ist so einfach opUnion(), also min(), aber vielleicht nutze ich das doch noch...
 }
 
 Hit texturedSdCylinder(vec3 p, vec2 h) {
@@ -426,7 +493,7 @@ Hit texturedSdCylinder(vec3 p, vec2 h) {
     // nun aber...
     float s = atan(p.z / h.x, p.x / h.x) / twoPi + 0.5;
     float t = 0.5 * p.y / h.y + 0.5;
-    return Hit(d, MATERIAL_CYLINDER, vec2(s, t));
+    return Hit(d, MATERIAL_CYLINDER, vec2(s, t), 0.);
 }
 
 float sdNoiseMountains(vec3 p) {
@@ -467,8 +534,15 @@ Hit takeCloser(Hit d1, Hit d2)
 Hit takeCloser( Hit d1, float d2, float material2)
 {
     if (d1.t < d2) return d1;
-    // texCoord hier noch unbestimmt:
-    return Hit(d2, material2, c.yy);
+    return Hit(d2, material2, c.yy, 0.);
+}
+
+Hit takeCloser( Hit d1, float d2, float material2, float customArg2)
+{
+    if (d1.t < d2) return d1;
+    return Hit(d2, material2, c.yy, customArg2);
+    // texCoord hier unbestimmt, weil map() es tatsächlich noch nicht braucht.
+    // wäre aber dann auch straightforward nachgezogen.
 }
 
 const vec3 pyramidPos = vec3(-1.0, 0.0, -2.6);
@@ -477,11 +551,11 @@ const float pyramidHeight = 1.1;
 Hit map( in vec3 pos )
 {
     // flacher Boden auf y == 0
-    Hit res = Hit(pos.y, MATERIAL_FLOOR, c.yy);
+    Hit res = Hit(pos.y, MATERIAL_FLOOR, c.yy, 0.);
 
     float floorY = sdNoiseMountains(pos - vec3(0.8,0.0,-1.6));
     res = takeCloser(res,
-        Hit(floorY, MATERIAL_MOUNTAINS, fract(pos.xz))
+        Hit(floorY, MATERIAL_MOUNTAINS, fract(pos.xz), 0.)
     );
 
     // texturedSdBox: sdBox erweitert um die Aufprallkoordinate des Strahls,
@@ -560,17 +634,31 @@ Hit map( in vec3 pos )
 
     // render the path points for debugging
     if (doShowCameraPathPoints)
-    for (int p = 0; p < nPath; p++) {
+    for (int p = ZERO; p < nPath; p++) {
         res = takeCloser(res,
             Hit(
                 sdSphere(pos - camPosPath[p].xyz, 0.015 - 0.005 * cos(12. * iTime)),
                 MATERIAL_PATH_POINT,
-                vec2(float(p), 0.) // <-- Zweckentfremdung von texCoord für Unterscheidung :)
+                c.yy,
+                float(p)
             )
         );
-
     }
 
+    vec3 spinning = rotAround(cam.forward, 5. * iTime) * cam.right;
+    float error = spinning.z;
+    res = takeCloser(res, Hit(
+        sdArrow(pos, cam.origin + 2. * cam.forward, spinning, 0.),
+        MATERIAL_ARROW,
+        c.yy,
+        10. + error
+    ));
+    res = takeCloser(res, Hit(
+        sdArrow(pos, cam.origin + 2. * cam.forward, 0.5 * cam.up, 1.),
+        MATERIAL_ARROW,
+        c.yy,
+        20.
+    ));
 
     return res;
 }
@@ -589,7 +677,7 @@ vec2 iBox( in vec3 ro, in vec3 rd, in vec3 rad )
 
 Hit raycast( in vec3 ro, in vec3 rd )
 {
-    Hit res = Hit(-1.0, MISSING_MATERIAL, c.yy);
+    Hit res = Hit(-1.0, MISSING_MATERIAL, c.yy, 0.);
 
     float tmin = 0.1; // war letzte Woche noch 1.0: wird richtig hässlich beim bewegen :)
     float tmax = 20.0;
@@ -600,7 +688,7 @@ Hit raycast( in vec3 ro, in vec3 rd )
     {
         // hier erstmal für den Bereich außerhalb der Bounding Box, wohlgemerkt.
         tmax = min( tmax, tp1 );
-        res = Hit(tp1, MATERIAL_FLOOR, c.yy);
+        res = Hit(tp1, MATERIAL_FLOOR, c.yy, 0.);
     }
 
     // raymarch primitives
@@ -614,7 +702,7 @@ Hit raycast( in vec3 ro, in vec3 rd )
 //        tmax = min(boundingBox.y,tmax);
 
         float t = tmin;
-        for (int i=0; i<70 && t<tmax; i++)
+        for (int i=ZERO; i<70 && t<tmax; i++)
         {
             Hit h = map(ro + rd * t);
             if (abs(h.t) < (0.0001 * t))
@@ -742,6 +830,7 @@ void render(in vec3 rayOrigin, in vec3 rayDir)
     // um bei Bedarf Materialien unterschiedlich behandeln zu können.
     float specularCoeff = 1.0;
     float subSurfaceCoefficient = 1.0;
+    float ambientCoeff = 0.;
 
     // berechneten Strahl rekonstruieren
     vec3 rayPos = rayOrigin + res.t * rayDir;
@@ -841,8 +930,8 @@ void render(in vec3 rayOrigin, in vec3 rayDir)
     }
     else if (res.material == MATERIAL_PATH_POINT) {
         // einfache Visualisierung von Punkten im Raum (z.B: unserer Kamerapfad, falls aktiv)
-        // hier haben wir res.texCoord.x zweckentfremdet, um die Pfadpunkte durchzunummerieren
-        float partOfPath = res.texCoord.x/float(nPath - 1);
+        // Hier eine Verwendung vom (freien) customArg, um die Pfadpunkte durchzunummerieren
+        float partOfPath = res.customArg/float(nPath - 1);
         // partOfPath geht also von 0.0 = erster Punkt bis 1.0 = letzter Punkt.
         col = vec3(0., partOfPath, 1. - partOfPath);
         specularCoeff = 0.1;
@@ -860,11 +949,13 @@ void render(in vec3 rayOrigin, in vec3 rayDir)
         if (drawGridOnFloor) {
             col *= 0.3 + 0.7 * vec3(gridPattern(rayPos.xz, 0.5));
         }
+    } else if (res.material == MATERIAL_ARROW) {
+        col = materialPalette(20. + res.customArg);
+        specularCoeff = 0.1;
+        ambientCoeff = 0.7;
     }
 
-    vec3 shade = vec3(0.0);
-    vec3 lightDirection;
-    vec3 lightSourceColor;
+    vec3 shade = ambientCoeff * col;
 
     // Wir hatten letzte Woche mal eine einzelne (Richtungs)-Lichtquelle, und da die
     // verschiedenen Beiträge für etwa Phong/Blinn-Phong-Shading gesehen.
@@ -881,7 +972,9 @@ void render(in vec3 rayOrigin, in vec3 rayDir)
     // ~ 0 -> nur Richtungslicht
     // ~ 0.5 -> beide Quellen
     // ~ 1 -> nur Punktlicht
-    for (int light = 0; light < 2; light++) {
+    vec3 lightDirection;
+    vec3 lightSourceColor;
+    for (int light = ZERO; light < 2; light++) {
 
         if (light == 0) {
             // Reines Richtungslicht (ähnlich letztes Mal, nur jetzt als uniform für Flexibilität):
@@ -1012,7 +1105,7 @@ void calcApproxCamPathLength() {
     // Wir bieten zwei Optionen: Entweder die Strecke linear annähern (hier),
     // oder in konstanter Zeit pro Segment durchfahren (ignoriert das hier).
     float sum = 0.;
-    for (int seg = 0; seg < nPath - 1; seg++) {
+    for (int seg = ZERO; seg < nPath - 1; seg++) {
         sum += length(camPosPath[seg + 1] - camPosPath[seg]);
     }
     sum += length(camPosPath[0] - camPosPath[nPath - 1]);
@@ -1044,7 +1137,7 @@ void determinePathInterpolationParameters(inout float progress, out ivec4 segmen
     if (tryLinearSplineSpeedApproximation) {
         float progressLength = progress / float(nPath) * linearCamPathLength;
         float lengthAtSegmentStart = 0.;
-        for (seg = 0; seg < nPath; seg++) {
+        for (seg = ZERO; seg < nPath; seg++) {
             int next = (seg + 1 + nPath) % nPath;
             float segmentLength = length(camPosPath[next] - camPosPath[seg]);
             if (lengthAtSegmentStart + segmentLength > progressLength) {
@@ -1082,7 +1175,7 @@ vec4 getTargetPathAndRoll(float progress) {
     );
 }
 
-mat3 setCamera( in vec3 origin, in vec3 target, float rollAngle, vec2 pan)
+void setupCameraMatrix(inout Camera cam, float rollAngle, vec2 pan)
 {
     // Baut eine gesamte Rotationsmatrix zusammen, um Vektoren aus
     // den Welt- in die Kamerakoordinaten einheitlich zu transformieren.
@@ -1096,22 +1189,33 @@ mat3 setCamera( in vec3 origin, in vec3 target, float rollAngle, vec2 pan)
     //      Das ist speziell schwer zu verifizieren, weil man erstmal "visuelle Testfälle"
     //      aufstellen muss, von denen man wirklich weiß, dass sie so aussehen sollen.
     //
-    // Jenen Stand hier erkläre ich soweit mal als ausreichend:
+    // Jenen Stand hier erkläre ich soweit mal als ausreichend.
 
-    const vec3 worldUp = vec3(0, 1, 0);
+    const vec3 worldUp = c.yxy;
     mat3 extraYaw = rotAround(worldUp, pan.x);
-    // (*) Kern ohne unsere Extra-Yaw-Pitch-Roll:
-    vec3 cameraForward = normalize(target - origin);
-    vec3 cameraRight = normalize(cross(cameraForward, worldUp));
-    vec3 cameraUp = cross(cameraRight, cameraForward);
-    mat3 camMatrix = mat3(cameraRight, cameraUp, cameraForward);
+    // (*) Kern:
+    cam.forward = extraYaw * normalize(cam.target - cam.origin);
+    cam.right = normalize(cross(cam.forward, worldUp));
+    cam.up = cross(cam.right, cam.forward);
+    cam.matrix = mat3(cam.right, cam.up, cam.forward);
     // extraYaw musste vorher gedreht werden, weil das direkt cameraForward
     // vom target wegdreht und sich so auf jede weitere Richtung auswirkt.
     // -> extraPitch geht dann um die so bestimmten Von-der-Kamera-Rechts-Achse,
     //    und darf (wie roll sowieso) nicht mehr an den Welt-Achsen hängen.
-    mat3 extraPitch = rotAround(cameraRight, -pan.y + 0.5 * sin(iTime));
-    mat3 roll = rotAround(cameraForward, rollAngle);
-    return roll * extraPitch * camMatrix;
+    mat3 extraPitch = rotAround(cam.right, -0. * pan.y + 0.5 * sin(iTime));
+    mat3 roll = rotAround(cam.forward, rollAngle);
+
+    cam.matrix = roll * extraPitch * cam.matrix;
+    // Weiterverwendet wird vom "struct Camera" hier nur
+    // - cam.origin
+    // - cam.matrix
+    // alle anderen Größen sind fürs Veranschaulichen / Debugging global gemacht, nicht zum Rechnen.
+    cam.originalForward = cam.forward;
+    cam.originalRight = cam.right;
+    cam.originalUp = cam.up;
+    cam.right = cam.matrix[0];
+    cam.up = cam.matrix[1];
+    cam.forward = cam.matrix[2];
 }
 
 vec3 background() {
@@ -1121,6 +1225,17 @@ vec3 background() {
     vec4 space = texture(texSpace, st);
     // minimale Verarbeitung reicht uns mal (Gammakorrektur)
     return pow(space.rgb, vec3(1.5));
+}
+
+vec3 cmap_dream210(float t) {
+    return vec3(0.19, 0.24, 0.40)
+    +t*(vec3(3.42, -1.41, 4.13)
+    +t*(vec3(-21.95, 22.09, -7.62)
+    +t*(vec3(66.28, -51.41, -6.87)
+    +t*(vec3(-80.01, 41.55, 23.40)
+    +t*(vec3(33.21, -11.33, -11.18)
+    +t*(vec3(-0.94, 0.52, -1.86)
+    ))))));
 }
 
 void main()
@@ -1133,10 +1248,10 @@ void main()
     fragColor = c.yyyy;
 
     // Fixed Cam Origin:
-    vec3 camOrigin = vec3(-0.75, 1.5, 3.);
+    cam.origin = vec3(-0.75, 1.5, 3.);
     // mit fester Blick_richtung_ (im Gegensatz zu festem Blick-Zielpunkt)
     // (je nachdem eben, ob relativ zu Kameraposition oder unabhängig)
-    vec3 camTarget = camOrigin + vec3(1.2, -1.2, -3.5);
+    cam.target = cam.origin - c.yyx; // vec3(1.2, -1.2, -3.5);
     float camRoll = 0.;
 
     calcApproxCamPathLength();
@@ -1144,15 +1259,15 @@ void main()
     // Demonstration: Automatisierten Pfad ablaufen (per Spline-Interpolation)
     if (doUseCameraPath) {
         vec3 pathPos = getPathPosition(iPathOffset + iPathSpeed * iTime);
-        camOrigin = pathPos.xyz;
+        cam.origin = pathPos.xyz;
         // Wohin blicken? Entweder auf einen Punkt etwas weiter im Pfad... (*)
-        camTarget = getPathPosition(iPathOffset + iPathSpeed * iTime + 0.5);
+        cam.target = getPathPosition(iPathOffset + iPathSpeed * iTime + 0.5);
     }
     if (doUseCameraTargetPath) {
         // (*) oder einen komplett eigenen Pfad dafür verwenden
         // (hier vec4, um noch zusätzlich als Komponente .w den Rollwinkel zu animieren)
         vec4 pathTarget = getTargetPathAndRoll(iPathOffset + iPathSpeed * iTime);
-        camTarget = pathTarget.xyz;
+        cam.target = pathTarget.xyz;
         camRoll = pathTarget.w;
     }
 
@@ -1160,24 +1275,23 @@ void main()
     // aber etwas anderes Verhalten als "die Blickrichtung frei zu drehen".
     // Letzteres ist nämlich trickreich, und braucht einiges an Vorüberlegung
     // (siehe "Eulerwinkel", "Gimbal Lock", "Quaternionen" etc.).
-    camTarget += iCamLookOffset ;
+    cam.target += iCamLookOffset ;
     camRoll += iCamRoll;
 
-    // camera-to-world transformation
-    mat3 camMatrix = setCamera(camOrigin, camTarget, camRoll, pan);
-    // ray direction via screen coordinate and "screen distance" ~ focal length ("field of view")
-    vec3 rayDirection = camMatrix * normalize(vec3(uv, iCamFocalLength));
+    setupCameraMatrix(cam, camRoll, pan);
+
+    vec3 rayDirection = cam.matrix * normalize(vec3(uv, iCamFocalLength));
 
     // iCamOffset: freie Verschiebung der Kamera, soll aber,
     // bei Verwendung des Pfads, konsistent im Kamera-Koordinatensystem passieren
     // d.h. (0,0,1) soll "1 nach vorne" heißen, nicht "1 in Welt-Z-Koordinate".
     if (doUseCameraPath) {
-        camOrigin += camMatrix * iCamOffset;
+        cam.origin += cam.matrix * iCamOffset;
     } else {
-        camOrigin += iCamOffset;
+        cam.origin += iCamOffset;
     }
 
-    render(camOrigin, rayDirection);
+    render(cam.origin, rayDirection);
 
     applyToneMapping(fragColor.rgb);
     applyGammaCorrection(fragColor.rgb);
@@ -1186,4 +1300,6 @@ void main()
     //       den Hintergrund da druntermischen, wo der Ray Marcher noch nicht fragColor.a abdeckt
     fragColor.rgb = mix(background(), fragColor.rgb, fragColor.a);
     fragColor.a = 1.;
+
+    //float gray = dot(vec3(0.3, 0.59, 0.11), fragColor.rgb) + 0.05 * sin(iTime);
 }
