@@ -77,80 +77,102 @@ export function loadImage(imageSource, onLoad) {
 }
 
 export function createTextureFromImage(gl, imageSource, options) {
-    const wrapS = options?.wrapS ?? gl.CLAMP_TO_EDGE;
-    const wrapT = options?.wrapT ?? gl.CLAMP_TO_EDGE;
-    const minFilter = options?.minFilter ?? gl.LINEAR;
-    const magFilter = options?.magFilter ?? gl.LINEAR;
+    const opt = options ?? {};
+
+    // Texturen brauchen einerseits die Parameter, die beschreiben, wie eine Textur skaliert
+    // und außerhalb der Koordinaten (0..1) interpretiert werden soll,
+    // und die Spezifikation des Datentyps, Anzahl Kanäle, Farbtiefe.
+
+    // S, T: Alte Konvention für die Texel-Koordinaten (Heute oft UV, für OpenGL aber nicht.)
+    // Wrap: CLAMP_TO_EDGE, REPEAT, MIRRORED_REPEAT (in ES / WebGl: no border colors)
+    opt.wrapS ??= gl.CLAMP_TO_EDGE;
+    opt.wrapT ??= gl.CLAMP_TO_EDGE;
+    // Filter: LINEAR, NEAREST
+    opt.minFilter ??= gl.LINEAR;
+    opt.magFilter ??= gl.LINEAR;
+    // Wir lassen hier das Konzept der "Mipmaps" aus. Es geht da darum,
+    // verschiedene Versionen einen Textur für verschiedene Skalierungen darzustellen,
+    // was wir hier nur insofern wissen müssen, dass MIN_FILTER so etwas erwartet und deswegen,
+    // wenn man dessen glTexParameteri()-Call auslässt, die Textur erstmal gar nicht funktioniert.
+    // Das Argument "lod" (Level of Detail) in einigen Funktionen hängt auch an diesen Mipmaps -> Bei uns 0.
+
+    // Spezifikation des Datentyps (damit auch Anzahl Kanäle / Farbtiefe)
+    // ACHTUNG: Diese müssen aufeinander abgestimmt sein. Wird sonst Fehler geben.
+    // https://registry.khronos.org/OpenGL-Refpages/gl4/html/glTexImage2D.xhtml
+    opt.dataType ??= gl.UNSIGNED_BYTE;
+    opt.dataFormat ??= gl.RGBA;
+    opt.internalFormat ??= gl.RGBA;
+    // Anmerkung: internalFormat = gl.SRGB8_ALPHA8 kann bei Bildern oft sinnvoll sein
 
     const texture = gl.createTexture();
     gl.bindTexture(gl.TEXTURE_2D, texture);
-    // S, T: Koordinaten in Texture-Space
-    // Wrap: CLAMP_TO_EDGE, REPEAT, MIRRORED_REPEAT (in ES / WebGl: no border colors)
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, wrapS);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, wrapT);
-    // Filter: LINEAR, NEAREST
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, minFilter);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, magFilter);
-    // <-- TEXTURE_MAG_FILTER kann auch ausgelassen werden, ist aber oft sinnvoll.
-    // wir lassen hier das Konzept "Mipmaps" aus, kann man aber mal bei Gelegenheit vertiefen.. :)
-
-    // Laden im Browser notwendigerweise asynchron, flackert dann leider kurz. (< 1 sec)
-
-    // const startLoading = performance.now();
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, opt.wrapS);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, opt.wrapT);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, opt.minFilter);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, opt.magFilter);
 
     loadImage(imageSource, (img) => {
-        // -> daher auch: Textur lieber neu binden, weil inzwischen alles mögliche passiert sein kann.
+        // Laden im Browser notwendigerweise asynchron. Flackert ggf. auch kurz.
+        // Wichtig: Textur neu binden, weil der Zustand von gl.TEXTURE_2D jetzt unklar ist.
         gl.bindTexture(gl.TEXTURE_2D, texture);
         gl.texImage2D(
             gl.TEXTURE_2D,
             0,
-            gl.RGBA,
-            gl.RGBA,
-            gl.UNSIGNED_BYTE,
+            opt.internalFormat,
+            opt.dataFormat,
+            opt.dataType,
             img
         );
-        // console.log("Image Loaded in", (performance.now() - startLoading).toFixed(2), "ms");
+        // Notiz: Weil das hier im Browser ist, ist die Auflösung des Bilds im HTMLImageElement "img"
+        //        bereits bekannt. Im Allgemeinen würde man die Auflösung hier auch noch spezifizieren.
     });
 
     return texture;
 }
 
 export function createFramebufferWithTexture(gl, options, fbIndex = undefined) {
-    const width = options?.width ?? gl.drawingBufferWidth;
-    const height = options?.height ?? gl.drawingBufferHeight;
+    const opt = options ?? {};
+    opt.width ??= gl.drawingBufferWidth;
+    opt.height ??= gl.drawingBufferHeight;
 
-    const wrapS = options?.wrapS ?? gl.CLAMP_TO_EDGE;
-    const wrapT = options?.wrapT ?? gl.CLAMP_TO_EDGE;
-    const minFilter = options?.minFilter ?? gl.LINEAR;
-    const magFilter = options?.magFilter ?? gl.LINEAR;
+    opt.wrapS ??= gl.CLAMP_TO_EDGE;
+    opt.wrapT ??= gl.CLAMP_TO_EDGE;
+    opt.minFilter ??= gl.LINEAR;
+    opt.magFilter ??= gl.LINEAR;
 
-    // Diese Parameter beschreiben den Typ der geschriebenen Pixeldaten.
-    // ACHTUNG: Diese müssen aufeinander abgestimmt sein. Wird sonst nicht klappen.
-    // https://registry.khronos.org/OpenGL-Refpages/gl4/html/glTexImage2D.xhtml
-    const internalFormat = options?.internalFormat ?? gl.RGBA8;
-    const dataFormat = options?.dataFormat ?? gl.RGBA;
-    const dataType = options?.dataType ?? gl.UNSIGNED_BYTE;
+    // siehe Anmerkung der Datentyp-Parameter in der Textur-Erstellung (weiter oben)
+    opt.internalFormat ??= gl.RGBA8;
+    opt.dataFormat ??= gl.RGBA;
+    opt.dataType ??= gl.UNSIGNED_BYTE;
 
-    // Attachment beschreiben die Direktverknüpfung zwischen einer Textur und einem Framebuffer
-    const colorAttachment = options?.colorAttachment ?? gl.COLOR_ATTACHMENT0;
+    // Attachment beschreibt die Direktverknüpfung zwischen einer Textur und einem Framebuffer,
+    // er könnte auch über mehrere Color-Attachments mehrere Texturen haben, außerdem gibt es
+    // da noch andere Arten von Attachments, die wir in der Vorlesung aber nicht brauchen.
+    opt.attachment ??= gl.COLOR_ATTACHMENT0;
 
     const texture = gl.createTexture();
     gl.bindTexture(gl.TEXTURE_2D, texture);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, minFilter);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, magFilter);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, wrapS);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, wrapT);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, opt.minFilter);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, opt.magFilter);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, opt.wrapS);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, opt.wrapT);
 
-    // Alloziert den Speicher, lässt ihn aber - siehe letztes Argument - leer
-    gl.texImage2D(gl.TEXTURE_2D, 0, internalFormat, width, height, 0, dataFormat, dataType, null);
-    // gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, width, height, 0, gl.RGBA, gl.FLOAT, null);
-    // gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+    // Speicher wird jetzt alloziert, aber - siehe letztes Argument - leergelassen.
+    gl.texImage2D(
+        gl.TEXTURE_2D,
+        0,
+        opt.internalFormat,
+        opt.width,
+        opt.height, 0,
+        opt.dataFormat,
+        opt.dataType,
+        null
+    );
 
     const fbo = gl.createFramebuffer();
     gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
 
-    // Attachment: Verknüpft Framebuffer fest mit der Textur
-    gl.framebufferTexture2D(gl.FRAMEBUFFER, colorAttachment, gl.TEXTURE_2D, texture, 0 );
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, opt.attachment, gl.TEXTURE_2D, texture, 0 );
 
     const status = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
     warnAboutBadFramebufferStatus(gl, status);
@@ -162,26 +184,16 @@ export function createFramebufferWithTexture(gl, options, fbIndex = undefined) {
     return {
         fbo,
         texture,
-        attachments: [colorAttachment],
+        attachments: [opt.attachment],
         extraDataTexture: null,
-        // for debugging:
+        width: opt.width,
+        height: opt.height,
+        params: opt,
+        // <-- Speichern wir hier, weil wir bei einem Resize reagieren müssen
+        //     TODO: mache ich aber noch nicht! Canvas-Resizing braucht F5-Reload.
+        // Und für die Fehlersuche:
         index: fbIndex,
         status,
-        // stored in here because we might need for resizing later
-        width,
-        height,
-        params: {
-            width,
-            height,
-            internalFormat,
-            dataFormat,
-            dataType,
-            colorAttachment,
-            wrapS,
-            wrapT,
-            minFilter,
-            magFilter,
-        },
     };
 }
 
@@ -248,7 +260,7 @@ export function recreateFramebufferWithTexture(gl, framebuffer) {
     const fbo = gl.createFramebuffer();
     gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
 
-    gl.framebufferTexture2D(gl.FRAMEBUFFER, old.colorAttachment, gl.TEXTURE_2D, texture, 0 );
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, old.attachment, gl.TEXTURE_2D, texture, 0 );
 
     const status = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
     warnAboutBadFramebufferStatus(gl, status);

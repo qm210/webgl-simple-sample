@@ -29,7 +29,7 @@ export default {
             image: createPingPongFramebuffersWithTexture(gl, {
                 width,
                 height,
-                colorAttachment: gl.COLOR_ATTACHMENT0,
+                attachment: gl.COLOR_ATTACHMENT0,
             }),
             fluid: {},
             post: {},

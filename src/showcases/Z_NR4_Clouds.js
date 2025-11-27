@@ -23,7 +23,7 @@ export default {
             createPingPongFramebuffersWithTexture(gl, {
                 width,
                 height,
-                colorAttachment: gl.COLOR_ATTACHMENT0,
+                attachment: gl.COLOR_ATTACHMENT0,
                 internalFormat: gl.RGBA32F,
                 dataFormat: gl.RGBA,
                 dataType: gl.FLOAT,

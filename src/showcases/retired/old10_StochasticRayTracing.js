@@ -20,7 +20,7 @@ export default {
             createFramebufferWithTexture(gl, {
                 width: gl.drawingBufferWidth,
                 height: gl.drawingBufferHeight,
-                colorAttachment: gl.COLOR_ATTACHMENT0,
+                attachment: gl.COLOR_ATTACHMENT0,
                 internalFormat: gl.RGBA16F,
                 dataFormat: gl.RGBA,
                 dataType: gl.FLOAT,

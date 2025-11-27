@@ -18,7 +18,7 @@ export default {
             createFramebufferWithTexture(gl, {
                 width: gl.drawingBufferWidth,
                 height: gl.drawingBufferHeight,
-                colorAttachment: gl.COLOR_ATTACHMENT0,
+                attachment: gl.COLOR_ATTACHMENT0,
                 // Diese Formate werden später wichtig, können hier aber auf dem Default bleiben:
                 // internalFormat: gl.RGBA,
                 // dataFormat: gl.RGBA,

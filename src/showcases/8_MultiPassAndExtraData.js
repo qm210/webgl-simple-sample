@@ -28,7 +28,7 @@ export default {
             createPingPongFramebuffersWithTexture(gl, {
                 width,
                 height,
-                colorAttachment: gl.COLOR_ATTACHMENT0,
+                attachment: gl.COLOR_ATTACHMENT0,
             });
 
         // for the second, i.e. app(location=1) out ... we need another texture PER FRAMEBUFFER.

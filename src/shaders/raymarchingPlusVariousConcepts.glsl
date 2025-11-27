@@ -116,11 +116,11 @@ struct Camera {
     vec3 right;
     vec3 up;
     mat3 matrix;
-
+    // speziell diese hier haben nur Verwendung zum initialen Ausrechnen von .matrix:
     vec3 target;
-    vec3 originalForward;
-    vec3 originalRight;
-    vec3 originalUp;
+    vec3 tForward;
+    vec3 tRight;
+    vec3 tUp;
 };
 Camera cam;
 
@@ -159,17 +159,35 @@ mat3 rotZ(float angle) {
 }
 
 mat3 rotAround(vec3 axis, float angle) {
+    // Für allgemeine Drehmatrizen:
+    // https://en.wikipedia.org/wiki/Rodrigues%27_rotation_formula
     vec3 v = normalize(axis);
-    // skew-symmetric cross product matrix
-    mat3 sscp = mat3(
+    mat3 skewSym = mat3(
         0, v.z, -v.y,
         -v.z, 0, v.x,
         v.y, -v.x, 0
     );
+    // Diese Schiefsymmetrische Matrix bewirkt das Kreuzprodukt:
+    // skewSym(v1) * v2 == cross(v1, v2)
     float c = cos(angle);
     float s = sin(angle);
-//    return mat3(c) + (1. - c) * outerProduct(v, v) + s * sscp;
-     return mat3(1.) + (1. - c) * sscp * sscp + s * sscp;
+     return mat3(1.) + (1. - c) * skewSym * skewSym + s * skewSym;
+    // Andere Schreibweise mit GLSL-eingebautem outerProduct:
+    // return mat3(c) + (1. - c) * outerProduct(v, v) + s * skewSym;
+    // -> outerProduct() = 1 + skewSym²
+}
+
+mat3 rotTowards(vec3 original, vec3 target) {
+    // Vorgehen, um allgemein eine Matrix für die Rotation original -> target zu bekommen:
+    float cosine = dot(original, target);
+    if (abs(cosine) == 1.) {
+        // Vektoren parallel?
+        // -> cross() wird 0 sein, aber Resultat ist dann eh nur ein Faktor:
+        return mat3(cosine);
+    }
+    vec3 axis = cross(original, target);
+    float theta = acos(cosine);
+    return rotAround(axis, -theta);
 }
 
 mat2 rot2D(float angle) {
@@ -414,8 +432,6 @@ Hit texturedSdBox( vec3 p, vec3 b, float rounding) {
     } else if (abs(a.x) > 0.5) {
         st = vec2(0.5 - a.z * sign(a.x), 0.5 - a.y);
     }
-    // Reminder: if() generell überdenken, aber das reicht auch,
-    // wenn irgendwo konkret ein Performanceproblem vorliegt.
 
     // kompaktere, weniger direkt ersichtliche Version:
     //    uv = mix(
@@ -464,18 +480,17 @@ float opSmoothUnion( float d1, float d2, float k )
     return min(d1, d2) - h*h*0.25/k;
 }
 
-float sdArrow(vec3 p, vec3 target, vec3 vec, float offset) {
+float sdVector(vec3 p, vec3 target, vec3 vec, float offset) {
+    if (vec == c.yyy) {
+        return sdSphere(p - target, 0.2);
+    }
     target += offset * vec;
     vec3 start = target - vec;
     float hHead = 0.12;
     float rLine = 0.02;
     // sdCone schaut intrinsisch nach c.yxy (Spitze Richtung +y).
-    // Wir konstruieren die Matrix, um c.yxy auf "dir" zu drehen, allgemein so:
     vec = normalize(vec);
-    vec3 axis = cross(c.yxy, vec);
-    float theta = acos(dot(c.yxy, vec));
-    mat3 rot = rotAround(axis, -theta);
-
+    mat3 rot = rotTowards(c.yxy, vec);
     float dHead = sdCone(rot * (p - target), vec2(0.06, 0.1), hHead);
     float dLine = sdCapsule(p, start, target - hHead * vec, rLine);
     return opSmoothUnion(dLine, dHead, -1.);
@@ -645,20 +660,33 @@ Hit map( in vec3 pos )
         );
     }
 
-    vec3 spinning = rotAround(cam.forward, 5. * iTime) * cam.right;
-    float error = spinning.z;
+    /*
+    mat3 extraYaw = rotAround(cam.tUp, 0.);
+    mat3 extraPitch = rotAround(cam.tRight, iFree5);
+    mat3 roll = rotAround(cam.forward, iFree4);
+    mat3 extra = roll * extraPitch * extraYaw * mat3(cam.tRight, cam.tUp, cam.tForward);
+    vec3 or = extra * 0.5 * c.xyy;
+    vec3 ou = extra * 0.5 * c.yxy;
+    vec3 of = extra * 0.5 * c.yyx;
     res = takeCloser(res, Hit(
-        sdArrow(pos, cam.origin + 2. * cam.forward, spinning, 0.),
-        MATERIAL_ARROW,
-        c.yy,
-        10. + error
-    ));
-    res = takeCloser(res, Hit(
-        sdArrow(pos, cam.origin + 2. * cam.forward, 0.5 * cam.up, 1.),
+        sdVector(pos, cam.origin + 2. * cam.forward, or, 1.),
         MATERIAL_ARROW,
         c.yy,
         20.
     ));
+    res = takeCloser(res, Hit(
+        sdVector(pos, cam.origin + 2. * cam.forward, ou, 1.),
+        MATERIAL_ARROW,
+        c.yy,
+        21.
+    ));
+    res = takeCloser(res, Hit(
+    sdVector(pos, cam.origin + 2. * cam.forward, of, 1.),
+        MATERIAL_ARROW,
+        c.yy,
+        22.
+    ));
+    */
 
     return res;
 }
@@ -808,7 +836,7 @@ vec3 materialPalette(float parameter) {
     // muss die letzte Spalte ("d") jeder Farbe -> vec3(-1.57, -0.57, 0.43)
 }
 
-void render(in vec3 rayOrigin, in vec3 rayDir)
+vec4 render(in vec3 rayOrigin, in vec3 rayDir)
 {
     // Diese Funktion folgt der selben Logik wie letzter Woche,
     // ich habe ein bisschen refakturiert und neue Effekte eingebaut,
@@ -819,7 +847,7 @@ void render(in vec3 rayOrigin, in vec3 rayDir)
     // Materialkonstanten mit Namen machen mehr Freude.
     // war: if (res.material < -0.5) { ... }
     if (res.material <= MISSING_MATERIAL) {
-        return;
+        return c.yyyy;
     }
 
     bool isFloor = res.material <= MATERIAL_FLOOR;
@@ -943,7 +971,10 @@ void render(in vec3 rayOrigin, in vec3 rayDir)
         // wir projizieren einfach den Strahl auf die y-Ebene (Boden y == 0); skalieren nach Laune
         res.texCoord = rayPos.xz * 0.3;
         col = texture(texRock, res.texCoord).rgb;
-        col = pow(col, vec3(2.8));
+        // Gamma-Korrektur auf Bilddaten kann je nach deren Encoding sinnvoll sein.
+        // Es hängt aber davon ab, ob glTexImage2D() als internalFormat "RGBA" oder "GL_SRGB8_ALPHA8"
+        // nimmt, weil bei letzterem OpenGL die Korrektur automatisch durchführt.
+        // col = pow(col, vec3(2.8));
         specularCoeff = 0.12;
 
         if (drawGridOnFloor) {
@@ -951,7 +982,7 @@ void render(in vec3 rayOrigin, in vec3 rayDir)
         }
     } else if (res.material == MATERIAL_ARROW) {
         col = materialPalette(20. + res.customArg);
-        specularCoeff = 0.1;
+        specularCoeff = 0.07;
         ambientCoeff = 0.7;
     }
 
@@ -1003,8 +1034,7 @@ void render(in vec3 rayOrigin, in vec3 rayDir)
                 vec3 rayDirectionIntoTheLight = normalize(lightPointSource - rayOrigin);
                 float overlap = dot(rayDir, rayDirectionIntoTheLight);
                 if (overlap > 0.99995) {
-                    fragColor = vec4(lightSourceColor, 1.);
-                    return;
+                    return vec4(lightSourceColor, 1.);
                 }
             }
         }
@@ -1055,12 +1085,12 @@ void render(in vec3 rayOrigin, in vec3 rayDir)
 
     if (res.t > 15.) {
         // wir schneiden die Ebene mal ab (um mehr Weltall zu sehen)
-        return;
+        return c.yyyy;
     }
 
     col = shade;
     applyDistanceFog(col, res.t, vec3(0.001,0.,0.004), 0.003, iDistanceFogExponent);
-    fragColor = vec4(col, 1.);
+    return vec4(col, 1.);
 }
 
 float calcCentripetalKnotParameter(float t, vec3 p0, vec3 p1) {
@@ -1183,36 +1213,46 @@ void setupCameraMatrix(inout Camera cam, float rollAngle, vec2 pan)
     // - Kameraposition und einen anvisierten Blickpunkt
     //   -> damit endet die Suche oft, der Kernteil (*) bestimmt diese Matrix
     // - dazu aber noch zusätzliche freie Rotation um Yaw-Pitch-Rollwinkel
-    //   -> Roll allein ist unproblematisch, weil das den Blickpunkt nicht ändert
-    //   -> Die Gesamtdrehung muss aber genau so aneinandergereiht werden,
-    //      dass die späteren Drehachsen noch die sind, die man eingangs meinte.
-    //      Das ist speziell schwer zu verifizieren, weil man erstmal "visuelle Testfälle"
-    //      aufstellen muss, von denen man wirklich weiß, dass sie so aussehen sollen.
-    //
-    // Jenen Stand hier erkläre ich soweit mal als ausreichend.
+    //   -> Rollwinkel, der eigentlich immer um die finale Blickrichtung gemeint ist
+    //   -> Für eine zusätzliche freie Drehung (z.B. Mausbewegung) von Yaw & Pitch
+    //      muss definiert werden, in welchem Koordinatensystem wir sie verstehen wollen.
+    //      Wenn sie in den Weltkoordinaten gemeint sind, müssen sie _rechts_ der cam.matrix,
+    //      wenn zusätzlich zu den gedrehten Koordinaten (üblicherer Fall), _links_ davon.
+    //   -> Die Gesamtdrehung muss exakt die richtige Reihenfolge haben.
+    //      Drehung um z.B: Yaw dreht die Drehachse für Pitch weg, jeder Schritt muss passen.
+    //      Fehler sind speziell schwer zu verifizieren, weil man sich erstmal visuelle "Testfälle"
+    //      aufstellen muss, von denen man wirklich sicher sein kann, wie sie aussehen müssen.
 
+    // (*) Kern-Transformation der Kamera Richtung gegebenes Target.
     const vec3 worldUp = c.yxy;
-    mat3 extraYaw = rotAround(worldUp, pan.x);
-    // (*) Kern:
-    cam.forward = extraYaw * normalize(cam.target - cam.origin);
+    cam.forward = normalize(cam.target - cam.origin);
     cam.right = normalize(cross(cam.forward, worldUp));
     cam.up = cross(cam.right, cam.forward);
     cam.matrix = mat3(cam.right, cam.up, cam.forward);
-    // extraYaw musste vorher gedreht werden, weil das direkt cameraForward
-    // vom target wegdreht und sich so auf jede weitere Richtung auswirkt.
-    // -> extraPitch geht dann um die so bestimmten Von-der-Kamera-Rechts-Achse,
-    //    und darf (wie roll sowieso) nicht mehr an den Welt-Achsen hängen.
-    mat3 extraPitch = rotAround(cam.right, -0. * pan.y + 0.5 * sin(iTime));
-    mat3 roll = rotAround(cam.forward, rollAngle);
 
-    cam.matrix = roll * extraPitch * cam.matrix;
-    // Weiterverwendet wird vom "struct Camera" hier nur
-    // - cam.origin
-    // - cam.matrix
-    // alle anderen Größen sind fürs Veranschaulichen / Debugging global gemacht, nicht zum Rechnen.
-    cam.originalForward = cam.forward;
-    cam.originalRight = cam.right;
-    cam.originalUp = cam.up;
+    // Die Extra-Rotation soll noch auf Weltkoordinaten greifen.
+    mat3 extraYaw = rotAround(cam.up, pan.x);
+    mat3 extraPitch = rotAround(cam.right, -pan.y);
+    cam.matrix = extraPitch * extraYaw * cam.matrix;
+
+    // Der Rollwinkel wird so eigentlich stets um die finale Blickrichtung bezeichnet.
+    mat3 roll = rotAround(cam.forward, rollAngle);
+    cam.matrix = roll * cam.matrix;
+
+    // OBACHT: Bei dieser Konstruktion kam mir seltsames Fehlverhalten unter.
+    // Wenn ich das in einem Schritt direkt versucht habe:
+    //   cam.matrix = roll * extraPitch * extraYaw * cam.matrix;
+    // Hat eine Drehung um extraPitch hier eine Rollbewegung ausgeführt statt Pitch.
+    // Das muss aber dasselbe sein wie
+    //   cam.matrix = extraPitch * extraYaw * cam.matrix;
+    //   cam.matrix = roll * cam.matrix;
+    // --> mysteriös!
+
+    // Zum "struct Camera": Wir brauchen weiter eigentlich nur "cam.origin" und "cam.matrix".
+    // Alle anderen Größen sind fürs Veranschaulichen / Debugging global gedacht.
+    cam.tForward = cam.forward;
+    cam.tRight = cam.right;
+    cam.tUp = cam.up;
     cam.right = cam.matrix[0];
     cam.up = cam.matrix[1];
     cam.forward = cam.matrix[2];
@@ -1227,15 +1267,50 @@ vec3 background() {
     return pow(space.rgb, vec3(1.5));
 }
 
-vec3 cmap_dream210(float t) {
-    return vec3(0.19, 0.24, 0.40)
-    +t*(vec3(3.42, -1.41, 4.13)
-    +t*(vec3(-21.95, 22.09, -7.62)
-    +t*(vec3(66.28, -51.41, -6.87)
-    +t*(vec3(-80.01, 41.55, 23.40)
-    +t*(vec3(33.21, -11.33, -11.18)
-    +t*(vec3(-0.94, 0.52, -1.86)
-    ))))));
+mat3 m11 = mat3(
+    .41,.54,.05,
+    .21,.68,.11,
+    .09,.28,.63
+);
+mat3 m2 = mat3(
+    .21,.79,0,
+    1.97,-2.42,.45,
+    .03,.78,-.81
+);
+
+vec3 srgb_to_oklch( vec3 c ) {
+    c = pow(c * m11,vec3(1./3.)) * m2;
+    return vec3(c.x,sqrt((c.y*c.y) + (c.z * c.z)),atan(c.z,c.y));
+}
+vec3 oklch_to_srgb( vec3 c ) {
+    return pow(vec3(c.x,c.y*cos(c.z),c.y*sin(c.z)) * inverse(m2),vec3(3.)) * inverse(m11);
+}
+vec3 rgb2hsv(vec3 c) {
+    float cMax = max(c.r, max(c.g, c.b));
+    float cMin = min(c.r, min(c.g, c.b));
+    float delta = cMax - cMin;
+
+    float h = 0.0;
+    if (delta > 0.00001) {
+        if (cMax == c.r)
+        h = mod((c.g - c.b) / delta, 6.0);
+        else if (cMax == c.g)
+        h = ((c.b - c.r) / delta) + 2.0;
+        else
+        h = ((c.r - c.g) / delta) + 4.0;
+        h /= 6.0;
+    }
+
+    float s = (cMax == 0.0) ? 0.0 : delta / cMax;
+    float v = cMax;
+
+    return vec3(h, s, v);
+}
+
+vec3 postProcess(vec3 col) {
+    vec3 hsv = rgb2hsv(col);
+    vec3 oklch = vec3(0.5 * hsv.z, 0.3 * hsv.y, twoPi * hsv.x);
+    return oklch_to_srgb(oklch);
 }
 
 void main()
@@ -1244,7 +1319,8 @@ void main()
     vec2 pan = iMouseDrag.xy / iResolution.x;
 
     // Wir machen das hier mal so herum: fragColor = absolut transparent
-    // und dann siehe (==>) unten
+    // render() gibt uns dann ein Bild mit alpha = 1 oder 0 (nichts getroffen)
+    // dann können wir im Nachgang den Hintergrund reinmischen, s.u. (==>)
     fragColor = c.yyyy;
 
     // Fixed Cam Origin:
@@ -1278,6 +1354,11 @@ void main()
     cam.target += iCamLookOffset ;
     camRoll += iCamRoll;
 
+    if (abs(uv.x - camRoll) < 0.005) {
+        fragColor.rgb = c.xxx;
+        return;
+    }
+
     setupCameraMatrix(cam, camRoll, pan);
 
     vec3 rayDirection = cam.matrix * normalize(vec3(uv, iCamFocalLength));
@@ -1291,15 +1372,15 @@ void main()
         cam.origin += iCamOffset;
     }
 
-    render(cam.origin, rayDirection);
-
-    applyToneMapping(fragColor.rgb);
-    applyGammaCorrection(fragColor.rgb);
+    fragColor = render(cam.origin, rayDirection);
 
     // (==>) jetzt haben wir fragColor als "unabhängige Ebene" behandelt und können
     //       den Hintergrund da druntermischen, wo der Ray Marcher noch nicht fragColor.a abdeckt
     fragColor.rgb = mix(background(), fragColor.rgb, fragColor.a);
-    fragColor.a = 1.;
 
-    //float gray = dot(vec3(0.3, 0.59, 0.11), fragColor.rgb) + 0.05 * sin(iTime);
+    fragColor.rgb = mix(fragColor.rgb, postProcess(fragColor.rgb), iFree2);
+    applyToneMapping(fragColor.rgb);
+    applyGammaCorrection(fragColor.rgb);
+
+    fragColor.a = 1.;
 }

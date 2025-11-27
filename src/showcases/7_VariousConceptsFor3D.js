@@ -26,11 +26,13 @@ export default {
             wrapS: gl.REPEAT,
             wrapT: gl.REPEAT,
             minFilter: gl.LINEAR,
+            internalFormat: gl.SRGB8_ALPHA8,
         });
         state.textureRock = createTextureFromImage(gl, imageRock, {
             wrapS: gl.REPEAT,
             wrapT: gl.REPEAT,
             minFilter: gl.LINEAR,
+            internalFormat: gl.SRGB8_ALPHA8,
         });
 
         gl.useProgram(state.program);

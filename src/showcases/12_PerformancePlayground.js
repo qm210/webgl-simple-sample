@@ -23,7 +23,7 @@ export default {
             createFramebufferWithTexture(gl, {
                 width: gl.drawingBufferWidth,
                 height: gl.drawingBufferHeight,
-                colorAttachment: gl.COLOR_ATTACHMENT0,
+                attachment: gl.COLOR_ATTACHMENT0,
             })
         );
         state.location.texture = [
