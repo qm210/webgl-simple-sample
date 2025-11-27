@@ -45,8 +45,9 @@ uniform float iFractionalDecay;
 // toggle options
 uniform bool doShowPointLightSource;
 uniform bool doUseCameraPath;
-uniform bool doShowCameraPathPoints;
-uniform bool doUseCameraTargetPath; // try it :)
+uniform bool doUseCameraTargetPath;
+uniform bool displayCameraPathPoints;
+uniform bool displayCameraRotationAxes;
 uniform bool drawGridOnFloor;
 uniform bool justTheBoxes;
 uniform bool showPyramidTextureGrid;
@@ -198,16 +199,6 @@ mat2 rot2D(float angle) {
        -s, c
     );
 }
-
-mat3 squeezeY(float sqY) {
-    float sqXZ = 1./sqY;
-    return mat3(
-         sqXZ,  0.,   0.,
-           0., sqY,   0.,
-           0.,  0., sqXZ
-    );
-}
-
 
 vec2 hash22(vec2 p) {
     // this is a pseudorandom generator with 2d input -> 2d output
@@ -480,18 +471,20 @@ float opSmoothUnion( float d1, float d2, float k )
     return min(d1, d2) - h*h*0.25/k;
 }
 
-float sdVector(vec3 p, vec3 target, vec3 vec, float offset) {
+float sdVector(vec3 p, vec3 target, vec3 vec, float offset, float scale) {
     if (vec == c.yyy) {
-        return sdSphere(p - target, 0.2);
+        return sdSphere(p - target, 0.2 * scale);
     }
+    vec *= scale;
     target += offset * vec;
     vec3 start = target - vec;
-    float hHead = 0.12;
-    float rLine = 0.02;
+    float rLine = 0.02 * pow(scale, 0.7);
+    float hHead = 6. * rLine;
+    const vec2 headShape = vec2(0.06, 0.1);
     // sdCone schaut intrinsisch nach c.yxy (Spitze Richtung +y).
     vec = normalize(vec);
     mat3 rot = rotTowards(c.yxy, vec);
-    float dHead = sdCone(rot * (p - target), vec2(0.06, 0.1), hHead);
+    float dHead = sdCone(rot * (p - target), headShape, hHead);
     float dLine = sdCapsule(p, start, target - hHead * vec, rLine);
     return opSmoothUnion(dLine, dHead, -1.);
     // Anmerkung zur -1:
@@ -563,6 +556,102 @@ Hit takeCloser( Hit d1, float d2, float material2, float customArg2)
 const vec3 pyramidPos = vec3(-1.0, 0.0, -2.6);
 const float pyramidHeight = 1.1;
 
+void displayDevelopmentHelpers(inout Hit res, in vec3 pos) {
+    // render the path points for debugging
+    if (displayCameraPathPoints) {
+        for (int p = ZERO; p < nPath; p++) {
+            res = takeCloser(res, Hit(
+                sdSphere(pos - camPosPath[p].xyz, 0.015 - 0.005 * cos(12. * iTime)),
+                MATERIAL_PATH_POINT, c.yy, float(p)
+            ));
+        }
+    }
+
+    if (!displayCameraRotationAxes) {
+        return;
+    }
+
+    const float colorArgRight = 20.;
+    const float colorArgUp = 19.58;
+    const float colorArgForward = 19.19;
+    const float worldAxesThickness = 0.002;
+    const float axesSize = 0.13;
+    vec3 axesOrigin = cam.origin + cam.forward - 0.55 * cam.right - 0.3 * cam.up;
+
+    vec3 axisRight = axesSize * cam.right;
+    vec3 axisUp= axesSize * cam.up;
+    vec3 axisForward = axesSize * cam.forward;
+
+    res = takeCloser(res, Hit(
+        sdCapsule(pos, axesOrigin, axesOrigin + axisRight, worldAxesThickness),
+        MATERIAL_ARROW, c.yy, colorArgRight
+    ));
+    res = takeCloser(res, Hit(
+        sdCapsule(pos, axesOrigin, axesOrigin + axisUp, worldAxesThickness),
+        MATERIAL_ARROW, c.yy, colorArgUp
+    ));
+    res = takeCloser(res, Hit(
+        sdCapsule(pos, axesOrigin, axesOrigin - axisForward, worldAxesThickness),
+        MATERIAL_ARROW, c.yy, colorArgForward
+    ));
+
+    axisRight *= cam.matrix / axesSize;
+    axisUp *= cam.matrix / axesSize;
+    axisForward *= cam.matrix / axesSize;
+
+    res = takeCloser(res, Hit(
+        sdVector(pos, axesOrigin, axisRight, 1., axesSize),
+        MATERIAL_ARROW, c.yy, colorArgRight
+    ));
+    res = takeCloser(res, Hit(
+        sdVector(pos, axesOrigin, axisUp, 1., axesSize),
+        MATERIAL_ARROW, c.yy, colorArgUp
+    ));
+    res = takeCloser(res, Hit(
+        sdVector(pos, axesOrigin, axisForward, 1., axesSize),
+        MATERIAL_ARROW, c.yy, colorArgForward
+    ));
+}
+
+Hit bouncingBall(vec3 pos) {
+    // Mal ein Beispiel einer ungewöhnlichen Transformation, die wir aber (behaupte ich)
+    // durchaus Stück für Stück verstehen können, da wir die Einzelteile schon alle hatten.
+    float sphereRadius = 0.25;
+    vec3 spherePos = vec3(2., sphereRadius, 0.4);
+    // sich wiederholende Parabel (s. https://de.wikipedia.org/wiki/Wurfparabel):
+    // aber alles < 0 wird nicht auf die y-Koordinate berechnet, sondern zum "squeeze".
+    float bounceY = bounceParabola(0.9, 3., 2., iTime) - 1.2;
+    float squeeze = -min(0., bounceY) + 1.;
+    spherePos.y += max(0., bounceY);
+    // Mit dem Squeeze-Faktor wollen wir y reduzieren, also den Ball in der Höhe stauchen.
+    // Die Stauchung schafft dann wieder eine Lücke zum Boden, die also noch abgezogen wird.
+    float squeezedGap = (1. - 1./squeeze) * sphereRadius;
+    spherePos.y -= squeezedGap;
+
+    // In die beiden anderen Richtung soll sich die dann so ausdehnen, dass sie aussieht,
+    // als wäre die gesamte Masse insgesamt gleich.
+    // Als Transformationsmatrix wäre das eine Diagonalmatrix wie
+    // mat3 squeezeMatrix = mat3(
+    //     extendXZ,       0.,       0.,
+    //           0., squeezeY,       0.,
+    //           0.,       0., extendXZ
+    // );
+    // pos = squeezeMatrix * (pos - spherePos);
+    // ...
+    // aber das geht hier auch direkt auf den Komponenten (Diagonalmatrizen mischen die ja nicht):
+    pos -= spherePos;
+    pos.y *= squeeze;
+    float extend = 1./squeeze;
+    // die Auswölbung soll auch gegen unten stärker sein als oben, also irgendwie an pos.y hängen.
+    // diese Form hat sich nach etwas Rumprobieren als tauglich erwiesen:
+    extend /= (1. - (squeeze - 1.) * 2. * (pos.y - sphereRadius));
+    pos.xz *= extend;
+
+    // Außerdem Farbe beim Squeezen ändern.
+    float material = 24.9 - 1. * squeeze;
+    return Hit(sdSphere(pos, sphereRadius), material, c.yy, 0.);
+}
+
 Hit map( in vec3 pos )
 {
     // flacher Boden auf y == 0
@@ -572,6 +661,8 @@ Hit map( in vec3 pos )
     res = takeCloser(res,
         Hit(floorY, MATERIAL_MOUNTAINS, fract(pos.xz), 0.)
     );
+
+    displayDevelopmentHelpers(res, pos);
 
     // texturedSdBox: sdBox erweitert um die Aufprallkoordinate des Strahls,
     // um später die Textur abbilden zu können. Lässt sich beim Quader noch überschauen...
@@ -608,34 +699,7 @@ Hit map( in vec3 pos )
         MATERIAL_PYRAMID
     );
 
-    // Mal ein Beispiel einer ungewöhnlichen Transformation, die wir aber (behaupte ich)
-    // durchaus Stück für Stück verstehen können, da wir die Einzelteile schon alle hatten.
-    {
-        float sphereRadius = 0.25;
-        vec3 spherePos = vec3(2., sphereRadius, 0.4);
-        float bounceY = bounceParabola(0.9, 3., 2., iTime) - 1.2;
-        float squeeze = -min(0., bounceY) + 1.;
-        spherePos.y += max(0., bounceY);
-        mat3 transformMatrix = squeezeY(squeeze);
-        float squeezedGap = (1. - 1./squeeze) * sphereRadius;
-        spherePos.y -= squeezedGap;
-
-        vec3 transformed = transformMatrix * (pos - spherePos);
-        // nonlinear squeeze
-        transformed.xz /= (1. - (squeeze - 1.) * 2. * (transformed.y - sphereRadius));
-
-        res = takeCloser(res,
-            sdSphere(transformed, sphereRadius),
-            24.9 - 1. * squeeze
-        );
-
-        // Erklärung:
-        // sich wiederholende Parabel (s. https://de.wikipedia.org/wiki/Wurfparabel),
-        // aber alles < 0 wird nicht auf die y-Koordinate berechnet, sondern zum "squeeze".
-        // squeezeY() ist eine Transformationsmatrix, die zu einer Verzerrung / Stauchung führ.
-        // Die Stauchung schafft dann wieder einen Spalt zum Boden, der noch abgezogen wird
-        // Außerdem geben wir den "squeeze"-Wert über den Material-Parameter in die Farbe
-    }
+    res = takeCloser(res, bouncingBall(pos));
 
     vec3 cylinderPos = (pos-vec3( 1.0,0.35,-2.0));
     // Eulerwinkel-Drehung am Beispiel des Zylinders:
@@ -646,47 +710,6 @@ Hit map( in vec3 pos )
     res = takeCloser(res,
         texturedSdCylinder(cylinderPos, vec2(0.15,0.25))
     );
-
-    // render the path points for debugging
-    if (doShowCameraPathPoints)
-    for (int p = ZERO; p < nPath; p++) {
-        res = takeCloser(res,
-            Hit(
-                sdSphere(pos - camPosPath[p].xyz, 0.015 - 0.005 * cos(12. * iTime)),
-                MATERIAL_PATH_POINT,
-                c.yy,
-                float(p)
-            )
-        );
-    }
-
-    /*
-    mat3 extraYaw = rotAround(cam.tUp, 0.);
-    mat3 extraPitch = rotAround(cam.tRight, iFree5);
-    mat3 roll = rotAround(cam.forward, iFree4);
-    mat3 extra = roll * extraPitch * extraYaw * mat3(cam.tRight, cam.tUp, cam.tForward);
-    vec3 or = extra * 0.5 * c.xyy;
-    vec3 ou = extra * 0.5 * c.yxy;
-    vec3 of = extra * 0.5 * c.yyx;
-    res = takeCloser(res, Hit(
-        sdVector(pos, cam.origin + 2. * cam.forward, or, 1.),
-        MATERIAL_ARROW,
-        c.yy,
-        20.
-    ));
-    res = takeCloser(res, Hit(
-        sdVector(pos, cam.origin + 2. * cam.forward, ou, 1.),
-        MATERIAL_ARROW,
-        c.yy,
-        21.
-    ));
-    res = takeCloser(res, Hit(
-    sdVector(pos, cam.origin + 2. * cam.forward, of, 1.),
-        MATERIAL_ARROW,
-        c.yy,
-        22.
-    ));
-    */
 
     return res;
 }
@@ -814,11 +837,20 @@ float calcAmbientOcclusion(in vec3 pos, in vec3 normal)
 // https://iquilezles.org/articles/normalsSDF
 vec3 calcNormal( in vec3 pos )
 {
+    vec3 n = vec3(0.0);
+    for( int i=ZERO; i<4; i++ )
+    {
+        vec3 e = 0.5773*(2.0*vec3((((i+3)>>1)&1),((i>>1)&1),(i&1))-1.0);
+        n += e*map(pos+0.0005*e).t;
+    }
+    return normalize(n);
+/*
     vec2 e = vec2(1.0,-1.0)*0.5773*0.0005;
     return normalize( e.xyy*map( pos + e.xyy ).t +
     e.yyx*map( pos + e.yyx ).t +
     e.yxy*map( pos + e.yxy ).t +
     e.xxx*map( pos + e.xxx ).t );
+*/
 }
 
 void applyDistanceFog(inout vec3 col, float distance, vec3 fogColor, float density, float growth) {
@@ -1223,33 +1255,25 @@ void setupCameraMatrix(inout Camera cam, float rollAngle, vec2 pan)
     //      Fehler sind speziell schwer zu verifizieren, weil man sich erstmal visuelle "Testfälle"
     //      aufstellen muss, von denen man wirklich sicher sein kann, wie sie aussehen müssen.
 
-    // (*) Kern-Transformation der Kamera Richtung gegebenes Target.
+    // (*) Grundlegende Kamerarotation Richtung Target
     const vec3 worldUp = c.yxy;
     cam.forward = normalize(cam.target - cam.origin);
     cam.right = normalize(cross(cam.forward, worldUp));
     cam.up = cross(cam.right, cam.forward);
     cam.matrix = mat3(cam.right, cam.up, cam.forward);
 
-    // Die Extra-Rotation soll noch auf Weltkoordinaten greifen.
+    // Die Extra-Rotationen wollen wir hier dann auf die rotierten Koordinaten
     mat3 extraYaw = rotAround(cam.up, pan.x);
-    mat3 extraPitch = rotAround(cam.right, -pan.y);
-    cam.matrix = extraPitch * extraYaw * cam.matrix;
-
+    mat3 extraPitch = rotAround(cam.right, -pan.y + 0.4 * sin(iTime));
     // Der Rollwinkel wird so eigentlich stets um die finale Blickrichtung bezeichnet.
     mat3 roll = rotAround(cam.forward, rollAngle);
-    cam.matrix = roll * cam.matrix;
+    cam.matrix = roll * (extraPitch * extraYaw * cam.matrix);
+    /// <- BUG in GLSL??: Diese Klammer spielt ominöserweise eine Rolle!
+    ///    Mathematisch ist die Klammer überflüssig (Assoziativität). Sehr mysteriös.
+    ///    Ohne sie führt extraPitch zu einer Roll-Bewegung, auch wenn extraYaw und roll je mat3(1.) sind.
 
-    // OBACHT: Bei dieser Konstruktion kam mir seltsames Fehlverhalten unter.
-    // Wenn ich das in einem Schritt direkt versucht habe:
-    //   cam.matrix = roll * extraPitch * extraYaw * cam.matrix;
-    // Hat eine Drehung um extraPitch hier eine Rollbewegung ausgeführt statt Pitch.
-    // Das muss aber dasselbe sein wie
-    //   cam.matrix = extraPitch * extraYaw * cam.matrix;
-    //   cam.matrix = roll * cam.matrix;
-    // --> mysteriös!
-
-    // Zum "struct Camera": Wir brauchen weiter eigentlich nur "cam.origin" und "cam.matrix".
-    // Alle anderen Größen sind fürs Veranschaulichen / Debugging global gedacht.
+    /* Globale "struct Camera": Wir brauchen weiter eigentlich nur "cam.origin" und "cam.matrix".
+    Wir speichern die uns nur hier, um sie selbst in der map() veranschaulichen zu können. */
     cam.tForward = cam.forward;
     cam.tRight = cam.right;
     cam.tUp = cam.up;
@@ -1281,7 +1305,7 @@ void main()
     cam.origin = vec3(-0.75, 1.5, 3.);
     // mit fester Blick_richtung_ (im Gegensatz zu festem Blick-Zielpunkt)
     // (je nachdem eben, ob relativ zu Kameraposition oder unabhängig)
-    cam.target = cam.origin - c.yyx; // vec3(1.2, -1.2, -3.5);
+    cam.target = cam.origin - vec3(1.2, -1.2, -3.5);
     float camRoll = 0.;
 
     calcApproxCamPathLength();

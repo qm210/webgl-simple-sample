@@ -87,7 +87,8 @@ function render(gl, state) {
     gl.uniform1i(state.location.usePyramidTextureFromBoxes, state.usePyramidTextureFromBoxes);
 
     gl.uniform1i(state.location.doUseCameraPath, state.doUseCameraPath);
-    gl.uniform1i(state.location.doShowCameraPathPoints, state.doShowCameraPathPoints);
+    gl.uniform1i(state.location.displayCameraPathPoints, state.displayCameraPathPoints);
+    gl.uniform1i(state.location.displayCameraRotationAxes, state.displayCameraRotationAxes);
     gl.uniform1i(state.location.doUseCameraTargetPath, state.doUseCameraTargetPath);
     gl.uniform1i(state.location.doShowPointLightSource, state.doShowPointLightSource);
 
@@ -158,14 +159,19 @@ function defineUniformControlsBelow() {
         defaultValue: true,
     }, {
         type: "bool",
-        name: "doShowCameraPathPoints",
+        name: "doUseCameraTargetPath",
+        defaultValue: false,
+        description: "Kamera-Blickpunkt auf (eigenem) Spline-Pfad bewegen"
+    }, {
+        type: "bool",
+        name: "displayCameraPathPoints",
         description: "Spline-Kamera-Kontrollpunkte als kleine Kugeln rendern",
         defaultValue: false,
     }, {
         type: "bool",
-        name: "doUseCameraTargetPath",
+        name: "displayCameraRotationAxes",
+        description: "Kamera-Achsen-Miniaturansicht dazurendern.",
         defaultValue: false,
-        description: "Kamera-Blickpunkt auf (eigenem) Spline-Pfad bewegen"
     }, {
         type: "float",
         name: "iPathSpeed",

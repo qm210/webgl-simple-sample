@@ -84,6 +84,7 @@ function createInitialState(sources) {
         activeUniforms: [],
         location: {},
         framebuffer: [],
+        createdAt: performance.now(),
     };
 }
 
@@ -117,16 +118,18 @@ export function compile(gl, sources) {
         return result;
     }
     result.program = program;
+    result.compiledMillis = performance.now() - result.createdAt;
+    console.log("Shader Program Compiled in", result.compiledMillis, "ms");
 
     collectActiveUniforms(gl, result);
-
     return result;
 }
 
 export function initVertices(gl, state, variableName) {
-    // Note: state.program needs to exist here!
+    if (!state.program) {
+        throw Error("initVertices() needs a working state.program");
+    }
 
-    // ... now... more of that stuff with all the parameters and the stuff?
     state.location.aPosition = gl.getAttribLocation(state.program, variableName);
     gl.enableVertexAttribArray(state.location.aPosition);
     gl.vertexAttribPointer(
@@ -140,12 +143,13 @@ export function initVertices(gl, state, variableName) {
 }
 
 function collectActiveUniforms(gl, state) {
-    // Earlier examples (or other simple WebGL / OpenGL codes) carry such definitions:
+    // In einfachen Fällen findet man solche Aufrufe entweder im Setup- oder im Rendercode:
     //   state.location.iTime = gl.getUniformLocation(state.program, "iTime");
     //   state.location.iResolution = gl.getUniformLocation(state.program, "iResolution");
     //   state.location.iMouse = gl.getUniformLocation(state.program, "iMouse");
     //   etc...
-    // -> this can be unified with WebGL functions (active == the uniform is actually accessed)
+    // -> seit die Showcases teilweise sehr viele Uniforms haben, lesen wir sie aber immer automatisch:
+    // Vorteil: getActiveUniform() sagt uns auch direkt, ob ein uniform überhaupt verwendet (gelesen) wird.
     const uniformCount = gl.getProgramParameter(state.program, gl.ACTIVE_UNIFORMS);
     for (let u = 0; u < uniformCount; u++) {
         const uniform = gl.getActiveUniform(state.program, u);
