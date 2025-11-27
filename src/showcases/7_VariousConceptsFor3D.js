@@ -84,7 +84,7 @@ function render(gl, state) {
     gl.uniform1i(state.location.applyPyramidTextureSkewing, state.applyPyramidTextureSkewing);
     gl.uniform1i(state.location.applyPyramidTextureNarrowing, state.applyPyramidTextureNarrowing);
     gl.uniform1i(state.location.applyPyramidTextureTopDown, state.applyPyramidTextureTopDown);
-    gl.uniform1i(state.location.usePyramidTextureFromBoxes, state.usePyramidTextureFromBoxes);
+    gl.uniform1i(state.location.takeBoxTextureForPyramid, state.takeBoxTextureForPyramid);
 
     gl.uniform1i(state.location.doUseCameraPath, state.doUseCameraPath);
     gl.uniform1i(state.location.displayCameraPathPoints, state.displayCameraPathPoints);
@@ -319,6 +319,12 @@ function defineUniformControlsBelow() {
             "Blaue Linie (st.x == 0.5) und Rotes Gitter in Schritten von je 0.1"
     }, {
         type: "bool",
+        name: "takeBoxTextureForPyramid",
+        defaultValue: false,
+        description: "Zum Vergleich der Wahl in Texturkoordinaten: Textur aus Bilddatei anbringen\n" +
+            "(die im unverzerrten Fall auf den Quadern auch zu sehen ist)",
+    }, {
+        type: "bool",
         name: "applyPyramidTextureSkewing",
         defaultValue: false,
         description: "Pyramidentextur mit linkem Rand (st.x = 0) an Pyramidenkanten ausrichten,\n" +
@@ -335,12 +341,6 @@ function defineUniformControlsBelow() {
         defaultValue: false,
         description: "Andere Idee: Die Texturkoordinaten schlicht Grundriss gleichsetzen.\n" +
             "(entspricht Interpretation als Draufsicht; wird auch stark verzerrt.)"
-    }, {
-        type: "bool",
-        name: "usePyramidTextureFromBoxes",
-        defaultValue: false,
-        description: "Zum Vergleich der Wahl in Texturkoordinaten: Textur aus Bilddatei anbringen\n" +
-            "(die im unverzerrten Fall auf den Quadern auch zu sehen ist)",
     }, {
         type: "separator",
         title: "Post-Processing"
@@ -407,7 +407,7 @@ function defineUniformControlsBelow() {
         max: 2.,
     }, {
         type: "separator",
-        title: "Zur freien Verwendung"
+        title: "Zur freien Verwendung..."
     }, {
         type: "float",
         name: "iFree0",

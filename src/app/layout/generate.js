@@ -141,7 +141,9 @@ export const addControlsToPage = (elements, state, controls, autoRenderOnLoad) =
 
     const groups = collectGroups(controls);
 
-    for (const control of controls.uniforms ?? []) {
+    for (let c = 0; c < controls.uniforms?.length; c++) {
+        const control = controls.uniforms[c];
+        const nextControl = controls.uniforms[c + 1];
 
         if (control.type === "label") {
             if (elements[control.name] !== undefined) {
@@ -173,11 +175,13 @@ export const addControlsToPage = (elements, state, controls, autoRenderOnLoad) =
             continue;
         }
         else if (control.type === "separator") {
-            elements[control.name] =
+            if (nextControl && nextControl.type !== "separator") {
                 addFreeRow({
                     parent: elements.controls,
                     content: createDiv(control.title, "separator"),
-                })
+                });
+            }
+            continue;
         }
 
         if (control.group) {

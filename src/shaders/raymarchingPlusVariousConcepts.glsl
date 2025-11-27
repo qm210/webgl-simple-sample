@@ -54,7 +54,7 @@ uniform bool showPyramidTextureGrid;
 uniform bool applyPyramidTextureNarrowing;
 uniform bool applyPyramidTextureSkewing;
 uniform bool applyPyramidTextureTopDown;
-uniform bool usePyramidTextureFromBoxes;
+uniform bool takeBoxTextureForPyramid;
 uniform bool useCentripetalCatmullRomSplines;
 uniform bool useLinearSplines;
 uniform bool tryLinearSplineSpeedApproximation;
@@ -966,7 +966,7 @@ vec4 render(in vec3 rayOrigin, in vec3 rayDir)
             st = pos.xz + 0.5;
         }
 
-        if (usePyramidTextureFromBoxes) {
+        if (takeBoxTextureForPyramid) {
             col = texture(texFrame, st).rgb;
         }
         else {
