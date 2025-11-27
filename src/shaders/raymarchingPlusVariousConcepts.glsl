@@ -1267,52 +1267,6 @@ vec3 background() {
     return pow(space.rgb, vec3(1.5));
 }
 
-mat3 m11 = mat3(
-    .41,.54,.05,
-    .21,.68,.11,
-    .09,.28,.63
-);
-mat3 m2 = mat3(
-    .21,.79,0,
-    1.97,-2.42,.45,
-    .03,.78,-.81
-);
-
-vec3 srgb_to_oklch( vec3 c ) {
-    c = pow(c * m11,vec3(1./3.)) * m2;
-    return vec3(c.x,sqrt((c.y*c.y) + (c.z * c.z)),atan(c.z,c.y));
-}
-vec3 oklch_to_srgb( vec3 c ) {
-    return pow(vec3(c.x,c.y*cos(c.z),c.y*sin(c.z)) * inverse(m2),vec3(3.)) * inverse(m11);
-}
-vec3 rgb2hsv(vec3 c) {
-    float cMax = max(c.r, max(c.g, c.b));
-    float cMin = min(c.r, min(c.g, c.b));
-    float delta = cMax - cMin;
-
-    float h = 0.0;
-    if (delta > 0.00001) {
-        if (cMax == c.r)
-        h = mod((c.g - c.b) / delta, 6.0);
-        else if (cMax == c.g)
-        h = ((c.b - c.r) / delta) + 2.0;
-        else
-        h = ((c.r - c.g) / delta) + 4.0;
-        h /= 6.0;
-    }
-
-    float s = (cMax == 0.0) ? 0.0 : delta / cMax;
-    float v = cMax;
-
-    return vec3(h, s, v);
-}
-
-vec3 postProcess(vec3 col) {
-    vec3 hsv = rgb2hsv(col);
-    vec3 oklch = vec3(0.5 * hsv.z, 0.3 * hsv.y, twoPi * hsv.x);
-    return oklch_to_srgb(oklch);
-}
-
 void main()
 {
     vec2 uv = (2.0 * gl_FragCoord.xy - iResolution.xy) / iResolution.y;
@@ -1354,11 +1308,6 @@ void main()
     cam.target += iCamLookOffset ;
     camRoll += iCamRoll;
 
-    if (abs(uv.x - camRoll) < 0.005) {
-        fragColor.rgb = c.xxx;
-        return;
-    }
-
     setupCameraMatrix(cam, camRoll, pan);
 
     vec3 rayDirection = cam.matrix * normalize(vec3(uv, iCamFocalLength));
@@ -1378,7 +1327,6 @@ void main()
     //       den Hintergrund da druntermischen, wo der Ray Marcher noch nicht fragColor.a abdeckt
     fragColor.rgb = mix(background(), fragColor.rgb, fragColor.a);
 
-    fragColor.rgb = mix(fragColor.rgb, postProcess(fragColor.rgb), iFree2);
     applyToneMapping(fragColor.rgb);
     applyGammaCorrection(fragColor.rgb);
 
