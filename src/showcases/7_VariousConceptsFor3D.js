@@ -55,7 +55,7 @@ function render(gl, state) {
     gl.uniform1f(state.location.iTime, state.time);
     gl.uniform2fv(state.location.iResolution, state.resolution);
     gl.uniform4fv(state.location.iMouseDrag, state.iMouseDrag);
-    // <-- PS: habe mir ausgedacht, dass das neue iMouseDrag nützlicher ist als das iMouse wie auf Shadertoy.
+    // <-- PS: habe mir ausgedacht, dass das neue iMouseDrag nützlicher ist als das iMouse a la Shadertoy.
     gl.uniform3fv(state.location.iCamOffset, state.iCamOffset);
     gl.uniform3fv(state.location.iCamLookOffset, state.iCamLookOffset);
     gl.uniform1f(state.location.iCamRoll, state.iCamRoll);
@@ -69,6 +69,7 @@ function render(gl, state) {
     gl.uniform1i(state.location.useCentripetalCatmullRomSplines, state.useCentripetalCatmullRomSplines);
     gl.uniform1i(state.location.useLinearSplines, state.useLinearSplines);
     gl.uniform1i(state.location.tryLinearSplineSpeedApproximation, state.tryLinearSplineSpeedApproximation);
+    gl.uniform1f(state.location.iAmbientAmount, state.iAmbientAmount);
     gl.uniform1f(state.location.iDiffuseAmount, state.iDiffuseAmount);
     gl.uniform1f(state.location.iSpecularAmount, state.iSpecularAmount);
     gl.uniform1f(state.location.iSpecularExponent, state.iSpecularExponent);
@@ -76,7 +77,7 @@ function render(gl, state) {
     gl.uniform1f(state.location.iSubsurfaceAmount, state.iSubsurfaceAmount);
     gl.uniform1f(state.location.iSubsurfaceExponent, state.iSubsurfaceExponent);
     gl.uniform1f(state.location.iAmbientOcclusionScale, state.iAmbientOcclusionScale);
-    gl.uniform1f(state.location.iAmbientOcclusionStep, state.iAmbientOcclusionStep);
+    gl.uniform1f(state.location.iAmbientOcclusionRadius, state.iAmbientOcclusionRadius);
     gl.uniform1f(state.location.iAmbientOcclusionSamples, state.iAmbientOcclusionSamples);
     gl.uniform1i(state.location.justTheBoxes, state.justTheBoxes);
     gl.uniform1i(state.location.drawGridOnFloor, state.drawGridOnFloor);
@@ -85,16 +86,15 @@ function render(gl, state) {
     gl.uniform1i(state.location.applyPyramidTextureNarrowing, state.applyPyramidTextureNarrowing);
     gl.uniform1i(state.location.applyPyramidTextureTopDown, state.applyPyramidTextureTopDown);
     gl.uniform1i(state.location.takeBoxTextureForPyramid, state.takeBoxTextureForPyramid);
-
     gl.uniform1i(state.location.doUseCameraPath, state.doUseCameraPath);
     gl.uniform1i(state.location.displayCameraPathPoints, state.displayCameraPathPoints);
     gl.uniform1i(state.location.displayCameraRotationAxes, state.displayCameraRotationAxes);
     gl.uniform1i(state.location.doUseCameraTargetPath, state.doUseCameraTargetPath);
     gl.uniform1i(state.location.doShowPointLightSource, state.doShowPointLightSource);
-
     gl.uniform1f(state.location.iDistanceFogExponent, state.iDistanceFogExponent);
     gl.uniform1f(state.location.iToneMapExposure, state.iToneMapExposure);
     gl.uniform1f(state.location.iToneMapACESMixing, state.iToneMapACESMixing);
+    gl.uniform1f(state.location.iToneMapACESExposure, state.iToneMapACESExposure);
     gl.uniform1f(state.location.iGammaExponent, state.iGammaExponent);
     gl.uniform1f(state.location.iNoiseLevel, state.iNoiseLevel);
     gl.uniform1f(state.location.iNoiseFreq, state.iNoiseFreq);
@@ -102,6 +102,10 @@ function render(gl, state) {
     gl.uniform1i(state.location.iFractionalOctaves, Math.floor(state.iFractionalOctaves));
     gl.uniform1f(state.location.iFractionalScale, state.iFractionalScale);
     gl.uniform1f(state.location.iFractionalDecay, state.iFractionalDecay);
+    gl.uniform1i(state.location.useNormalizedFBM, state.useNormalizedFBM);
+    gl.uniform1f(state.location.iCylinderRotateYSpeed, state.iCylinderRotateYSpeed);
+    gl.uniform1f(state.location.iCylinderThenRotateZSpeed, state.iCylinderThenRotateZSpeed);
+    gl.uniform1f(state.location.iCylinderThenRotateNewYSpeed, state.iCylinderThenRotateNewYSpeed);
 
     gl.uniform1f(state.location.iFree0, state.iFree0);
     gl.uniform1f(state.location.iFree1, state.iFree1);
@@ -140,8 +144,8 @@ function defineUniformControlsBelow() {
         type: "vec3",
         name: "iCamLookOffset",
         defaultValue: [0, 0, 0],
-        min: -20,
-        max: +20,
+        min: -5,
+        max: +5,
     }, {
         type: "float",
         name: "iCamRoll",
@@ -254,6 +258,12 @@ function defineUniformControlsBelow() {
         max: 10.,
     }, {
         type: "float",
+        name: "iAmbientAmount",
+        defaultValue: 0.01,
+        min: 0.,
+        max: 1.,
+    }, {
+        type: "float",
         name: "iDiffuseAmount",
         defaultValue: 1,
         min: 0.,
@@ -268,8 +278,8 @@ function defineUniformControlsBelow() {
         type: "float",
         name: "iSpecularExponent",
         defaultValue: 21,
-        min: -10.,
-        max: 100.,
+        min: 0.1,
+        max: 40.,
     }, {
         type: "float",
         name: "iBacklightAmount",
@@ -297,7 +307,7 @@ function defineUniformControlsBelow() {
         step: 1.
     }, {
         type: "float",
-        name: "iAmbientOcclusionStep",
+        name: "iAmbientOcclusionRadius",
         defaultValue: 0.12,
         min: 0.,
         max: 2.,
@@ -343,6 +353,27 @@ function defineUniformControlsBelow() {
             "(entspricht Interpretation als Draufsicht; wird auch stark verzerrt.)"
     }, {
         type: "separator",
+        title: "Eulerwinkel-Drehung am Zylinder"
+    }, {
+        type: "float",
+        name: "iCylinderRotateYSpeed",
+        defaultValue: 0,
+        min: -2,
+        max: 2,
+    }, {
+        type: "float",
+        name: "iCylinderThenRotateZSpeed",
+        defaultValue: 0,
+        min: -2,
+        max: 2,
+    }, {
+        type: "float",
+        name: "iCylinderThenRotateNewYSpeed",
+        defaultValue: 0,
+        min: -2,
+        max: 2,
+    }, {
+        type: "separator",
         title: "Post-Processing"
     }, {
         type: "float",
@@ -358,10 +389,17 @@ function defineUniformControlsBelow() {
         max: 3.,
     }, {
         type: "float",
+        name: "iToneMapACESExposure",
+        defaultValue: 1,
+        min: 0.1,
+        max: 20.,
+        log: true
+    }, {
+        type: "float",
         name: "iToneMapACESMixing",
         defaultValue: 0,
-        min: -1.,
-        max: 2.,
+        min: 0,
+        max: 1.,
     }, {
         type: "float",
         name: "iGammaExponent",
@@ -405,6 +443,10 @@ function defineUniformControlsBelow() {
         defaultValue: 0.5,
         min: 0.01,
         max: 2.,
+    }, {
+        type: "bool",
+        name: "useNormalizedFBM",
+        defaultValue: false,
     }, {
         type: "separator",
         title: "Zur freien Verwendung..."

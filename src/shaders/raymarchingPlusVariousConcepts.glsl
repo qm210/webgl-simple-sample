@@ -19,11 +19,15 @@ uniform float iCamRoll;
 uniform float iCamFocalLength;
 uniform float iPathSpeed;
 uniform float iPathOffset;
+uniform float iCylinderRotateYSpeed;
+uniform float iCylinderThenRotateZSpeed;
+uniform float iCylinderThenRotateNewYSpeed;
 uniform vec3 vecDirectionalLight;
 uniform float iDirectionalLightStrength;
 uniform float iPointLightStrength;
 uniform float iLightSourceMix;
 uniform float iLightPointPaletteColor;
+uniform float iAmbientAmount;
 uniform float iDiffuseAmount;
 uniform float iSpecularAmount;
 uniform float iSpecularExponent;
@@ -31,11 +35,12 @@ uniform float iBacklightAmount;
 uniform float iSubsurfaceAmount;
 uniform float iSubsurfaceExponent;
 uniform float iAmbientOcclusionScale;
-uniform float iAmbientOcclusionStep;
+uniform float iAmbientOcclusionRadius;
 uniform float iAmbientOcclusionSamples;
 uniform float iDistanceFogExponent;
 uniform float iToneMapExposure;
 uniform float iToneMapACESMixing;
+uniform float iToneMapACESExposure;
 uniform float iGammaExponent;
 uniform float iNoiseLevel;
 uniform float iNoiseFreq;
@@ -58,6 +63,7 @@ uniform bool takeBoxTextureForPyramid;
 uniform bool useCentripetalCatmullRomSplines;
 uniform bool useLinearSplines;
 uniform bool tryLinearSplineSpeedApproximation;
+uniform bool useNormalizedFBM;
 // and for you to play around with:
 uniform float iFree0;
 uniform float iFree1;
@@ -78,7 +84,7 @@ const float MISSING_MATERIAL = -0.5;
 const float UNKNOWN_MATERIAL = 0.0;
 const float MATERIAL_FLOOR = 1.0;
 const float MATERIAL_BOX = 3.0;
-const float MATERIAL_CYLINDER = 8.0;
+const float MATERIAL_CYLINDER = 10.83;
 const float MATERIAL_PYRAMID = 13.0;
 const float MATERIAL_MOUNTAINS = 2.0;
 const float MATERIAL_PATH_POINT = 1.4;
@@ -173,9 +179,9 @@ mat3 rotAround(vec3 axis, float angle) {
     // skewSym(v1) * v2 == cross(v1, v2)
     float c = cos(angle);
     float s = sin(angle);
-     return mat3(1.) + (1. - c) * skewSym * skewSym + s * skewSym;
+    return mat3(1.) + s * skewSym + (1. - c) * skewSym * skewSym;
     // Andere Schreibweise mit GLSL-eingebautem outerProduct:
-    // return mat3(c) + (1. - c) * outerProduct(v, v) + s * skewSym;
+    // return mat3(c) + s * skewSym + (1. - c) * outerProduct(v, v);
     // -> outerProduct() = 1 + skewSym²
 }
 
@@ -254,7 +260,7 @@ float perlin2D(vec2 p)
     return ym;
 }
 
-float fractalBrownianMotion(vec2 p) {
+float fractalBrownianMotion(vec2 p, bool normalize) {
     float v = 0.;
     float a = 1.;
     float s = 0.;
@@ -271,7 +277,7 @@ float fractalBrownianMotion(vec2 p) {
         p = p * iFractionalScale;
         a *= iFractionalDecay;
     }
-    return v / s;
+    return normalize ? (v / s) : v;
 }
 
 float gridPattern(vec2 p, float gridStep) {
@@ -300,8 +306,9 @@ void applyToneMapping(inout vec3 col) {
 
     // Beispiel: "ACES Filmic Curve" ist eine Wahl einer allgemeinen Form
     // col = (a * col² + b * col + c) / (d * col² + e * col + f)
-    vec3 col2 = col * col;
-    vec3 acesToneMapped = (2.51*col2 + 0.03*col) / (2.43*col2 + 0.59*col + 0.14);
+    vec3 col1 = iToneMapACESExposure * col;
+    vec3 col2 = col1 * col1;
+    vec3 acesToneMapped = (2.51*col2 + 0.03*col1) / (2.43*col2 + 0.59*col1 + 0.14);
     col = mix(col, acesToneMapped, iToneMapACESMixing);
 
     // "Exposure Mapping" wäre auch eine relativ simple Form von Tone Mapping
@@ -370,6 +377,9 @@ float sdPyramid( in vec3 p, in float h )
     // recover 3D and scale, and add sign
     return sqrt( (d2+q.z*q.z)/m2 ) * sign(max(q.z,-p.y));
 }
+
+const vec3 pyramidPos = vec3(-1.0, 0.0, -2.5);
+const float pyramidHeight = 1.1;
 
 float sdU( in vec3 p, in float r, in float le, vec2 w )
 {
@@ -509,7 +519,7 @@ float sdNoiseMountains(vec3 p) {
     float height = max(0., length(p.xz) - 3.);
     // <-- -3. damit mittlere Arena ungestört bleibt
     height *= height * 0.2;
-    height *= iNoiseLevel * (1. + fractalBrownianMotion(iNoiseFreq * p.xz));
+    height *= iNoiseLevel * (1. + fractalBrownianMotion(iNoiseFreq * p.xz, useNormalizedFBM));
     return p.y - height;
 }
 
@@ -553,9 +563,6 @@ Hit takeCloser( Hit d1, float d2, float material2, float customArg2)
     // texCoord hier unbestimmt, weil map() es tatsächlich noch nicht braucht.
     // wäre aber dann auch straightforward nachgezogen.
 }
-
-const vec3 pyramidPos = vec3(-1.0, 0.0, -2.6);
-const float pyramidHeight = 1.1;
 
 void displayDevelopmentHelpers(inout Hit res, in vec3 pos) {
 
@@ -705,18 +712,18 @@ Hit map( in vec3 pos )
     // <-- man beachte die 90°-Drehung über das Vektor-Swizzling (= Richtungen vertauschen)
 
     res = takeCloser(res,
-        sdPyramid(pos - pyramidPos.xyz, pyramidHeight),
+        sdPyramid(pos - pyramidPos, pyramidHeight),
         MATERIAL_PYRAMID
     );
 
     res = takeCloser(res, bouncingBall(pos));
 
-    vec3 cylinderPos = (pos-vec3( 1.0,0.35,-2.0));
-    // Eulerwinkel-Drehung am Beispiel des Zylinders:
-    // (sieht man gut, wenn man den Pfad mit iPathOffset so wählt
-    cylinderPos *= rotY(2.0*iTime + 0.25); // dreht um eigene Achse
-    cylinderPos *= rotZ(0.0*iTime);
-    cylinderPos *= rotY(0.0*iTime);
+    vec3 cylinderPos = pos-vec3( 1.0,0.35,-2.0);
+    // Eulerwinkel-Drehung am Beispiel des Zylinders (der bisher nach oben zeigt)
+    // (Sieht man gut, wenn man den Pfad mit iPathOffset mal anfährt)
+    cylinderPos *= rotY(iCylinderRotateYSpeed*iTime);
+    cylinderPos *= rotZ(iCylinderThenRotateZSpeed*iTime);
+    cylinderPos *= rotY(iCylinderThenRotateNewYSpeed*iTime);
     res = takeCloser(res,
         texturedSdCylinder(cylinderPos, vec2(0.15,0.25))
     );
@@ -741,7 +748,7 @@ Hit raycast( in vec3 ro, in vec3 rd )
     Hit res = Hit(-1.0, MISSING_MATERIAL, c.yy, 0.);
 
     float tmin = 0.1; // war letzte Woche noch 1.0: wird richtig hässlich beim bewegen :)
-    float tmax = 20.0;
+    float tmax = 15.0;
 
     // raytrace floor plane (Ebene y==0, also Sichtstrahl = Kante eines einfaches Dreiecks)
     float tp1 = (0.0-ro.y)/rd.y;
@@ -794,7 +801,7 @@ float calcSoftshadow( in vec3 ro, in vec3 rd, in float mint, in float tmax )
     // geht es darum, die stärkste Abschwächung, d.h. den kleinsten Faktor zu finden
     float res = 1.0;
     float t = mint;
-    for( int i=0; i<80; i++ )
+    for (int i = ZERO; i < 80 && t < tmax; i++)
     {
         // Ray Marching von der Aufprallstelle des ersten Marchings (raymarch(...))
         float h = map( ro + rd*t ).t;
@@ -805,16 +812,18 @@ float calcSoftshadow( in vec3 ro, in vec3 rd, in float mint, in float tmax )
         // - kleines h/t heißt, der Schatten hatte genug Raum, sich auszubreiten.
         // Logik hinter h / t:
         //  - t ist aktuell beschrittene Länge des Strahls von Auftrittspunkt (Boden) Richtung Licht
-        //  - h ist dann Abstand zum nächsten Objekt (SDF eben, h == 0 wenn anderes Objekt getroffen)
+        //  - h ist ja SDF: Abstand zum nächsten Objekt (h <= 0 wenn Oberfläche getroffen)
         //  - h/t klein heißt: der Schatten, den das Objekt (in Abstand h) wirft, hat relativ viel Raum
         //    (Strahllänge t), um sich auszubreiten.
-        float s = clamp(8.0*h/t,0.0,1.0);
+        //  - Faktor 8 im clamp() macht, dass nur h/t <= 0.125 beiträgt.
+        float s = clamp(8.0 * h/t,0.0,1.0);
         // Aber auch hier: die genauen Zahlen sind künstlerisch / empirisch gewählt, nicht physikalisch.
-        res = min( res, s );
-        // Und: Schrittweite begrenzen, wir wollen viele Schattenbeiträge in der Nähe sammeln,
-        //      ergibt dann weiche Schatten, nicht nur klares "irgendwas ist im Weg" vs. "nicht".
-        t += clamp( h, 0.01, 0.2 );
-        if( res<0.004 || t>tmax ) break;
+        res = min(res, s);
+        // Und: Minimalschrittweite erzwingen, lieber weiter hinten noch einen wichtigeren Schatten finden.
+        // In Vorlage von iq steht da clamp(h, 0.01, 0.2); aber ich finde keinen Grund, 0.2 zu deckeln.
+        t += max(h, 0.01);
+        if (res<0.004)
+            break;
     }
     res = clamp( res, 0.0, 1.0 );
     return res*res*(3.0-2.0*res);
@@ -825,23 +834,25 @@ float calcSoftshadow( in vec3 ro, in vec3 rd, in float mint, in float tmax )
 float calcAmbientOcclusion(in vec3 pos, in vec3 normal)
 {
     // iAmbientOcclusionSamples ~ 5
-    // iAmbientOcclusionStep ~ 0.12
+    // iAmbientOcclusionRadius ~ 0.12
     // iAmbientOcclusionScale ~ 0.95;
     // Idee: wir werten die gesamte Map in verschiedenen Abständen von der Oberfläche aus
     //       (vom Auftrittspunkt also Richtung Normalenvektor) und summieren auf:
     //       (h - d) ~ Wenn d entlang dieser Linie zu klein bleibt, haben wir "Verdeckung", d.h.
     //                 schätzen Schatten / Hohlräume ab, ohne die Rays zum Licht _tracen_ zu müssen
-    float occlusion = 0.0;
+    float res = 0.0;
     float scale = 1.0;
     for (float i=0.; i < iAmbientOcclusionSamples; i += 1.)
     {
-        float h = 0.01 + iAmbientOcclusionStep * i / (iAmbientOcclusionSamples - 1.);
-        float d = map(pos + h*normal).t;
-        occlusion += (h-d) * scale;
+        float t = 0.01 + iAmbientOcclusionRadius * i / (iAmbientOcclusionSamples - 1.);
+        float h = map(pos + t*normal).t;
+        res += (t-h) * scale;
         scale *= iAmbientOcclusionScale;
-        if( occlusion>0.35 ) break;
+        if (res > 0.35) {
+            break;
+        }
     }
-    return clamp( 1.0 - 3.0*occlusion, 0.0, 1.0 ) * (0.5+0.5*normal.y);
+    return clamp( 1.0 - 3.0*res, 0.0, 1.0 ) * (0.5+0.5*normal.y);
 }
 
 // https://iquilezles.org/articles/normalsSDF
@@ -900,7 +911,7 @@ vec4 render(in vec3 rayOrigin, in vec3 rayDir)
     // um bei Bedarf Materialien unterschiedlich behandeln zu können.
     float specularCoeff = 1.0;
     float subSurfaceCoefficient = 1.0;
-    float ambientCoeff = 0.;
+    float ambientCoeff = iAmbientAmount;
 
     // berechneten Strahl rekonstruieren
     vec3 rayPos = rayOrigin + res.t * rayDir;
@@ -910,12 +921,18 @@ vec4 render(in vec3 rayOrigin, in vec3 rayDir)
     // Material-Floats auf Gleichheit zu prüfen wirkt gefährlich/fahrlässig, geht hier zwar,
     // aber nur, weil wir exakt wissen, dass wir diesen Wert so gesetzt haben. nicht berechnet.
     if (res.material == MATERIAL_BOX) {
+        // hier mal ein Beispiel, dass die Grundfarbe immer noch beliebig angepasst werden kann,
+        // auch wenn beide Boxen diese Material-Zahl haben. Ist halt anfällig gegenüber Verschiebung...
+        if (rayPos.x > 0.5) {
+            col = mix(c.xxx, materialPalette(4.8), 0.9);
+        }
         // res.texCoord haben wir uns oben gemerkt, um hier nicht dieselbe Geometrie
         // nochmal in alle Richtungen fallunterscheiden zu müssen. Möglich wäre das aber.
         col *= texture(texFrame, res.texCoord).rgb;
     }
     else if (res.material == MATERIAL_CYLINDER) {
-        col = c.yyy - col * texture(texFrame, res.texCoord).rgb;
+        // Einfach mal die Textur invertieren und auf die Grundfarbe multiplizieren; warum nicht?
+        col *= 1. - texture(texFrame, res.texCoord).rgb;
     }
     else if (res.material == MATERIAL_PYRAMID) {
         // hier z.B.: Farbverlauf an y-Achse
@@ -928,7 +945,7 @@ vec4 render(in vec3 rayOrigin, in vec3 rayDir)
         // Wir müssen uns aber überlegen, wie wir die Aufprallkoordinaten (vec3 pos, wo SDF == 0)
         // in Texturkoordinaten (vec2 st, normiert auf [0, 1]) umrechnen.
         // Wir vereinfachen das, indem wir uns erstmal in den umgebenden Würfel denken:
-        vec3 pos = rayPos - pyramidPos.xyz;
+        vec3 pos = rayPos - pyramidPos;
         // Nach der verwendeten SDF sdPyramid() läuft .y bisher von [0..pyramidHeight]:
         pos.y = pos.y / pyramidHeight - 0.5;
         // und wir spiegeln z, weil das "nach vorne" der Welt / Kamera als "-z" gewählt wurde
@@ -1018,17 +1035,26 @@ vec4 render(in vec3 rayOrigin, in vec3 rayDir)
         // nimmt, weil bei letzterem OpenGL die Korrektur automatisch durchführt.
         // col = pow(col, vec3(2.8));
         specularCoeff = 0.12;
+        subSurfaceCoefficient = 0.;
 
-        if (drawGridOnFloor && isFloor) {
+        if (drawGridOnFloor && rayPos.y < 0.1) {
             col *= 0.3 + 0.7 * vec3(gridPattern(rayPos.xz, 0.5));
         }
     } else if (res.material == MATERIAL_ARROW) {
         col = materialPalette(20. + res.customArg);
         specularCoeff = 0.07;
-        ambientCoeff = 0.7;
+        ambientCoeff += 0.7;
     }
 
+    // Hier auch mit "Ambient"-Amount, das ist ja ein Teil der unabhängig
+    // jeglicher Beleuchtung angewandt wird. Das ist gewöhnlich nicht viel, oft einfach weggelassen.
+    // Hier aber zum Vergleich mal mit vorgesehen.
     vec3 shade = ambientCoeff * col;
+
+    // Auch neu -- Die "Ambient Occlusion", die in etwa den Grad der Verdeckung / Verwinkelung bezeichnet:
+    float occ = calcAmbientOcclusion(rayPos, normal);
+    // ist ein Faktor zwischen 0 (absolut verdeckt / in einer Höhle -> schwarz) und 1 (absolut frei).
+    shade *= occ;
 
     // Wir hatten letzte Woche mal eine einzelne (Richtungs)-Lichtquelle, und da die
     // verschiedenen Beiträge für etwa Phong/Blinn-Phong-Shading gesehen.
@@ -1064,6 +1090,10 @@ vec4 render(in vec3 rayOrigin, in vec3 rayDir)
                 1.1 + 0.1 * cos(0.4 * iTime + 0.2),
                 -1.5 -sin(0.8 * iTime)
             );
+            // <-- NOTIZ: Wird gerade bewusst relativ zum Kamera-Ursprung verstanden.
+            //     Ist natürlich bei der Pfadbewegung sehr unnatürlich.
+            //     Ändern wir später bei Gelegenheit.
+
             // Punktlicht: Richtung unterschiedlich je nach Strahl, es geht um die Differenz:
             lightDirection = normalize(lightPointSource - rayDir);
             lightSourceColor = mix(c.xxx, 2. * materialPalette(14.5 + iLightPointPaletteColor), 0.7);
@@ -1098,13 +1128,11 @@ vec4 render(in vec3 rayOrigin, in vec3 rayDir)
         specular *= 3.00 * specularCoeff;
         shade += specular * lightSourceColor * iSpecularAmount;
 
-        // Heute neu -- Weitere Terme, die sich "Ambient Occlusion" bedienen:
-        float occ = calcAmbientOcclusion(rayPos, normal);
-
         // "Backlight / Ambient Illumination", Idee ist dass in eher verdeckten Bereichen
         // zusätzliche Beiträge durch irgendwelche Spiegelungen am Boden (für unseren festen Fall y == 0)
         // die Schatten leicht aufweichen
-        vec3 lightFloorReflection = normalize(vec3(-lightDirection.x, 0., -lightDirection.z));
+        // vec3 lightFloorReflection = normalize(vec3(-lightDirection.x, 0., -lightDirection.z));
+        vec3 lightFloorReflection = cross(lightDirection, vec3(0,1,0));
         float backlightIllumination = occ
             * clamp(dot(normal, lightFloorReflection), 0.0, 1.0)
             * clamp(1.0 - rayPos.y, 0.0, 1.0);
@@ -1118,11 +1146,12 @@ vec4 render(in vec3 rayOrigin, in vec3 rayDir)
         //
         // Das hängt am Ambient-Occlusion-Faktor aufgrund der Annahme, dass die Lichtstrahlen, die
         // in diesen Ecken bzw. Materialien etc. "verdeckt" werden, ja irgendwo hin müssen.
-        // Hat dann einen specular-artigen Beitrag wie dot(normal, rayDir), weil das Licht das Material
-        // am ehesten senkrecht verlässt und dann also entlang der Blickrichtung liegen muss.
-        float subsurfaceScattering = occ * pow(clamp(1.0+dot(normal, rayDir), 0.0, 1.0), iSubsurfaceExponent);
-        subsurfaceScattering = occ * pow(subsurfaceScattering, iSubsurfaceExponent);
-        shade += col * iSubsurfaceAmount * subsurfaceScattering * c.xxx;
+        // Richtungsverhalten ist: Kein Beitrag bei direkt draufschauen (Licht wird ja "weggestreut")
+        // wird dann 1 dann Richtung 90° und darüber hinaus ("von hinten auf Oberfläche")
+        float subSurfaceScattering = clamp(1.0+dot(normal, rayDir), 0.0, 1.0);
+        subSurfaceScattering = occ * pow(subSurfaceScattering, iSubsurfaceExponent);
+        subSurfaceScattering *= subSurfaceCoefficient * iSubsurfaceAmount;
+        shade += subSurfaceScattering * col;
     }
 
     if (res.t > 15.) {
@@ -1316,7 +1345,7 @@ void main()
     // Ohne Kamera-Pfad-Optionen: erstmal fester Ursprung und Richtung.
     // -> hier über Uniforms modifizierbar, um Flexibilität zu zeigen.
     cam.origin = vec3(-0.75, 1.5, 3.);
-    cam.target = cam.origin + vec3(0.4, -0.33, -1);
+    cam.target = cam.origin - vec3(0.4, -0.33, -1);
     float camRoll = 0.;
 
     // Demonstration: Automatisierte Pfade per Spline-Interpolation ablaufen

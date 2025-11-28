@@ -103,7 +103,7 @@ export default {
             max: 40.,
         }, {
             type: "float",
-            name: "iAmbientOcclusionStep",
+            name: "iAmbientOcclusionRadius",
             defaultValue: 0.12,
             min: 0.,
             max: 2.,
@@ -411,7 +411,7 @@ function render(gl, state) {
     gl.uniform3fv(state.location.vecSkyColor, state.vecSkyColor);
     gl.uniform1f(state.location.iSubsurfaceAmount, state.iSubsurfaceAmount);
     gl.uniform1f(state.location.iAmbientOcclusionScale, state.iAmbientOcclusionScale);
-    gl.uniform1f(state.location.iAmbientOcclusionStep, state.iAmbientOcclusionStep);
+    gl.uniform1f(state.location.iAmbientOcclusionRadius, state.iAmbientOcclusionRadius);
     gl.uniform1f(state.location.iAmbientOcclusionIterations, state.iAmbientOcclusionIterations);
     gl.uniform1i(state.location.iShadowCastIterations, state.iShadowCastIterations);
     gl.uniform1f(state.location.iMetalReflectance, state.iMetalReflectance);

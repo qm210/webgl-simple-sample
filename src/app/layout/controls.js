@@ -112,9 +112,9 @@ export function createInputElements(state, control) {
         case "bool":
         case "boolean":
             control.boolean = true;
-            return asBoolInput(input, state, control);
+            return asBoolInput(input, state, control)
         default:
-            console.warn("Control type has no elements definition (yet)", control);
+            console.warn("Control type", control.type, "has no elements definition (yet)", control);
             return undefined;
     }
 }

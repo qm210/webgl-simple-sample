@@ -18,7 +18,7 @@ uniform vec3 vecSkyColor;
 uniform float iBacklightAmount;
 uniform float iSubsurfaceAmount;
 uniform float iAmbientOcclusionScale;
-uniform float iAmbientOcclusionStep;
+uniform float iAmbientOcclusionRadius;
 uniform float iAmbientOcclusionIterations;
 uniform int iShadowCastIterations;
 uniform float iShadowSharpness;
@@ -481,7 +481,7 @@ float calcAmbientOcclusion(in vec3 pos, in vec3 normal)
 {   // Ambient Occlusion: Metrik für den Grad der Verdeckung / Verwinkeltheit
     // Parameter als Uniform erklärt:
     // iAmbientOcclusionIterations ~ 5
-    // iAmbientOcclusionStep ~ 0.12
+    // iAmbientOcclusionRadius ~ 0.12
     // iAmbientOcclusionScale ~ 0.95;
     // Idee: wir werten die gesamte Map in verschiedenen Abständen von der Oberfläche aus
     //       (vom Auftrittspunkt also Richtung Normalenvektor) und summieren auf:
@@ -491,7 +491,7 @@ float calcAmbientOcclusion(in vec3 pos, in vec3 normal)
     float scale = 1.0;
     for (float i=0.; i < iAmbientOcclusionIterations; i += 1.)
     {
-        float h = 0.01 + iAmbientOcclusionStep * i / (iAmbientOcclusionIterations - 1.);
+        float h = 0.01 + iAmbientOcclusionRadius * i / (iAmbientOcclusionIterations - 1.);
         float d = map(pos + h*normal).t;
         // Wieder eine etwas andere Logik als beim initialen Raymarchen Abstandfinden) und Schatten:
         // Gegangen wird hier vom Oberflächenpunkt, und in Richtung des Normalenvektors
@@ -680,8 +680,6 @@ vec3 shadeForOpaqueMaterial(Ray ray, vec3 rayHit, vec3 normal, vec3 baseColor, f
         // Das ist physikalisch ein Diffusionseffekt und sieht generell weich aus, oder wachs-artig.
         // Das hängt am Ambient-Occlusion-Faktor aufgrund der Annahme, dass die Lichtstrahlen, die
         // in diesen Ecken bzw. Materialien etc. "verdeckt" werden, ja irgendwo hin müssen.
-        // Hat dann einen specular-artigen Beitrag wie dot(normal, rayDir), weil das Licht das Material
-        // am ehesten senkrecht verlässt und dann also entlang der Blickrichtung liegen muss.
         float subsurfaceScattering = pow(clamp(1.0+dot(normal, ray.dir), 0.0, 1.0), 2.0);
         subsurfaceScattering *= occlusion;
 

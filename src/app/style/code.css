@@ -217,7 +217,7 @@ pre.error {
 
 .changed-info {
     position: absolute;
-    top: 0;
+    top: 1.15rem;
     right: 0;
     background: white;
     padding: 2px;
