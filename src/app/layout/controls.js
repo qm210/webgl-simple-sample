@@ -24,24 +24,29 @@ export function addButton({parent, onClick, onRightClick, title = "", className 
     return button;
 }
 
-export const addFreeRow = ({parent, label, id, content, valuePrefix}) => {
+export const addFreeRow = ({parent, label, id, content, valuePrefix, isSeparator}) => {
     const name = createElement("label", label);
     const container = createDiv("", "free-row");
+    const value = createDiv("", "value-label");
     if (label) {
         parent.appendChild(name);
     } else {
         container.classList.add("extra-column");
     }
     parent.appendChild(container);
-
-    container.dataset.id = id;
-    const value = createDiv("", "value-label");
-    if (valuePrefix) {
-        container.appendChild(
-            createDiv(valuePrefix, "value-label")
-        );
+    if (id) {
+        container.dataset.id = id;
     }
-    container.appendChild(value);
+    if (isSeparator) {
+        container.classList.add("separator-row");
+    } else {
+        if (valuePrefix) {
+            container.appendChild(
+                createDiv(valuePrefix, "value-label")
+            );
+        }
+        container.appendChild(value);
+    }
     if (content instanceof Array) {
         content.forEach(c => container.appendChild(c));
     } else if (content) {

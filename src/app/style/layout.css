@@ -250,3 +250,8 @@ button.render-button {
     padding: 0 1rem;
     white-space: nowrap;
 }
+
+#shader-controls > .separator-row:has(+ .separator-row),
+#shader-controls > .separator-row:last-child {
+    display: none;
+}

@@ -119,7 +119,7 @@ export function compile(gl, sources) {
     }
     result.program = program;
     result.compiledMillis = performance.now() - result.createdAt;
-    console.log("Shader Program Compiled in", result.compiledMillis, "ms");
+    console.info("Shader Program Compiled in", +result.compiledMillis.toFixed(3), "ms");
 
     collectActiveUniforms(gl, result);
     return result;

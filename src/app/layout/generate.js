@@ -102,7 +102,6 @@ export const addControlsToPage = (elements, state, controls, autoRenderOnLoad) =
         });
     }
 
-    // We nowadays want to always have the time, not specify it in every showcase anymore
     elements.iTime = addFreeRow({
         parent: elements.controls,
         label: "iTime",
@@ -141,9 +140,7 @@ export const addControlsToPage = (elements, state, controls, autoRenderOnLoad) =
 
     const groups = collectGroups(controls);
 
-    for (let c = 0; c < controls.uniforms?.length; c++) {
-        const control = controls.uniforms[c];
-        const nextControl = controls.uniforms[c + 1];
+    for (const control of controls.uniforms) {
 
         if (control.type === "label") {
             if (elements[control.name] !== undefined) {
@@ -175,12 +172,11 @@ export const addControlsToPage = (elements, state, controls, autoRenderOnLoad) =
             continue;
         }
         else if (control.type === "separator") {
-            if (nextControl && nextControl.type !== "separator") {
-                addFreeRow({
-                    parent: elements.controls,
-                    content: createDiv(control.title, "separator"),
-                });
-            }
+            addFreeRow({
+                parent: elements.controls,
+                content: createDiv(control.title, "separator"),
+                isSeparator: true,
+            });
             continue;
         }
 
