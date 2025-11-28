@@ -1019,7 +1019,7 @@ vec4 render(in vec3 rayOrigin, in vec3 rayDir)
         // col = pow(col, vec3(2.8));
         specularCoeff = 0.12;
 
-        if (drawGridOnFloor) {
+        if (drawGridOnFloor && isFloor) {
             col *= 0.3 + 0.7 * vec3(gridPattern(rayPos.xz, 0.5));
         }
     } else if (res.material == MATERIAL_ARROW) {
@@ -1313,16 +1313,14 @@ void main()
     // dann können wir im Nachgang den Hintergrund reinmischen, s.u. (==>)
     fragColor = c.yyyy;
 
-    // Fixed Cam Origin:
+    // Ohne Kamera-Pfad-Optionen: erstmal fester Ursprung und Richtung.
+    // -> hier über Uniforms modifizierbar, um Flexibilität zu zeigen.
     cam.origin = vec3(-0.75, 1.5, 3.);
-    // mit fester Blick_richtung_ (im Gegensatz zu festem Blick-Zielpunkt)
-    // (je nachdem eben, ob relativ zu Kameraposition oder unabhängig)
-    cam.target = cam.origin - vec3(1.2, -1.2, -3.5);
+    cam.target = cam.origin + vec3(0.4, -0.33, -1);
     float camRoll = 0.;
 
+    // Demonstration: Automatisierte Pfade per Spline-Interpolation ablaufen
     calcApproxCamPathLength();
-
-    // Demonstration: Automatisierten Pfad ablaufen (per Spline-Interpolation)
     if (doUseCameraPath) {
         vec3 pathPos = getPathPosition(iPathOffset + iPathSpeed * iTime);
         cam.origin = pathPos.xyz;
