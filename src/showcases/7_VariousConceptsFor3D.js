@@ -100,7 +100,7 @@ function render(gl, state) {
     gl.uniform1f(state.location.iNoiseFreq, state.iNoiseFreq);
     gl.uniform1f(state.location.iNoiseOffset, state.iNoiseOffset);
     gl.uniform1i(state.location.iFractionalOctaves, Math.floor(state.iFractionalOctaves));
-    gl.uniform1f(state.location.iFractionalScale, state.iFractionalScale);
+    gl.uniform1f(state.location.iFractionalScaling, state.iFractionalScaling);
     gl.uniform1f(state.location.iFractionalDecay, state.iFractionalDecay);
     gl.uniform1i(state.location.useNormalizedFBM, state.useNormalizedFBM);
     gl.uniform1f(state.location.iCylinderRotateYSpeed, state.iCylinderRotateYSpeed);
@@ -437,6 +437,12 @@ function defineUniformControlsBelow() {
         min: 1,
         max: 20.,
         step: 1,
+    }, {
+        type: "float",
+        name: "iFractionalScaling",
+        defaultValue: 2.,
+        min: 1.,
+        max: 4.,
     }, {
         type: "float",
         name: "iFractionalDecay",

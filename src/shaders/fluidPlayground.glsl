@@ -33,12 +33,19 @@ uniform float iVelocityDissipation;
 uniform float iMaxInitialVelocity;
 uniform float iCurlStrength;
 uniform float iSpawnSeed;
+uniform vec3 iSpawnColorHSV;
+uniform float iSpawnHueGradient;
+
 // for debugging:
 uniform int doRenderVelocity;
 
 // for post processing
 uniform float iSunraysWeight;
 uniform float iSunraysIterations;
+uniform float iSunraysDensity;
+uniform float iSunraysDecay;
+uniform float iSunraysExposure;
+uniform float iGamma;
 
 // for smoe other day
 uniform float iNoiseFreq;
@@ -584,6 +591,13 @@ vec3 blendColors(vec3 colA, vec3 colB, float alpha, float gamma) {
     return pow(blend, vec3(1./gamma));
 }
 
+vec3 hsv2rgb(vec3 hsvColor) {
+    hsvColor.x /= 360.;
+    const vec4 K = vec4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
+    vec3 p = abs(fract(hsvColor.xxx + K.xyz) * 6.0 - K.www);
+    return hsvColor.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), hsvColor.y);
+}
+
 const mat3 rgb2yiq = mat3(
     0.299,  0.5959,  0.2215,
     0.587, -0.2746, -0.5227,
@@ -697,12 +711,9 @@ vec4 simulateAdvection(sampler2D fieldTexture, float dissipationFactor) {
 }
 
 float calcSunrays() {
-    const float density = 0.3;
-    const float decay = 0.95;
-    const float exposure = 0.2;
     vec2 stCursor = st;
     vec2 cursorDir = st - 0.5;
-    cursorDir *= 1. / iSunraysIterations * density;
+    cursorDir *= 1. / iSunraysIterations * iSunraysDensity;
     float illumination = 1.;
     // now this is a "red only" texture, i.e. let's call it "value" instead of "color":
     float value = previous.a;
@@ -710,9 +721,9 @@ float calcSunrays() {
         stCursor -= cursorDir;
         float cursorVal = texture(texPrevious, stCursor).a;
         value += cursorVal * illumination * iSunraysWeight;
-        illumination *= decay;
+        illumination *= iSunraysDecay;
     }
-    value *= exposure;
+    value *= iSunraysExposure;
     return value;
 }
 
@@ -779,10 +790,12 @@ void main() {
             uv = uv - spawnCenter;
             d = sdCircle(uv, spawnSize);
             float a = smoothstep(0.02, 0., d) * exp(-dot(uv, uv) / spawnSize);
-            vec4 spawn = a * c.yyxx;
-            spawn.r += pow(-min(0., d), 0.5) * 1.6;
+            vec3 spawnColor = iSpawnColorHSV;
+            spawnColor.x += pow(-min(0., d), 0.5) * iSpawnHueGradient;
+            vec3 spawn = a * hsv2rgb(spawnColor);
+            // spawn.r += pow(-min(0., d), 0.5) * 1.6;
             // mix old stuff in:
-            fragColor = vec4(previous.rgb + spawn.rgb, 1.);
+            fragColor = vec4(previous.rgb + spawn, 1.);
             // just new stuff:
             // fragColor = vec4(spawn.rgb, 1.);
             return;
@@ -893,6 +906,8 @@ void main() {
             float sunrays = texture(texPostSunrays, st).r;
             fragColor.rgb *= sunrays;
             // fragColor.a = max3(fragColor.rgb);
+
+            fragColor.rgb = pow(fragColor.rgb, vec3(1./iGamma));
             fragColor.a = 1.;
             return;
         default:

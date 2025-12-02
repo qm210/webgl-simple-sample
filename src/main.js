@@ -10,7 +10,7 @@ const elements = initLayout("app");
 const glContext = setupWebGl(elements.canvas, {aspectRatio: 16 / 9});
 const state = prepareShowcase(showcase, glContext);
 
-console.info("WebGL objects initialized:", state, glContext);
+console.info("Shader compiled in", state.compiledMillis, "ms.", state, glContext);
 
 const controls = showcase.generateControls(glContext, state, elements);
 generatePage(glContext, elements, state, controls);

@@ -165,7 +165,7 @@ function render(gl, state) {
     gl.uniform1f(state.location.deltaTime, state.deltaTime);
     gl.uniform2fv(state.location.iResolution, state.resolution);
     gl.uniform2fv(state.location.texelSize, state.texelSize);
-    gl.uniform1i(state.location.iFrame, state.frameIndex);
+    gl.uniform1i(state.location.iFrame, state.iFrame);
 
     gl.uniform1f(state.location.iColorDissipation, state.iColorDissipation);
     gl.uniform1f(state.location.iVelocityDissipation, state.iVelocityDissipation);

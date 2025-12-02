@@ -57,19 +57,28 @@ uniform vec2 iResolution;
 uniform float iTime;
 uniform int iFrame;
 uniform int iPassIndex;
-uniform sampler2D iChannel0;
+uniform sampler2D iFirstPass;
 
-#define MAX_FLOAT 1e5
-#define MAX_RECURSION (6+min(0,iFrame))
+uniform float iMaxDistance; // war 1e5
+uniform int iMaxRecursion; // war 6
+uniform bool disableVariationWithTime;
+uniform bool disableVariationOverall;
+uniform bool disableAccumulation;
+uniform bool demonstrateMovement;
+uniform float nSmallSpheresX;
+uniform float nSmallSpheresZ;
+uniform float iDielectricEta; // war 1.5
+uniform float iDielectricRandomizeDir; // gab es nicht
+uniform float iMetalRandomizeDir; // war 0 -> perfekter Spiegel
+uniform vec3 colMetalReflectance; // war [1,1,1] -> keine Tönung
+uniform float iGamma;
 
 #define LAMBERTIAN 0
 #define METAL 1
 #define DIELECTRIC 2
 
-//
-// Hash functions by Nimitz:
-// https://www.shadertoy.com/view/Xt3cDn
-//
+// Beispiel Permutation-basierter Hashfunktionen, anders als bisher fract/sin/dot-basiert
+// siehe https://www.shadertoy.com/view/Xt3cDn by Nimitz
 
 uint base_hash(uvec2 p) {
     p = 1103515245U*((p >> 1U)^(p.yx));
@@ -201,6 +210,8 @@ out ray scattered) {
         } else {
             scattered = ray(rec.p, refracted);
         }
+        /// Eigene Erweiterung für trübes Glas o.Ä.
+        scattered.direction = normalize(scattered.direction + iDielectricRandomizeDir * random_in_unit_sphere(g_seed));
         return true;
     }
     return false;
@@ -284,16 +295,23 @@ const in float t_max, out hit_record rec) {
 
     if (hitable_hit(hitable(vec3(0,-1000,-1),1000.),r,t_min,rec.t,rec)) hit=true,rec.mat=material(LAMBERTIAN,vec3(.5),0.);
 
-    if (hitable_hit(hitable(vec3( 2,1,2),1.),r,t_min,rec.t,rec))        hit=true,rec.mat=material(DIELECTRIC,vec3(0.5,0.,0.),1.5);
-    if (hitable_hit(hitable(vec3(-4,1,0),1.),r,t_min,rec.t,rec))        hit=true,rec.mat=material(LAMBERTIAN,vec3(.4,.2,.1),0.);
-    if (hitable_hit(hitable(vec3( 4. + 1. * sin(0.1 * iTime),1.,-0.5),1.),r,t_min,rec.t,rec))   hit=true,rec.mat=material(METAL     ,vec3(1.,1.,1.),0.);
+    vec3 posLargeGlassSphere = vec3(2,1,2);
+    vec3 posLargeLambertSphere = vec3(-4,1,0);
+    vec3 posLargeMetalSphere = vec3(4.,1.,-0.5);
+    if (demonstrateMovement) {
+        posLargeGlassSphere.z -= 0.5 * sin(iTime);
+        posLargeMetalSphere.x += 0.7 * sin(0.66 * iTime);
+        posLargeLambertSphere.y += 0.2 * (1. - cos(1.33 * iTime));
+    }
+    if (hitable_hit(hitable(posLargeGlassSphere,1.),r,t_min,rec.t,rec))   hit=true,rec.mat=material(DIELECTRIC,vec3(0.5,0.,0.),iDielectricEta);
+    if (hitable_hit(hitable(posLargeLambertSphere,1.),r,t_min,rec.t,rec)) hit=true,rec.mat=material(LAMBERTIAN,vec3(.4,.2,.1),0.);
+    if (hitable_hit(hitable(posLargeMetalSphere,1.),r,t_min,rec.t,rec))   hit=true,rec.mat=material(METAL     ,colMetalReflectance,iMetalRandomizeDir);
 
-    int NO_UNROLL = min(0,iFrame);
-    for (int a = -11; a < 11+NO_UNROLL; a++) {
-        for (int b = -11; b < 11+NO_UNROLL; b++) {
-            float m_seed = float(a) + float(b)/1000.;
+    for (float a = -0.5 * nSmallSpheresX; a < 0.5 * nSmallSpheresX; a+= 1.) {
+        for (float b = -0.5 * nSmallSpheresZ; b < 0.5 * nSmallSpheresZ; b += 1.) {
+            float m_seed = a + b/1000.;
             vec3 rand1 = hash3(m_seed);
-            vec3 center = vec3(float(a)+.9*rand1.x,.2,float(b)+.9*rand1.y);
+            vec3 center = vec3(a+.9*rand1.x,.2,b+.9*rand1.y);
             float choose_mat = rand1.z;
 
             if (distance(center,vec3(4,.2,0)) > .9) {
@@ -321,8 +339,8 @@ vec3 color(in ray r) {
     vec3 col = vec3(1);
     hit_record rec;
 
-    for (int i=0; i<MAX_RECURSION; i++) {
-        if (world_hit(r, 0.001, MAX_FLOAT, rec)) {
+    for (int i=0; i<iMaxRecursion; i++) {
+        if (world_hit(r, 0.001, iMaxDistance, rec)) {
             ray scattered;
             vec3 attenuation;
             // Demo: mal durchprobieren (siehe Definitionen oben)
@@ -353,16 +371,20 @@ void main() {
     float frameScale = 1./float(iFrame + 1);
 
     vec2 st = gl_FragCoord.xy / iResolution.xy;
-    vec4 image = texture(iChannel0, st);
+    vec4 image = texture(iFirstPass, st);
     // Alternative - hat genau denselben Zweck, Hauptunterschied sind: Integerkoordinaten statt normiert.
     // vec4 image = texelFetch(iChannel0, ivec2(gl_FragCoord.xy), 0);
 
     // Seed für Pseudorandom -- überall wo das eingeht, wird stochastisch variiert.
     g_seed = float(base_hash(floatBitsToUint(gl_FragCoord.xy)))/float(0xffffffffU);
     // g_seed nicht nur pro Pixel, sondern auch pro Zeit / Frame variieren:
-    g_seed += iTime;
+    if (!disableVariationWithTime) {
+        g_seed += iTime;
+    }
     // Demo: Abschalten der stochastischen Variation:
-    // g_seed = 0.;
+    if (disableVariationOverall) {
+        g_seed = 0.;
+    }
 
     vec2 uv = (gl_FragCoord.xy + hash2(g_seed))/iResolution.xy;
     float aspect = iResolution.x/iResolution.y;
@@ -381,13 +403,15 @@ void main() {
         //    --> OBACHT: Damit das geht, muss die Textur im richtigen Format aufgesetzt sein. Das ist tricky!
         // 2) (nur für hübsch) Simples Color Grading. ( Quadratwurzel sqrt(...) == pow(..., 0.5) )
 
-        frag_color = vec4(sqrt(image.rgb / image.a), 1.);
+        frag_color.rgb = image.rgb / image.a;
+        frag_color.rgb = pow(frag_color.rgb, vec3(1./iGamma));
+        frag_color.a = 1.;
         return;
     }
 
     frag_color = vec4(col, 1);
 
-    if (iFrame > 0) {
+    if (iFrame > 0 && !disableAccumulation) {
 
         frag_color += image;
 

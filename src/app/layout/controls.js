@@ -312,6 +312,10 @@ export const asVecInput = (elements, state, control) => {
     if (control.sameStep) {
         control.step = toVec(control.dim, control.step);
     }
+    if (!(state[control.name] instanceof Array)) {
+        // fixes bad data from the Browser Storage
+        state[control.name] = toVec(control.dim, state[control.name]);
+    }
 
     const sliders = [];
     const elementsForComponent = [];
@@ -476,12 +480,10 @@ function updateVecLabel(labelElement, state, control) {
 }
 
 export const asBoolInput = (elements, state, control) => {
+    elements.control.type = "checkbox";
     if (control.group) {
-        elements.control.type = "radio";
         elements.control.name = control.group;
         elements.control.dataset.name = control.name;
-    } else {
-        elements.control.type = "checkbox";
     }
     elements.control.id = `check.${control.name}`;
     elements.description =
@@ -501,9 +503,11 @@ export const asBoolInput = (elements, state, control) => {
         update(event.target.checked);
     });
 
-    elements.reset.addEventListener("click", () => {
-        update(control.defaultValue);
-    });
+    if (elements.reset) {
+        elements.reset.addEventListener("click", () => {
+            update(control.defaultValue);
+        });
+    }
 
     return elements;
 
@@ -563,7 +567,7 @@ export function createResetAllButton(elements, state, controls) {
                 sessionStoreControlState(state, control);
             }
         }
-        initMouseState(state);
+        initMouseState(state, true);
         state.resetSignal = true;
         event.target.blur();
     });

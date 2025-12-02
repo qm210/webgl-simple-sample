@@ -53,7 +53,7 @@ export function addCanvasMouseInteraction(elements, state) {
 
 }
 
-export function initMouseState(state) {
+export function initMouseState(state, resetStored = false) {
     state.iMouse = [0, 0, 0, 0];
     state.iMouseDrag = [0, 0, 0, 0];
     state.iMouseWheel = 0;
@@ -65,6 +65,9 @@ export function initMouseState(state) {
             wheel: 0,
         }
     };
+    if (resetStored) {
+        storeMouseTotals(state);
+    }
 }
 
 function storeMouseTotals(state) {

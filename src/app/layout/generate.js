@@ -171,10 +171,10 @@ export const addControlsToPage = (elements, state, controls, autoRenderOnLoad) =
                 })
             continue;
         }
-        else if (control.type === "separator") {
+        else if (control.type === "separator" || control.separator) {
             addFreeRow({
                 parent: elements.controls,
-                content: createDiv(control.title, "separator"),
+                content: createDiv(control.separator ?? control.title, "separator"),
                 isSeparator: true,
             });
             continue;

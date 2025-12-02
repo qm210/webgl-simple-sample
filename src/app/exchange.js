@@ -10,7 +10,6 @@ const HEADER = {
 const uniformNameMap = {
     iTime: "time",
     iResolution: "resolution",
-    iFrame: "frameIndex"
 };
 
 function bundleUniforms(state) {

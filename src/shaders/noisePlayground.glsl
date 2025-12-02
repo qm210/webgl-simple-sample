@@ -53,7 +53,7 @@ vec2 hash22(vec2 p)
     // Manche sind auch auf bestimmte Anwendungsfälle optimiert,
     // d.h. man sucht sich in der Praxis eben eine - oder mehrere und vergleicht diese.
     p = p*mat2(127.1,311.7,269.5,183.3);
-    p = -1.0 + 2.0 * fract(sin(p + .01 * iOverallHashOffset)*43758.5453123);
+    p = -1.0 + 2.0 * fract(sin(p + .01 * iOverallHashOffset * length(p))*43758.5453123);
     return sin(twoPi * p + iOverallHashMorphing * iTime);
 }
 

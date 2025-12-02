@@ -118,7 +118,7 @@ function render(gl, state) {
 
     gl.uniform1f(state.location.iTime, state.time);
     gl.uniform2fv(state.location.iResolution, state.resolution);
-    gl.uniform1i(state.location.iFrame, state.frameIndex);
+    gl.uniform1i(state.location.iFrame, state.iFrame);
 
     gl.uniform1f(state.location.iResultMin, state.iResultMin);
     gl.uniform1f(state.location.iResultMax, state.iResultMax);

@@ -20,28 +20,16 @@ export default {
             return state;
         }
 
-        gl.disable(gl.BLEND);
-
         // TODO: Resizing the canvas DOES NOT scale the framebuffers / textures yet!! MUST DO
         const {width, height} = updateResolutionInState(state, gl);
         state.nPasses = 2;
 
-        state.framebuffer = [0, 1].map((index) =>
-            createFramebufferWithTexture(gl, {
-                // Diese Formate werden später wichtig, können hier aber auf dem Default bleiben:
-                // internalFormat: gl.RGBA,
-                // dataFormat: gl.RGBA,
-                // dataType: gl.UNSIGNED_BYTE,
-            }, index)
-        );
-        state.fbPingIndex = 0;
-        state.fbPongIndex = 1;
-
-        state.simFB = Object.fromEntries(
-            ["velocity", "divergence", "curl", "pressure"].map(key =>
-                [key, createFramebufferWithTexture]
-            )
-        )
+        state.framebuffer =
+            createPingPongFramebuffersWithTexture(gl, {
+                width,
+                height,
+                attachment: gl.COLOR_ATTACHMENT0,
+            });
 
         // for the second, i.e. app(location=1) out ... we need another texture PER FRAMEBUFFER.
         const extraData = {
@@ -64,7 +52,7 @@ export default {
         state.extraData = extraData;
         state.wantToReadExtraData = false;
 
-        state.framebuffer.forEach((fb, index) => {
+        state.framebuffer.fb.forEach((fb, index) => {
             fb.extraDataTexture = gl.createTexture();
             gl.bindTexture(gl.TEXTURE_2D, fb.extraDataTexture);
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
@@ -80,7 +68,7 @@ export default {
                 0,
                 extraData.dataFormat,
                 extraData.dataType,
-                index === state.fbPongIndex ? extraData.initialData : null,
+                index === state.framebuffer.pong() ? extraData.initialData : null,
                 // <-- need the data only in the first "read" buffer
             );
 
@@ -194,7 +182,7 @@ function render(gl, state) {
     gl.uniform2fv(state.location.texelSize, state.texelSize);
     gl.uniform1f(state.location.iTime, state.time);
     gl.uniform2fv(state.location.iResolution, state.resolution);
-    gl.uniform1i(state.location.iFrame, state.frameIndex);
+    gl.uniform1i(state.location.iFrame, state.iFrame);
 
     gl.uniform1f(state.location.iNoiseLevel, state.iNoiseLevel);
     gl.uniform1f(state.location.iNoiseFreq, state.iNoiseFreq);
@@ -208,20 +196,27 @@ function render(gl, state) {
     gl.uniform3fv(state.location.iFree1, state.iFree1);
     gl.uniform3fv(state.location.iFree2, state.iFree2);
 
+    gl.disable(gl.BLEND);
+
     let pass, write, read;
     for (pass = 0; pass < state.nPasses; pass++) {
 
-        write = state.framebuffer[state.fbPingIndex];
-        read = state.framebuffer[state.fbPongIndex];
+        // write = state.framebuffer[state.fbPingIndex];
+        // read = state.framebuffer[state.fbPongIndex];
+        [write, read] = state.framebuffer.currentWriteAndRead();
 
         // ... but the last pass needs to go to the screen (framebuffer == null)
         if (pass < state.nPasses - 1) {
-            [state.fbPingIndex, state.fbPongIndex] = [state.fbPongIndex, state.fbPingIndex];
+            // [state.fbPingIndex, state.fbPongIndex] = [state.fbPongIndex, state.fbPingIndex];
+            state.framebuffer.doPingPong();
             gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo);
             gl.drawBuffers(write.attachments);
         } else {
             // Note: will not render the extra output anymore, only fragColor!
             gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+
+            gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+            gl.enable(gl.BLEND);
         }
 
         // get the previously rendered image from the other buffer on its attachment
@@ -234,8 +229,8 @@ function render(gl, state) {
         gl.bindTexture(gl.TEXTURE_2D, read.extraDataTexture);
         gl.uniform1i(state.location.iPrevData, 1);
 
-        if (state.frameIndex < 3) {
-            console.log("[DEBUG]", state.frameIndex, pass, write, read, "bound", gl.getParameter(gl.FRAMEBUFFER_BINDING));
+        if (state.iFrame < 3) {
+            console.log("[DEBUG]", state.iFrame, pass, write, read, "bound", gl.getParameter(gl.FRAMEBUFFER_BINDING));
         }
 
         gl.uniform1i(state.location.iPassIndex, pass);

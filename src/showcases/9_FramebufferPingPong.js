@@ -2,7 +2,7 @@ import standardSetup from "./retired/old3_SimpleGeometry.js";
 import {startRenderLoop} from "../webgl/render.js";
 import {createFramebufferWithTexture, createTextureFromImage, takePingPongFramebuffers} from "../webgl/helpers.js";
 
-import fragmentShaderSource from "../shaders/spring-2025/framebufferPingPong.glsl";
+import fragmentShaderSource from "../shaders/framebufferPingPong.glsl";
 import someSampleImage from "../textures/mysterious_capybara.png";
 
 export default {
@@ -19,7 +19,8 @@ export default {
                 width: gl.drawingBufferWidth,
                 height: gl.drawingBufferHeight,
                 attachment: gl.COLOR_ATTACHMENT0,
-                // Diese Formate werden später wichtig, können hier aber auf dem Default bleiben:
+                /** Diese Formate sind wichtig, aber wir können hier aber auf dem Default bleiben,
+                  * weil die Framebuffer-Texturen auch einfach RGBA-Daten im Bereich [0..1] halten müssen. */
                 // internalFormat: gl.RGBA,
                 // dataFormat: gl.RGBA,
                 // dataType: gl.UNSIGNED_BYTE,
@@ -27,15 +28,16 @@ export default {
         );
 
         state.location.previousRender = gl.getUniformLocation(state.program, "iPreviousRender");
-        state.location.passIndex = gl.getUniformLocation(state.program, "iPassIndex");
+        state.location.iPassIndex = gl.getUniformLocation(state.program, "iPassIndex");
         state.location.iFrame = gl.getUniformLocation(state.program, "iFrame");
 
         // Hinweis: useProgram muss nur in der Renderschleife stehen, wenn es mehrere Shaderprogram gibt
-        //          Es ist aber effizienter, beim selben zu bleiben.
+        //          Es ist aber für uns einfacher, beim selben zu bleiben.
         //          -> mit uniform flags zwischen verschiedenem Verhalten umschalten
         //          -> bereits erwähnter Nachteil:
         //             kleine Änderungen in großen Shadern erfordern komplette Neukompilation
-        //          Probiert gerne mal den Unterschied aus, vielleicht merkt mans hier auch kaum.
+        //          -> Fallbezogen entscheiden, was besser ist
+        //             -- ihr könnt das als Übung hier mal in zwei Programme aufteilen und vergleichen.
         gl.useProgram(state.program);
 
         // Ein Bild als Textur laden, um schnell ein Beispiel als Renderziel zu haben
@@ -69,24 +71,26 @@ function render(gl, state) {
 
     gl.uniform1f(state.location.iTime, state.time);
     gl.uniform2fv(state.location.iResolution, state.resolution);
-    gl.uniform1i(state.location.iFrame, state.frameIndex);
+    gl.uniform1i(state.location.iFrame, state.iFrame);
 
     gl.activeTexture(gl.TEXTURE1);
     gl.bindTexture(gl.TEXTURE_2D, state.sampleTexture);
     gl.uniform1i(state.location.iSampleImage, 1);
 
-    const {write, read} = takePingPongFramebuffers(state);
+    // const {write, read} = takePingPongFramebuffers(state);
 
+    const write = state.framebuffer[state.iFrame % 2];
+    const read = state.framebuffer[1 - state.iFrame % 2];
+    
+    gl.uniform1i(state.location.iPassIndex, 0);
     gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo);
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, read.texture);
     gl.uniform1i(state.location.previousRender, 0);
-
-    gl.uniform1i(state.location.passIndex, 0);
     gl.drawArrays(gl.TRIANGLES, 0, 6);
 
+    gl.uniform1i(state.location.iPassIndex, 1);
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-    gl.uniform1i(state.location.passIndex, 1);
     gl.drawArrays(gl.TRIANGLES, 0, 6);
 
     /*

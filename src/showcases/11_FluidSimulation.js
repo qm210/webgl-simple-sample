@@ -113,6 +113,43 @@ export default {
             );
         },
         uniforms: [{
+            separator: "Spawn Colors & Velocity"
+        }, {
+            type: "vec3",
+            name: "iSpawnColorHSV",
+            defaultValue: [240, 1, 1],
+            min: [0, 0, 0],
+            max: [360, 1, 1],
+        }, {
+            type: "float",
+            name: "iSpawnHueGradient",
+            defaultValue: 100,
+            min: -999,
+            max: 999,
+            step: 1
+        }, {
+            type: "float",
+            name: "iMaxInitialVelocity",
+            defaultValue: 100,
+            min: -500,
+            max: 500,
+        }, {
+            type: "button",
+            name: "doRenderVelocity",
+            label: "Render Velocity instead of Image",
+            onClick: (button) => {
+                state.doRenderVelocity = (state.doRenderVelocity + 1) % 3;
+                button.textContent =
+                    state.doRenderVelocity === 1
+                        ? "Rendering: Velocity Texture (.rg)"
+                        : state.doRenderVelocity === 2
+                            ? "Rendering: Curl Texture (.r)"
+                            :"Rendering Image, click to debug other textures";
+                console.log(state);
+            }
+        }, {
+            separator: "Dissipation & Curl"
+        }, {
             type: "float",
             name: "iColorDissipation",
             defaultValue: 0.3,
@@ -126,43 +163,44 @@ export default {
             max: 2.,
         }, {
             type: "float",
-            name: "iMaxInitialVelocity",
-            defaultValue: 1,
-            min: -500,
-            max: 500,
-        }, {
-            type: "float",
             name: "iCurlStrength",
             defaultValue: 0,
             min: -0.5,
             max: 1.5,
         }, {
-            type: "button",
-            name: "doRenderVelocity",
-            label: "Render Velocity instead of Image",
-            onClick: (button) => {
-                state.doRenderVelocity = (state.doRenderVelocity + 1) % 3;
-                button.textContent =
-                    state.doRenderVelocity === 1
-                        ? "Rendering: Velocity Texture (.rg)"
-                        : state.doRenderVelocity === 2
-                        ? "Rendering: Curl Texture (.r)"
-                        :"Rendering Image, click to debug other textures";
-                console.log(state);
-            }
+            separator: "Sunrays-Effekt"
         }, {
             type: "float",
             name: "iSunraysWeight",
             defaultValue: 1.,
-            min: 0.,
-            max: 20.,
+            min: 0,
+            max: 20,
         }, {
             type: "float",
+            name: "iSunraysDensity",
+            defaultValue: 0.3,
+            min: 0,
+            max: 10,
+        }, {
+            type: "float",
+            name: "iSunraysDecay",
+            defaultValue: 0.95,
+            min: 0,
+            max: 1,
+        }, {
+            type: "float",
+            name: "iSunraysExposure",
+            defaultValue: 0.5,
+            min: 0,
+            max: 2,
+        }, {
+            type: "int",
             name: "iSunraysIterations",
             defaultValue: 5,
             min: 1,
             max: 30,
-            step: 1,
+        }, {
+            separator: "Pseudo-Random - Allgemeine Parameter"
         }, {
             type: "float",
             name: "iNoiseLevel",
@@ -213,6 +251,14 @@ export default {
             min: -2.,
             max: 2,
         }, {
+            separator: "Noch allgemeiner..."
+        }, {
+            type: "float",
+            name: "iGamma",
+            defaultValue: 2.2,
+            min: 0.01,
+            max: 10.,
+        }, {
             type: "vec3",
             name: "iFree0",
             defaultValue: [0, 0, 0],
@@ -259,14 +305,19 @@ function render(gl, state) {
     gl.uniform1f(state.location.iTime, state.time);
     gl.uniform1f(state.location.deltaTime, state.deltaTime);
     gl.uniform2fv(state.location.iResolution, state.resolution);
-    gl.uniform1i(state.location.iFrame, state.frameIndex);
-
+    gl.uniform1i(state.location.iFrame, state.iFrame);
+    gl.uniform1f(state.location.iGamma, state.iGamma);
+    gl.uniform3fv(state.location.iSpawnColorHSV, state.iSpawnColorHSV);
+    gl.uniform1f(state.location.iSpawnHueGradient, state.iSpawnHueGradient);
     gl.uniform1f(state.location.iColorDissipation, state.iColorDissipation);
     gl.uniform1f(state.location.iVelocityDissipation, state.iVelocityDissipation);
     gl.uniform1f(state.location.iMaxInitialVelocity, state.iMaxInitialVelocity);
     gl.uniform1f(state.location.iCurlStrength, state.iCurlStrength);
     gl.uniform1i(state.location.doRenderVelocity, state.doRenderVelocity);
     gl.uniform1f(state.location.iSunraysWeight, state.iSunraysWeight);
+    gl.uniform1f(state.location.iSunraysDensity, state.iSunraysDensity);
+    gl.uniform1f(state.location.iSunraysDecay, state.iSunraysDecay);
+    gl.uniform1f(state.location.iSunraysExposure, state.iSunraysExposure);
     gl.uniform1f(state.location.iSunraysIterations, state.iSunraysIterations);
 
     gl.uniform1f(state.location.iNoiseLevel, state.iNoiseLevel);

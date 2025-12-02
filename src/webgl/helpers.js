@@ -1,7 +1,3 @@
-// we'll get to that, but let's not use these for less confusion
-// even though, of course, we all love clean glslCode.
-
-
 export function createShader(gl, type, source) {
     let shader = gl.createShader(type);
     let error = "";
@@ -16,6 +12,10 @@ export function createShader(gl, type, source) {
     }
 
     return {shader, error};
+}
+
+export function takeMilliSeconds(since = 0) {
+    return +(performance.now() - since).toFixed(3);
 }
 
 /**
@@ -301,7 +301,7 @@ export function takePingPongFramebuffers(state) {
     // "ping": write fbo 0, read texture 1
     // "pong": write fbo 1, read texture 0
     // etc.
-    const pingIndex = state.frameIndex % 2;
+    const pingIndex = state.iFrame % 2;
     const pongIndex = 1 - pingIndex;
     return {
         write: state.framebuffer[pingIndex],

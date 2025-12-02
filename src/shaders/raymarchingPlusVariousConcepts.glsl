@@ -46,6 +46,7 @@ uniform float iNoiseLevel;
 uniform float iNoiseFreq;
 uniform float iNoiseOffset;
 uniform int iFractionalOctaves;
+uniform float iFractionalScaling;
 uniform float iFractionalDecay;
 // toggle options
 uniform bool doShowPointLightSource;
@@ -188,12 +189,11 @@ mat3 rotAround(vec3 axis, float angle) {
 mat3 rotTowards(vec3 original, vec3 target) {
     // Vorgehen, um allgemein eine Matrix für die Rotation original -> target zu bekommen:
     float cosine = dot(original, target);
-    if (abs(cosine) == 1.) {
-        // Vektoren parallel?
-        // -> cross() wird 0 sein, aber Resultat ist dann eh nur ein Faktor:
+    vec3 axis = cross(original, target);
+    if (axis == c.yyy) {
+        // Kreuzprodukt 0 bei parallelen Vektoren
         return mat3(cosine);
     }
-    vec3 axis = cross(original, target);
     float theta = acos(cosine);
     return rotAround(axis, -theta);
 }
@@ -207,10 +207,16 @@ mat2 rot2D(float angle) {
     );
 }
 
+/// Pseudozufall-Generatoren nach Art "Hash" und Angabe der Dimensionalität:
+/// hash11 -> float in, float out; hash22 -> vec2 in, vec2 out; etc.
+float hash11( float n )
+{
+    return fract( n*17.0*fract( n*0.3183099 ) );
+}
+
 vec2 hash22(vec2 p) {
-    // this is a pseudorandom generator with 2d input -> 2d output
     float n = sin(dot(p, vec2(127.1, 311.7))) * 43758.5453;
-    // custom phase shift just to have more variation, is not commonly used
+    // custom phase shift just to have more variation, is not part of the actual hash
     n += iNoiseOffset;
     return fract(vec2(n, n * 1.2154));
 }
@@ -260,24 +266,25 @@ float perlin2D(vec2 p)
     return ym;
 }
 
-float fractalBrownianMotion(vec2 p, bool normalize) {
+float fractalBrownianMotion(vec2 p) {
     float v = 0.;
     float a = 1.;
     float s = 0.;
-    const float iFractionalScale = 2.;
     // Gewöhnliche Parameter:
     // iFractionalOctaves ~ 3-6
+    // iFractionalScaling = 2;
     // iFractionalDecay = 0.5;
-    // <-- heißt auch oft "lacunarity" bei Fraktalen...
-    // ihr könnt auch iFractionalScale mal durchvariieren (z.B. mal 3.)
-    // aber da sind viele Werte nicht zu viel zu gebrauchen.
+    // Anmerkungen:
+    // - iFractionalScaling wird manchmal jede Oktave leicht variiert, um auffällige "Gitter" zu vermeiden
+    // - wenn bei sowas irgendwo der Begriff "Lacunarity" auftaucht, meint das das, was hier "Decay" heißt
+    //   (der Faktor an die Amplitude pro Iteration, bei anderen Fraktalen ist das wörtlich eine "Löchrigkeit")
     for (int i = ZERO; i < iFractionalOctaves; i++) {
         v += a * perlin2D(p);
         s += a;
-        p = p * iFractionalScale;
+        p = p * iFractionalScaling;
         a *= iFractionalDecay;
     }
-    return normalize ? (v / s) : v;
+    return useNormalizedFBM ? (v / s) : v;
 }
 
 float gridPattern(vec2 p, float gridStep) {
@@ -517,9 +524,9 @@ Hit texturedSdCylinder(vec3 p, vec2 h) {
 
 float sdNoiseMountains(vec3 p) {
     float height = max(0., length(p.xz) - 3.);
-    // <-- -3. damit mittlere Arena ungestört bleibt
-    height *= height * 0.2;
-    height *= iNoiseLevel * (1. + fractalBrownianMotion(iNoiseFreq * p.xz, useNormalizedFBM));
+    // <-- -3. damit mittlere Arena ungestört bleibt, außerdem quadratisches Wachstum:
+    height *= 0.2 * height;
+    height *= iNoiseLevel * (1. + fractalBrownianMotion(iNoiseFreq * p.xz));
     return p.y - height;
 }
 

@@ -1,6 +1,7 @@
 import {startRenderLoop} from "../webgl/render.js";
 import {initBasicState} from "./common.js";
-import fragmentShaderSource from "../shaders/raytracingFirstSteps.glsl";
+import fragmentShaderSource from "../shaders/raytracingWithMultipass.glsl";
+import {createFramebufferWithTexture, updateResolutionInState} from "../webgl/helpers.js";
 
 export default {
     title: "Ray Tracing: First Steps",
@@ -16,6 +17,19 @@ export default {
         // innerhalb initBasicState() abgehandelt, war auf Dauer zuviel zu duplizieren.
         // Hier kommt also noch, was wir darüber hinaus initialisieren müssen (Texturen, Framebuffer, Sonstiges)
 
+        const {width, height} = updateResolutionInState(state, gl);
+        state.framebuffer = createFramebufferWithTexture(gl, {
+            width,
+            height,
+            attachment: gl.COLOR_ATTACHMENT0,
+            wrapS: gl.CLAMP_TO_EDGE,
+            wrapT: gl.CLAMP_TO_EDGE,
+            minFilter: gl.LINEAR,
+            magFilter: gl.LINEAR,
+            internalFormat: gl.RGBA32F,
+            dataFormat: gl.RGBA,
+            dataType: gl.FLOAT,
+        });
         state.modeDebugRendering = 0;
 
         return state;
@@ -71,12 +85,6 @@ export default {
             defaultValue: 21,
             min: 0.01,
             max: 100.,
-        }, {
-            type: "float",
-            name: "iHalfwaySpecularMixing",
-            defaultValue: 0,
-            min: 0.,
-            max: 1.,
         }, {
             type: "float",
             name: "iShadowSharpness",
@@ -214,21 +222,68 @@ export default {
             name: "iFractionalOctaves",
             defaultValue: 1,
             min: 1,
-            max: 20.,
+            max: 10.,
             step: 1,
         }, {
             type: "float",
-            name: "iFractionalScale",
+            name: "iFractionalScaling",
             defaultValue: 2.,
-            min: 0.01,
-            max: 10.,
-            hidden: true, // wenig lehrreich, den zu ändern
+            min: 1.,
+            max: 4.,
         }, {
             type: "float",
             name: "iFractionalDecay",
             defaultValue: 0.5,
             min: 0.01,
             max: 2.,
+        }, {
+            type: "bool",
+            name: "useNormalizedFBM",
+            defaultValue: false,
+        }, {
+            type: "separator",
+            title: "Post-Processing: Tiefenunschärfe (Depth of Field)"
+        }, {
+            type: "float",
+            name: "iDofFocusDistance",
+            defaultValue: 4.6,
+            min: 0,
+            max: 10,
+        }, {
+            type: "float",
+            name: "iDofWidth",
+            defaultValue: 0.5,
+            min: 0.1,
+            max: 3,
+        }, {
+            type: "float",
+            name: "iDofMaxBlur",
+            defaultValue: 0.,
+            min: 0,
+            max: 10,
+        }, {
+            type: "float",
+            name: "iDofThreshold",
+            defaultValue: 1,
+            min: 0,
+            max: 10,
+        }, {
+            type: "bool",
+            name: "makeDarkInsteadOfBlur",
+            defaultValue: false,
+            description: ""
+        }, {
+            type: "separator",
+            title: "Post-Processing: Chromatische Farbabweichung"
+        }, {
+            type: "vec2",
+            name: "iChromaticAbberation",
+            defaultValue: [0, 0],
+            min: -5,
+            max: 5,
+        }, {
+            type: "separator",
+            title: "Zur freien Verwendung..."
         }, {
             type: "float",
             name: "iFree0",
@@ -280,7 +335,6 @@ function render(gl, state) {
     gl.uniform1f(state.location.iDiffuseAmount, state.iDiffuseAmount);
     gl.uniform1f(state.location.iSpecularAmount, state.iSpecularAmount);
     gl.uniform1f(state.location.iSpecularExponent, state.iSpecularExponent);
-    gl.uniform1f(state.location.iHalfwaySpecularMixing, state.iHalfwaySpecularMixing);
     gl.uniform1f(state.location.iShadowSharpness, state.iShadowSharpness);
     gl.uniform1f(state.location.iBacklightAmount, state.iBacklightAmount);
     gl.uniform3fv(state.location.vecSkyColor, state.vecSkyColor);
@@ -296,8 +350,15 @@ function render(gl, state) {
     gl.uniform1f(state.location.iNoiseFreq, state.iNoiseFreq);
     gl.uniform1f(state.location.iNoiseOffset, state.iNoiseOffset);
     gl.uniform1i(state.location.iFractionalOctaves, state.iFractionalOctaves);
-    gl.uniform1f(state.location.iFractionalScale, state.iFractionalScale);
+    gl.uniform1f(state.location.iFractionalScaling, state.iFractionalScaling);
     gl.uniform1f(state.location.iFractionalDecay, state.iFractionalDecay);
+    gl.uniform1i(state.location.useNormalizedFBM, state.useNormalizedFBM);
+    gl.uniform1f(state.location.iDofFocusDistance, state.iDofFocusDistance);
+    gl.uniform1f(state.location.iDofWidth, state.iDofWidth);
+    gl.uniform1f(state.location.iDofMaxBlur, state.iDofMaxBlur)
+    gl.uniform1f(state.location.iDofThreshold, state.iDofThreshold)
+    gl.uniform1i(state.location.makeDarkInsteadOfBlur, state.makeDarkInsteadOfBlur);
+    gl.uniform2fv(state.location.iChromaticAbberation, state.iChromaticAbberation)
     gl.uniform1i(state.location.modeDebugRendering, state.modeDebugRendering);
     gl.uniform1f(state.location.iFree0, state.iFree0);
     gl.uniform1f(state.location.iFree1, state.iFree1);
@@ -305,5 +366,24 @@ function render(gl, state) {
     gl.uniform1f(state.location.iFree3, state.iFree3);
     gl.uniform1f(state.location.iFree4, state.iFree4);
 
+    // Weil es hier nur eine einzelne Textur gibt, können wir die Zuordnung der Textur-Unit
+    // hier schon machen, anstatt inmitten der Framebuffer-/Render-Aufrufen weiter unten.
+    gl.activeTexture(gl.TEXTURE0);
+    gl.uniform1i(state.location.texFirstPass, 0);
+
+    // Für Depth-of-Field-Post-Processing brauchen wir kein Framebuffer-Ping-Pong,
+    // der erste Pass berechnet immer das Bild von Grund auf,
+    // Für den DOF-Effekt wird nur der Alpha-Kanal zweckentfremdet, um den Abstand zu speichern.
+    gl.uniform1i(state.location.iPassIndex, 0);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, state.framebuffer.fbo);
+    gl.bindTexture(gl.TEXTURE_2D, null);
+    gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+    // Im zweiten Pass wird dann die erste Textur anhand des mitgelieferten Abstands an
+    // verschiedenen Stellen ausgewertet und damit verwaschen (Blur),
+    // und auf dem Bildschirm (Framebuffer 0) angezeigt:
+    gl.uniform1i(state.location.iPassIndex, 1);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.bindTexture(gl.TEXTURE_2D, state.framebuffer.texture);
     gl.drawArrays(gl.TRIANGLES, 0, 6);
 }

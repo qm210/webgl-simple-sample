@@ -19,7 +19,7 @@ export function startRenderLoop(renderFunction, state, elements) {
     state.startTime = null;
     state.timeRunning = true;
     state.deltaTime = 0;
-    state.frameIndex = -1;
+    state.iFrame = -1;
     state.resetSignal = false;
     state.stopSignal = false;
     state.stopReached = false;
@@ -58,7 +58,7 @@ function runLoop(renderFunction, state, elements, timestamp) {
         const previousTime = state.time;
         state.time = 0.001 * (timestamp - state.startTime);
         state.deltaTime = previousTime ? (state.time - previousTime) : 0;
-        state.frameIndex = state.frameIndex + 1;
+        state.iFrame = state.iFrame + 1;
         doFpsMeasurement(state);
     }
 
@@ -94,7 +94,7 @@ export function shiftTime(state, seconds) {
 export function resetLoop(state) {
     state.startTime = null;
     state.time = 0;
-    state.frameIndex = -1;
+    state.iFrame = -1;
     state.timeRunning = true;
     state.resetSignal = false;
     state.stopSignal = false;
@@ -138,11 +138,11 @@ function doFpsMeasurement(state) {
     // direct rate
     if (fpsMeter.direct.lastTime !== null) {
         fpsMeter.direct.fps =
-            (state.frameIndex - fpsMeter.direct.lastFrame)
+            (state.iFrame - fpsMeter.direct.lastFrame)
             / (state.time - fpsMeter.direct.lastTime);
     }
     fpsMeter.direct.lastTime = state.time;
-    fpsMeter.direct.lastFrame = state.frameIndex;
+    fpsMeter.direct.lastFrame = state.iFrame;
 
     state.fps = 0;
     let weight = 0;

@@ -70,7 +70,7 @@ export default {
                     "Accumulate: " + (state.accumulate ? "On" : "Off"),
                 onClick: () => {
                     clearFramebuffers(gl, state);
-                    state.frameIndex = 0;
+                    state.iFrame = 0;
                     state.toggleDebugOption(0);
                     state.accumulate = state.hasDebugOption(0);
                 }
@@ -260,7 +260,7 @@ let write, read;
 
 function render(gl, state) {
     gl.uniform1f(state.location.iTime, state.time);
-    gl.uniform1i(state.location.iFrame, state.frameIndex);
+    gl.uniform1i(state.location.iFrame, state.iFrame);
     gl.uniform2fv(state.location.iResolution, state.resolution);
     gl.uniform4fv(state.location.iMouse, state.iMouse);
     gl.uniform4fv(state.location.iMouseDrag, state.iMouseDrag);

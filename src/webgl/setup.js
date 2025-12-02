@@ -1,4 +1,4 @@
-import {createShader, initialOrStoredResolution, storeResolution} from "./helpers.js";
+import {createShader, initialOrStoredResolution, storeResolution, takeMilliSeconds} from "./helpers.js";
 import {maybeAdjustForCompatibility} from "./compatibility.js";
 import {loadExtensions} from "./extensions.js";
 
@@ -84,7 +84,7 @@ function createInitialState(sources) {
         activeUniforms: [],
         location: {},
         framebuffer: [],
-        createdAt: performance.now(),
+        createdAt: takeMilliSeconds(),
     };
 }
 
@@ -118,8 +118,7 @@ export function compile(gl, sources) {
         return result;
     }
     result.program = program;
-    result.compiledMillis = performance.now() - result.createdAt;
-    console.info("Shader Program Compiled in", +result.compiledMillis.toFixed(3), "ms");
+    result.compiledMillis = takeMilliSeconds(result.createdAt);
 
     collectActiveUniforms(gl, result);
     return result;
