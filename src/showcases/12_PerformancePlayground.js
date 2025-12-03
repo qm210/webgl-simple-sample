@@ -19,11 +19,6 @@ export default {
             console.error("For querying, we need the \"EXT_disjoint_timer_query_webgl2\" WebGL2 extension.");
         }
 
-        const a = gl.getParameter(gl.MAX_COMBINED_FRAGMENT_UNIFORM_COMPONENTS);
-        const b = gl.getParameter(gl.MAX_UNIFORM_BLOCK_SIZE);
-        const c = gl.getParameter(gl.MAX_FRAGMENT_UNIFORM_COMPONENTS);
-        console.log(a,b,c);
-
         state.framebuffer = [0, 1].map(() =>
             createFramebufferWithTexture(gl, {
                 width: gl.drawingBufferWidth,
