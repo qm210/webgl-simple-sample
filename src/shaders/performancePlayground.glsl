@@ -402,6 +402,11 @@ float fbmB2A2(vec3 p, int maxOctave)
 
 /////////
 
+float sin_approx(float x) {
+    x = mod(x + 1., 2.) - 1.;
+    return x * (1. - abs(x));
+}
+
 mat3 rotAround(vec3 axis, float angle) {
     // Für allgemeine Drehmatrizen:
     // https://en.wikipedia.org/wiki/Rodrigues%27_rotation_formula
@@ -481,9 +486,16 @@ Marched map( in vec3 pos, bool modified)
             floorY + 0.7,
             (z + shiftZ)/spacing
         );
-        center.y -= 0.2 * cos(iTime + rand1.y * 6.28);
-        center.x += 0.03 * sin(rand1.x * iTime);
-        center.z += 0.03 * sin(rand1.z * iTime);
+//        if (modified) {
+//            center.y -= 0.2 * sin_approx(iTime + rand1.y * 6.28 + 1.57);
+//            center.x += 0.03 * sin_approx(rand1.x * iTime);
+//            center.z += 0.03 * sin_approx(rand1.z * iTime);
+//        } else
+        {
+            center.y -= 0.2 * cos(iTime + rand1.y * 6.28);
+            center.x += 0.03 * sin(rand1.x * iTime);
+            center.z += 0.03 * sin(rand1.z * iTime);
+        }
 
         res = opUnion(
             res,
@@ -676,7 +688,7 @@ void main() {
             return;
         }
         if (onlyPassA && !onlyPassB) {
-            fragColor.rgb = texture(textureB, st).rgb;
+            fragColor.rgb = texture(textureA, st).rgb;
             return;
         }
 
