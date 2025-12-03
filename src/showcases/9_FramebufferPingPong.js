@@ -77,11 +77,8 @@ function render(gl, state) {
     gl.bindTexture(gl.TEXTURE_2D, state.sampleTexture);
     gl.uniform1i(state.location.iSampleImage, 1);
 
-    // const {write, read} = takePingPongFramebuffers(state);
+    const {write, read} = takePingPongFramebuffers(state);
 
-    const write = state.framebuffer[state.iFrame % 2];
-    const read = state.framebuffer[1 - state.iFrame % 2];
-    
     gl.uniform1i(state.location.iPassIndex, 0);
     gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo);
     gl.activeTexture(gl.TEXTURE0);

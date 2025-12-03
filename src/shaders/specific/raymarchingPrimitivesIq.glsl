@@ -537,7 +537,7 @@ vec3 render( in vec3 ro, in vec3 rd, in vec3 rdx, in vec3 rdy )
     // background
     vec3 col = vec3(0.7, 0.7, 0.9) - max(rd.y,0.0)*0.3;
 
-    // raycast scene
+    // raymarch scene
     vec2 res = raycast(ro,rd);
     float t = res.x;
     float m = res.y;

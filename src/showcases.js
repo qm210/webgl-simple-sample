@@ -23,7 +23,7 @@ import showcaseOld11 from "./showcases/retired/old11_Volumetric.js";
 import showcaseX from "./showcases/X_SimulationPlayground.js";
 import showcaseZClouds from "./showcases/Z_NR4_Clouds.js";
 
-const defaultShowcase = showcase10;
+const defaultShowcase = showcase12;
 
 const MAP_PATH = {
     // Zum Anfang ein sehr, sehr langweiliger Anfang.

@@ -2,13 +2,9 @@
 precision mediump float;
 out vec4 fragColor;
 uniform vec2 iResolution;
-uniform vec4 iMouseDrag;
 uniform float iTime;
 uniform int iFrame;
 uniform int iPassIndex;
-uniform bool onlyPassA;
-uniform bool onlyPassB;
-
 uniform int iQueryRepetitions;
 uniform float iCutoffMin;
 uniform float iCutoffMax;
@@ -20,18 +16,6 @@ uniform float iStepLength;
 uniform float iNoiseScale;
 uniform sampler2D textureA;
 uniform sampler2D textureB;
-
-uniform float nObjectsProDim;
-
-uniform float iFree0;
-uniform float iFree1;
-uniform float iFree2;
-uniform float iFree3;
-uniform float iFree4;
-uniform float iFree5;
-uniform vec3 vecFree0;
-uniform vec3 vecFree1;
-uniform vec3 vecFree2;
 
 const vec3 c = vec3(1, 0, -1);
 
@@ -137,11 +121,6 @@ vec3 hash33(vec3 p3) {
 //        dot(p3, vec3(0.5773503, 0.7071067, 0.7071067))
 //    ));
 //}
-vec3 hash33_pcg(vec3 p) {
-    p = fract(p * vec3(0.1031, 0.1030, 0.0973));
-    p += dot(p, p.zyx + 33.33);
-    return fract((p.xxy + p.yzz) * p.zyx);  // Slightly cheaper swizzles, maybe?
-}
 
 //const float F3 =  0.3333333;
 //const float G3 =  0.1666667;
@@ -187,10 +166,6 @@ float lfnoise3(vec3 p) {
     d.y = dot(hash33(s + i1) - .5, x1);
     d.z = dot(hash33(s + i2) - .5, x2);
     d.w = dot(hash33(s + 1.) - .5, x3);
-
-    // Note: in Theory, we could try to Unroll + Reuse Registers
-    // Or to use a PCG Style Hash?
-    // -> TODO unfinished
 
     /* multiply d by w^4 */
     w *= w;
@@ -397,253 +372,6 @@ float fbmB2A2(vec3 p, int maxOctave)
     return f;
 }
 
-/////////
-
-mat3 rotAround(vec3 axis, float angle) {
-    // Für allgemeine Drehmatrizen:
-    // https://en.wikipedia.org/wiki/Rodrigues%27_rotation_formula
-    vec3 v = normalize(axis);
-    mat3 skewSym = mat3(
-    0, v.z, -v.y,
-    -v.z, 0, v.x,
-    v.y, -v.x, 0
-    );
-    // Diese Schiefsymmetrische Matrix bewirkt das Kreuzprodukt:
-    // skewSym(v1) * v2 == cross(v1, v2)
-    float c = cos(angle);
-    float s = sin(angle);
-    return mat3(1.) + s * skewSym + (1. - c) * skewSym * skewSym;
-    // Andere Schreibweise mit GLSL-eingebautem outerProduct:
-    // return mat3(c) + s * skewSym + (1. - c) * outerProduct(v, v);
-    // -> outerProduct() = 1 + skewSym²
-}
-
-float sdSphere( vec3 p, float s )
-{
-    return length(p)-s;
-}
-
-float sdBox( vec3 p, vec3 b )
-{
-    vec3 d = abs(p) - b;
-    return min(max(d.x,max(d.y,d.z)),0.0) + length(max(d,0.0));
-}
-
-vec2 iBox( in vec3 ro, in vec3 rd, in vec3 rad )
-{
-    vec3 m = 1.0/rd;
-    vec3 n = m*ro;
-    vec3 k = abs(m)*rad;
-    vec3 t1 = -n - k;
-    vec3 t2 = -n + k;
-    return vec2( max( max( t1.x, t1.y ), t1.z ),
-    min( min( t2.x, t2.y ), t2.z ) );
-}
-
-struct Marched {
-    float distance; // <-- das heißt wirklich oft einfach nur "t". Wir machen es _hier_mal_explizit_.
-    int material;
-    float paletteColor;
-};
-
-#define OBJECT_MATERIAL 1
-#define FLOOR_MATERIAL 0
-#define NO_MATERIAL -1
-
-Marched opUnion(Marched res1, float distance2, int material2, float color2)
-{
-    if (res1.distance < distance2) {
-        return res1;
-    }
-    return Marched(distance2, material2, color2);
-}
-
-Marched map( in vec3 pos, bool modified)
-{
-    Marched res = Marched(pos.y, FLOOR_MATERIAL, 0.);
-
-    float nObjectsX = nObjectsProDim;
-    float nObjectsZ = nObjectsProDim;
-    float shiftX = -0.5 * nObjectsX;
-    float shiftZ = -0.5 * nObjectsZ;
-    float spacing = 1.9;
-
-    for (float z = 0.; z < nObjectsZ; z+=1.)
-    for (float x = 0.; x < nObjectsX; x+=1.)
-    {
-        vec3 rand1 = hash31(1. + x/100. + z/10.);
-        vec3 center = vec3(
-            (x + shiftX)/spacing,
-            0.7,
-            (z + shiftZ)/spacing
-        );
-        center.y -= 0.2 * cos(iTime + rand1.y * 6.28);
-        center.x += 0.03 * sin(rand1.x * iTime);
-        center.z += 0.03 * sin(rand1.z * iTime);
-
-        res = opUnion(
-            res,
-            sdSphere(pos - center, 0.15),
-            OBJECT_MATERIAL,
-            4. + x + 8. * z
-        );
-        // Das Folgende Demonstriert Branch-Divergenz ganz gut:
-        // für nObjectsProDim = 11 führt allein die Präsenz dieser Abbruchbedingung
-        // zu einem Drop von 40 -> 20 FPS (auf meinem Laptop)
-        if (res.distance < 0.001) {
-            break;
-        }
-    }
-    return res;
-}
-
-vec3 calcNormal( in vec3 pos, bool modified)
-{
-    vec2 e = vec2(1.0,-1.0)*0.5773*0.0005;
-    return normalize( e.xyy*map( pos + e.xyy, modified ).distance +
-    e.yyx*map( pos + e.yyx, modified).distance +
-    e.yxy*map( pos + e.yxy, modified ).distance +
-    e.xxx*map( pos + e.xxx, modified ).distance );
-}
-
-float calcSoftshadow( in vec3 ro, in vec3 rd, bool modified)
-{
-    const float mint = 0.2;
-    float tmax = 2.5;
-
-    // bounding volume
-    float tp = (0.8-ro.y)/rd.y;
-    if( tp>0.0 ) tmax = min( tmax, tp );
-
-    float res = 1.0;
-    float t = mint;
-    /// Beispiel Vergleichs-Modifikation... hier ist vielleicht was zu holen?
-    int nShadowMarchingSteps = modified ? 70 : 70;
-    for (int i=0; i < nShadowMarchingSteps; i++)
-    {
-        float h = map(ro + rd*t, modified).distance;
-        float s = clamp(8. * h/t, 0.0, 1.0);
-        res = min( res, s );
-        t += clamp( h, 0.01, 0.2 );
-        if( res<0.004 || t>tmax ) break;
-    }
-    /// Beispiel Vergleichs-Modifikation (die aber wenig Unterschied macht)
-    if (modified) {
-        res = clamp( res, 0.0, 1.0 );
-        return res*res*(3.0-2.0*res);
-    } else {
-        return smoothstep(0., 1., res);
-    }
-}
-
-vec3 renderSampleRaymarching(vec2 uv, bool modified) {
-    // Idee: mit if(modified) { ...optimieren versuchen... }
-    vec2 pan = iMouseDrag.xy / iResolution.x;
-
-    vec3 rayOrigin = vec3(3.5, 1.7 + 10. * pan.y, -2.6) + vecFree0;
-    vec3 camTarget = vec3(-1.2, 0.7 - pan.y, 0.55) + vecFree1;
-    vec3 camForward = normalize(camTarget - rayOrigin);
-    vec3 camRight = normalize(cross(camForward, c.yxy));
-    vec3 camUp = cross(camRight, camForward);
-    mat3 extraYaw = rotAround(camUp, pan.x);
-    mat3 camMatrix = extraYaw * mat3(camRight, camUp, camForward);
-    vec3 rayDir = camMatrix * normalize(vec3(uv, 2.5));
-
-    // raymarch scene
-    Marched res = Marched(-1.0, NO_MATERIAL, -1.0);
-
-    float tmin = 1.0;
-    float tmax = 20.0;
-
-    // raytrace floor plane
-    float tp1 = (0.0-rayOrigin.y)/rayDir.y;
-    if (tp1>0.0)
-    {
-        tmax = min( tmax, tp1 );
-        res = Marched(tp1, FLOOR_MATERIAL, .0);
-    }
-    vec2 tb = iBox( rayOrigin-vec3(-2.0,0.4,-1.5), rayDir, vec3(4.,2.,3.0) );
-    if( tb.x<tb.y && tb.y>0.0 && tb.x<tmax)
-    {
-        tmin = max(tb.x,tmin);
-        tmax = min(tb.y,tmax);
-
-        float t = tmin;
-        /// Beispiel Vergleichs-Modifikation: ist 70 einfach unnötig viel?
-        int nMarchingSteps = modified ? 70 : 70;
-        for( int i=0; i<nMarchingSteps && t<tmax; i++ )
-        {
-            vec3 pos = rayOrigin + rayDir * t;
-            Marched h = map(pos, modified);
-
-            // Möglicher Vergleich: Verschiedene Maximaldistanzen
-            // Oder auch adaptive Abbruchbedingung "< 0.0001 * t"?
-            // -> Ergebnis vs. Rechenaufwand vergleichen...
-            if (abs(h.distance) < 0.001)
-            {
-                res = Marched(t, h.material, h.paletteColor);
-                break;
-            }
-            t += h.distance;
-        }
-    }
-    vec3 col;
-    if (res.material != NO_MATERIAL) {
-        vec3 rayPos = rayOrigin + res.distance * rayDir;
-        vec3 normal = res.material == FLOOR_MATERIAL ? vec3(0.0, 1.0, 0.0) : calcNormal(rayPos, modified);
-
-        col = 0.2 + 0.2*sin(res.paletteColor*2.0 + vec3(0.0, 1.0, 2.0));
-        float specularCoeff = 0.4 + 0.5 *exp(0.03 * res.paletteColor);
-
-        if (res.material == FLOOR_MATERIAL)
-        {
-            float f = 1. - abs(step(0.5, fract(1.5*rayPos.x)) - step(0.5, fract(1.5*rayPos.z)));
-            col = 0.15 + f*vec3(0.25);
-            specularCoeff = 0.1;
-        }
-
-        vec3 shade = vec3(0.0);
-        bool useBlinnPhongSpecular = false; // <-- Ein Fall für "modified"?
-        float specularExponent = 2.4;
-        // Licht: reines Richtungslicht (passt zu einer Sonne, die weit weg ist, im Gegensatz zu Punktlicht)
-        {
-            vec3  lightDirection = normalize(vec3(1., 2., -.1));
-            float diffuse = clamp(dot(normal, lightDirection), 0.0, 1.0);
-            diffuse *= calcSoftshadow(rayPos, lightDirection, modified);
-
-            float specular, shininess;
-            if (useBlinnPhongSpecular) {
-                vec3 halfway = normalize(lightDirection - rayDir);
-                specular = dot(normal, halfway);
-                shininess = specularExponent * 3.;
-            } else {
-                vec3 reflected = reflect(lightDirection, normal);
-                specular = dot(rayDir, reflected);
-                    shininess = specularExponent;
-            }
-            specular = pow(clamp(specular, 0.0, 1.0), shininess);
-
-            const vec3 sourceCol = vec3(1.30, 1.00, 0.70);
-            shade += col * 0.8 * sourceCol * diffuse;
-            shade +=       1.3 * sourceCol * specular * specularCoeff;
-        }
-
-        col = shade;
-    } else {
-        res.distance = 1.e5;
-    }
-
-    // "Distanznebel", inwiefern macht dieser Begriff Sinn?
-    vec3 colFog = vec3(fbmB(rayDir));
-    float fogOpacity = 1.0 - exp( -0.0001 * pow(res.distance, 3.0));
-    col = mix(col, colFog, fogOpacity);
-
-    col = clamp(col, 0.0, 1.0);
-    col = pow(col, vec3(1./1.7));
-
-    return col;
-}
-
 ////////////////////////////////////////////////////////////////////////
 
 void toFragColor(vec3 result) {
@@ -664,19 +392,8 @@ void main() {
     vec2 uv = (2.0 * gl_FragCoord.xy - iResolution.xy) / iResolution.y;
 
     if (iPassIndex == -1) {
+        // Compare both queried passes left and right
         vec2 st = gl_FragCoord.xy / iResolution.xy;
-        fragColor.a = 1.;
-
-        if (onlyPassB && !onlyPassA) {
-            fragColor.rgb = texture(textureB, st).rgb;
-            return;
-        }
-        if (onlyPassA && !onlyPassB) {
-            fragColor.rgb = texture(textureB, st).rgb;
-            return;
-        }
-
-        // Both Passes Queried? Compare A left and B right
         if (uv.x < -0.01) {
             st.x += 0.25;
             fragColor.rgb = texture(textureA, st).rgb;
@@ -686,6 +403,7 @@ void main() {
         } else {
             discard;
         }
+        fragColor.a = 1.;
         return;
     }
 
@@ -697,9 +415,7 @@ void main() {
     ray /= iScale;
 
     for (int i = ZERO; i < iQueryRepetitions; i++) {
-        toFragColor(renderSampleRaymarching(uv, !passA));
-
-        //        toFragColor(passA ? doDivision(uv) : doMultiply(uv));
+//        toFragColor(passA ? doDivision(uv) : doMultiply(uv));
 //        toFragColor(passA ? inbuiltReflect(uv) : customReflect(uv));
 //        toFragColor(passA ? useBranching(uv) : useNoBranching(uv));
 //        toFragColor(passA ? inbuiltSmoothstep(uv) : splineSmoothstep(uv));
@@ -730,7 +446,7 @@ void main() {
 //        toFragColor(passA ? fbmB2A2(ray, 10) : fbmB2(ray, 10));
 //        toFragColor(passA ? fbmA2B3(ray, 6) : fbmA(ray, 6));
 //
-        // toFragColor(passA ? mfnoise3(ray) : xt95mfnoise3(ray));
+        toFragColor(passA ? mfnoise3(ray) : xt95mfnoise3(ray));
 
         // More Stuff to investigate:
         // - using c.xyz instead of vec3(...) calls

@@ -258,7 +258,7 @@ vec3 render(in vec3 rayOrigin, in vec3 rayDir)
     vec3 bgCol = vec3(1.0, 0.808, 0.945) - max(rayDir.y,0.0)*0.3;
     vec3 col = bgCol;
 
-    // raycast scene
+    // raymarch scene
     Marched res = raycast(rayOrigin,rayDir);
     vec3 rayPos = rayOrigin + res.t * rayDir;
 

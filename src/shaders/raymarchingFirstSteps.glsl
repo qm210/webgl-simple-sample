@@ -442,7 +442,6 @@ Marched opUnion( Marched d1, Marched d2 )
 
 Marched map( in vec3 pos )
 {
-    // Notiz:
     Marched res = Marched(pos.y, 0.0);
 
     if (showJustASphere) {
@@ -503,7 +502,7 @@ vec2 iBox( in vec3 ro, in vec3 rd, in vec3 rad )
     min( min( t2.x, t2.y ), t2.z ) );
 }
 
-Marched raycast( in vec3 ro, in vec3 rd )
+Marched raymarch( in vec3 ro, in vec3 rd )
 {
     Marched res = Marched(-1.0,-1.0);
 
@@ -609,8 +608,8 @@ vec3 render(in vec3 rayOrigin, in vec3 rayDir)
     // background
     vec3 col = vec3(0.0, 0., 0.0) - max(rayDir.y,0.0)*0.3;
 
-    // raycast scene
-    Marched res = raycast(rayOrigin,rayDir);
+    // raymarch scene
+    Marched res = raymarch(rayOrigin,rayDir);
     if( res.material > -0.5 )
     {
         bool isFloor = res.material < 1.5;

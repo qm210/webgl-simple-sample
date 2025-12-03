@@ -19,6 +19,11 @@ export default {
             console.error("For querying, we need the \"EXT_disjoint_timer_query_webgl2\" WebGL2 extension.");
         }
 
+        const a = gl.getParameter(gl.MAX_COMBINED_FRAGMENT_UNIFORM_COMPONENTS);
+        const b = gl.getParameter(gl.MAX_UNIFORM_BLOCK_SIZE);
+        const c = gl.getParameter(gl.MAX_FRAGMENT_UNIFORM_COMPONENTS);
+        console.log(a,b,c);
+
         state.framebuffer = [0, 1].map(() =>
             createFramebufferWithTexture(gl, {
                 width: gl.drawingBufferWidth,
@@ -63,6 +68,18 @@ export default {
             max: 100_000,
             log: true
         }, {
+            type: "bool",
+            name: "onlyPassA",
+            defaultValue: false,
+            description: "Nur Fall \"A\" berechnen",
+            group: "onePass"
+        }, {
+            type: "bool",
+            name: "onlyPassB",
+            defaultValue: false,
+            description: "Nur Fall \"B\" berechnen",
+            group: "onePass"
+        }, {
             type: "float",
             name: "iResultMin",
             defaultValue: 0,
@@ -102,12 +119,76 @@ export default {
             min: 1,
             max: 999,
         }, {
+            separator: "Szene vereinfachen / erschweren..."
+        }, {
+            type: "int",
+            name: "nObjectsProDim",
+            defaultValue: 4,
+            min: 1,
+            max: 20,
+        }, {
+            separator: "Zur freien Verwendung..."
+        }, {
             type: "float",
-            name: "iShenanigans",
+            name: "iNoiseScale",
             defaultValue: 1,
             min: 0.1,
             max: 30,
             step: 0.01,
+        }, {
+            type: "float",
+            name: "iFree0",
+            defaultValue: 0,
+            min: -9.99,
+            max: +9.99,
+        }, {
+            type: "float",
+            name: "iFree1",
+            defaultValue: 0,
+            min: -9.99,
+            max: +9.99,
+        }, {
+            type: "float",
+            name: "iFree2",
+            defaultValue: 0,
+            min: -9.99,
+            max: +9.99,
+        }, {
+            type: "float",
+            name: "iFree3",
+            defaultValue: 0,
+            min: -9.99,
+            max: +9.99,
+        }, {
+            type: "float",
+            name: "iFree4",
+            defaultValue: 0,
+            min: -9.99,
+            max: +9.99,
+        }, {
+            type: "float",
+            name: "iFree5",
+            defaultValue: 0,
+            min: -9.99,
+            max: +9.99,
+        } , {
+            type: "vec3",
+            name: "vecFree0",
+            defaultValue: [0, 0, 0],
+            min: -9.99,
+            max: +9.99,
+        }, {
+            type: "vec3",
+            name: "vecFree1",
+            defaultValue: [0, 0, 0],
+            min: -9.99,
+            max: +9.99,
+        }, {
+            type: "vec3",
+            name: "vecFree2",
+            defaultValue: [0, 0, 0],
+            min: -9.99,
+            max: +9.99,
         }]
     })
 };
@@ -118,7 +199,10 @@ function render(gl, state) {
 
     gl.uniform1f(state.location.iTime, state.time);
     gl.uniform2fv(state.location.iResolution, state.resolution);
+    gl.uniform4fv(state.location.iMouseDrag, state.iMouseDrag);
     gl.uniform1i(state.location.iFrame, state.iFrame);
+
+    gl.uniform1f(state.location.nObjectsProDim, state.nObjectsProDim);
 
     gl.uniform1f(state.location.iResultMin, state.iResultMin);
     gl.uniform1f(state.location.iResultMax, state.iResultMax);
@@ -127,9 +211,28 @@ function render(gl, state) {
     gl.uniform1f(state.location.iScale, state.iScale);
     gl.uniform1f(state.location.iStepLength, state.iStepLength);
     gl.uniform1i(state.location.iStepIterations, state.iStepIterations);
-    gl.uniform1f(state.location.iShenanigans, state.iShenanigans);
+    gl.uniform1f(state.location.iNoiseScale, state.iNoiseScale);
+
+    gl.uniform1f(state.location.iFree0, state.iFree0);
+    gl.uniform1f(state.location.iFree1, state.iFree1);
+    gl.uniform1f(state.location.iFree2, state.iFree2);
+    gl.uniform1f(state.location.iFree3, state.iFree3);
+    gl.uniform1f(state.location.iFree4, state.iFree4);
+    gl.uniform1f(state.location.iFree5, state.iFree5);
+    gl.uniform3fv(state.location.vecFree0, state.vecFree0);
+    gl.uniform3fv(state.location.vecFree1, state.vecFree1);
+    gl.uniform3fv(state.location.vecFree2, state.vecFree2);
+    gl.uniform1i(state.location.onlyPassA, state.onlyPassA);
+    gl.uniform1i(state.location.onlyPassB, state.onlyPassB);
 
     state.framebuffer.forEach((fb, index) => {
+        if (state.onlyPassB && index === 0) {
+            return;
+        }
+        if (state.onlyPassA && index === 1) {
+            return;
+        }
+
         gl.bindFramebuffer(gl.FRAMEBUFFER, fb.fbo);
         gl.activeTexture(gl.TEXTURE0 + index);
         gl.bindTexture(gl.TEXTURE_2D, null);
@@ -168,7 +271,7 @@ function checkQueries(gl, state) {
         state.query.obj.map((query, index) =>
             evaluateQuery(query, gl)
                 .then(time => {
-                    console.log("Query Pass", index, "took", time / state.iQueryRepetitions, "ns per repetition");
+                    console.log("Query Pass", index, "took", time / state.iQueryRepetitions / 1e6, "ms per repetition");
                     return time;
                 })
         )
