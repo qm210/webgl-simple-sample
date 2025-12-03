@@ -486,6 +486,8 @@ Marched map( in vec3 pos, bool modified)
             floorY + 0.7,
             (z + shiftZ)/spacing
         );
+        // Lässt sich... sin() vereinfachen, wenn er nur aus optischen Gründen
+        // gewählt wird? Versuche z.B. sin_approx() von oben
 //        if (modified) {
 //            center.y -= 0.2 * sin_approx(iTime + rand1.y * 6.28 + 1.57);
 //            center.x += 0.03 * sin_approx(rand1.x * iTime);
@@ -496,6 +498,10 @@ Marched map( in vec3 pos, bool modified)
             center.x += 0.03 * sin(rand1.x * iTime);
             center.z += 0.03 * sin(rand1.z * iTime);
         }
+
+        // Interessante Frage (habs nicht ausprobiert):
+        // Können hier sinnvolle Bounding Boxes gewählt werden
+        // oder laufen wir damit erstmal nur in die Branching-Falle?
 
         res = opUnion(
             res,

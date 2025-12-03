@@ -43,7 +43,7 @@ export default {
     generateControls: (gl, state, elements) => ({
         onRender: () => {
             startRenderLoop(
-                state => render(gl, state),
+                state => render(gl, state, elements),
                 state,
                 elements
             );
@@ -208,7 +208,7 @@ export default {
     })
 };
 
-function render(gl, state) {
+function render(gl, state, elements) {
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.bindTexture(gl.TEXTURE_2D, null);
 
@@ -275,10 +275,10 @@ function render(gl, state) {
     gl.uniform1i(state.location.iPassIndex, -1);
     gl.drawArrays(gl.TRIANGLES, 0, 6);
 
-    checkQueries(gl, state);
+    checkQueries(gl, state, elements);
 }
 
-function checkQueries(gl, state) {
+function checkQueries(gl, state, elements) {
     if (!state.query.doExecute) {
         return;
     }
@@ -289,11 +289,19 @@ function checkQueries(gl, state) {
             evaluateQuery(query, gl)
                 .then(time => {
                     console.log("Query Pass", index, "took", time / state.iQueryRepetitions / 1e6, "ms per repetition");
-                    return time;
+                    return time / state.iQueryRepetitions;
                 })
         )
     ).then(time => {
-        console.log("Query Pass 0 over 1 Ratio:", time[0] / time[1]);
+        const ratio = time[0] / time[1];
+        elements.controlButtons.executeQueries.innerHTML = `
+            <div class="readout-stats">
+                <div>Queried Rendering Times</div>
+                <div>Pass A: ${(time[0] / 1e6).toFixed(6)} ms</div>
+                <div>Pass B: ${(time[1] / 1e6).toFixed(6)} ms</div>
+                <div>Ratio A/B = ${(ratio*100).toFixed(3)} %</div>
+            </div>`;
+        console.log("Query Pass 0 over 1 Ratio:", ratio);
     });
 }
 
