@@ -17,7 +17,10 @@ uniform float iResultMax;
 uniform float iScale;
 uniform int iStepIterations;
 uniform float iStepLength;
+uniform float iNoiseLevel;
+uniform float iNoiseFreq;
 uniform float iNoiseScale;
+uniform int iNoiseOctaves;
 uniform sampler2D textureA;
 uniform sampler2D textureB;
 
@@ -241,7 +244,7 @@ vec3 hash31(float p)
 
 float fbmA(vec3 p, int maxOctave) {
     const float iCloudSeed = 11.07;
-    vec3 q = p + 1.e4*hash31(iCloudSeed);// + iTime * 0.5 * vec3(1.0, -0.2, -1.0);
+    vec3 q = p + 1.e4 * hash31(iCloudSeed);// + iTime * 0.5 * vec3(1.0, -0.2, -1.0);
     // float g = noise(q);
 
     float f = 0.0;
@@ -460,7 +463,8 @@ Marched opUnion(Marched res1, float distance2, int material2, float color2)
 
 Marched map( in vec3 pos, bool modified)
 {
-    Marched res = Marched(pos.y, FLOOR_MATERIAL, 0.);
+    float floorY = max(0., iNoiseLevel * fbmA(pos * iNoiseFreq, iNoiseOctaves));
+    Marched res = Marched(pos.y - floorY, FLOOR_MATERIAL, 0.);
 
     float nObjectsX = nObjectsProDim;
     float nObjectsZ = nObjectsProDim;
@@ -474,7 +478,7 @@ Marched map( in vec3 pos, bool modified)
         vec3 rand1 = hash31(1. + x/100. + z/10.);
         vec3 center = vec3(
             (x + shiftX)/spacing,
-            0.7,
+            floorY + 0.7,
             (z + shiftZ)/spacing
         );
         center.y -= 0.2 * cos(iTime + rand1.y * 6.28);
@@ -540,8 +544,8 @@ vec3 renderSampleRaymarching(vec2 uv, bool modified) {
     // Idee: mit if(modified) { ...optimieren versuchen... }
     vec2 pan = iMouseDrag.xy / iResolution.x;
 
-    vec3 rayOrigin = vec3(3.5, 1.7 + 10. * pan.y, -2.6) + vecFree0;
-    vec3 camTarget = vec3(-1.2, 0.7 - pan.y, 0.55) + vecFree1;
+    vec3 rayOrigin = vec3(3.5, 1.7 + 10. * pan.y, -2.6);
+    vec3 camTarget = vec3(-1.2, 0.7 - pan.y, 0.55);
     vec3 camForward = normalize(camTarget - rayOrigin);
     vec3 camRight = normalize(cross(camForward, c.yxy));
     vec3 camUp = cross(camRight, camForward);

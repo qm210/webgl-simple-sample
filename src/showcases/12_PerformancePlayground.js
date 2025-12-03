@@ -122,7 +122,25 @@ export default {
             min: 1,
             max: 20,
         }, {
-            separator: "Zur freien Verwendung..."
+            type: "float",
+            name: "iNoiseLevel",
+            defaultValue: 0,
+            min: 0.,
+            max: 2,
+            step: 0.01,
+        }, {
+            type: "float",
+            name: "iNoiseFreq",
+            defaultValue: 1,
+            min: 0.1,
+            max: 10,
+            step: 0.01,
+        }, {
+            type: "int",
+            name: "iNoiseOctaves",
+            defaultValue: 3,
+            min: 1,
+            max: 10,
         }, {
             type: "float",
             name: "iNoiseScale",
@@ -130,6 +148,8 @@ export default {
             min: 0.1,
             max: 30,
             step: 0.01,
+        }, {
+            separator: "Zur freien Verwendung..."
         }, {
             type: "float",
             name: "iFree0",
@@ -197,8 +217,9 @@ function render(gl, state) {
     gl.uniform4fv(state.location.iMouseDrag, state.iMouseDrag);
     gl.uniform1i(state.location.iFrame, state.iFrame);
 
+    gl.uniform1i(state.location.onlyPassA, state.onlyPassA);
+    gl.uniform1i(state.location.onlyPassB, state.onlyPassB);
     gl.uniform1f(state.location.nObjectsProDim, state.nObjectsProDim);
-
     gl.uniform1f(state.location.iResultMin, state.iResultMin);
     gl.uniform1f(state.location.iResultMax, state.iResultMax);
     gl.uniform1f(state.location.iCutoffMin, state.iCutoffMin);
@@ -207,6 +228,9 @@ function render(gl, state) {
     gl.uniform1f(state.location.iStepLength, state.iStepLength);
     gl.uniform1i(state.location.iStepIterations, state.iStepIterations);
     gl.uniform1f(state.location.iNoiseScale, state.iNoiseScale);
+    gl.uniform1f(state.location.iNoiseLevel, state.iNoiseLevel);
+    gl.uniform1f(state.location.iNoiseFreq, state.iNoiseFreq);
+    gl.uniform1i(state.location.iNoiseOctaves, state.iNoiseOctaves);
 
     gl.uniform1f(state.location.iFree0, state.iFree0);
     gl.uniform1f(state.location.iFree1, state.iFree1);
@@ -217,8 +241,6 @@ function render(gl, state) {
     gl.uniform3fv(state.location.vecFree0, state.vecFree0);
     gl.uniform3fv(state.location.vecFree1, state.vecFree1);
     gl.uniform3fv(state.location.vecFree2, state.vecFree2);
-    gl.uniform1i(state.location.onlyPassA, state.onlyPassA);
-    gl.uniform1i(state.location.onlyPassB, state.onlyPassB);
 
     state.framebuffer.forEach((fb, index) => {
         if (state.onlyPassB && index === 0) {
@@ -272,7 +294,7 @@ function checkQueries(gl, state) {
         )
     ).then(time => {
         console.log("Query Pass 0 over 1 Ratio:", time[0] / time[1]);
-    })
+    });
 }
 
 async function evaluateQuery(query, gl) {
