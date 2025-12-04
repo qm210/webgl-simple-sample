@@ -20,6 +20,8 @@ uniform float iStepLength;
 uniform float iNoiseLevel;
 uniform float iNoiseFreq;
 uniform float iNoiseScale;
+uniform int nShadowMarchingSteps;
+uniform int nMarchingSteps;
 uniform int iNoiseOctaves;
 uniform sampler2D textureA;
 uniform sampler2D textureB;
@@ -540,7 +542,7 @@ float calcSoftshadow( in vec3 ro, in vec3 rd, bool modified)
     float res = 1.0;
     float t = mint;
     /// Beispiel Vergleichs-Modifikation... hier ist vielleicht was zu holen?
-    int nShadowMarchingSteps = modified ? 70 : 70;
+    // int nShadowMarchingSteps = modified ? 70 : 70;
     for (int i=0; i < nShadowMarchingSteps; i++)
     {
         float h = map(ro + rd*t, modified).distance;
@@ -592,8 +594,8 @@ vec3 renderSampleRaymarching(vec2 uv, bool modified) {
 
         float t = tmin;
         /// Beispiel Vergleichs-Modifikation: ist 70 einfach unnötig viel?
-        int nMarchingSteps = modified ? 70 : 70;
-        for( int i=0; i<nMarchingSteps && t<tmax; i++ )
+        // int nMarchingSteps = modified ? 70 : 70;
+        for( int i=0; i < nMarchingSteps && t<tmax; i++ )
         {
             vec3 pos = rayOrigin + rayDir * t;
             Marched h = map(pos, modified);
@@ -601,7 +603,11 @@ vec3 renderSampleRaymarching(vec2 uv, bool modified) {
             // Möglicher Vergleich: Verschiedene Maximaldistanzen
             // Oder auch adaptive Abbruchbedingung "< 0.0001 * t"?
             // -> Ergebnis vs. Rechenaufwand vergleichen...
-            if (abs(h.distance) < 0.001)
+            bool isClose = modified
+                ? (abs(h.distance) < 0.0001 * t)
+                : (abs(h.distance) < 0.001);
+            if (isClose)
+            // if (abs(h.distance) < 0.001)
             {
                 res = Marched(t, h.material, h.paletteColor);
                 break;
@@ -657,6 +663,11 @@ vec3 renderSampleRaymarching(vec2 uv, bool modified) {
 
     // "Distanznebel", inwiefern macht dieser Begriff Sinn?
     vec3 colFog = vec3(fbmB(rayDir));
+    if (mod(gl_FragCoord.x, 3.) <= 1.) {
+        colFog.r = pow(colFog.r, 1./colFog.g);
+    } else {
+        colFog.g += 0.2 * sin(colFog.b);
+    }
     float fogOpacity = 1.0 - exp( -0.0001 * pow(res.distance, 3.0));
     col = mix(col, colFog, fogOpacity);
 
@@ -720,6 +731,14 @@ void main() {
 
     for (int i = ZERO; i < iQueryRepetitions; i++) {
         toFragColor(renderSampleRaymarching(uv, !passA));
+/*
+        if (passA) {
+            toFragColor(doDivision(uv));
+        } else {
+            toFragColor(doMultiply(uv));
+        }
+        */
+
 
         //        toFragColor(passA ? doDivision(uv) : doMultiply(uv));
 //        toFragColor(passA ? inbuiltReflect(uv) : customReflect(uv));

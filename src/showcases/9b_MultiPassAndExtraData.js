@@ -203,7 +203,7 @@ function render(gl, state) {
 
         // write = state.framebuffer[state.fbPingIndex];
         // read = state.framebuffer[state.fbPongIndex];
-        [write, read] = state.framebuffer.currentWriteAndRead();
+        [write, read] = state.framebuffer.currentWriteReadOrder();
 
         // ... but the last pass needs to go to the screen (framebuffer == null)
         if (pass < state.nPasses - 1) {

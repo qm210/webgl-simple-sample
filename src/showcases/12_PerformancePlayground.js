@@ -75,6 +75,22 @@ export default {
             description: "Nur Fall \"B\" berechnen",
             group: "onePass"
         }, {
+            type: "int",
+            name: "nMarchingSteps",
+            defaultValue: 70,
+            min: 1,
+            max: 100,
+        }, {
+            type: "int",
+            name: "nShadowMarchingSteps",
+            defaultValue: 50,
+            min: 1,
+            max: 100,
+        }, {
+            type: "float",
+            name: "iResultMin",
+            defaultValue: 0,
+        }, {
             type: "float",
             name: "iResultMin",
             defaultValue: 0,
@@ -231,6 +247,8 @@ function render(gl, state, elements) {
     gl.uniform1f(state.location.iNoiseLevel, state.iNoiseLevel);
     gl.uniform1f(state.location.iNoiseFreq, state.iNoiseFreq);
     gl.uniform1i(state.location.iNoiseOctaves, state.iNoiseOctaves);
+    gl.uniform1i(state.location.nMarchingSteps, state.nMarchingSteps);
+    gl.uniform1i(state.location.nShadowMarchingSteps, state.nShadowMarchingSteps);
 
     gl.uniform1f(state.location.iFree0, state.iFree0);
     gl.uniform1f(state.location.iFree1, state.iFree1);

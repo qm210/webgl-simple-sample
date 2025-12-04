@@ -22,8 +22,11 @@ uniform int iPassIndex;
 uniform sampler2D texPrevious;
 uniform sampler2D texVelocity;
 uniform sampler2D texCurl;
+uniform sampler2D texPressure;
+uniform sampler2D texDivergence;
 uniform sampler2D texPostSunrays;
-uniform sampler2D texPostBloom; // not implemented yet
+uniform sampler2D texPostBloom;
+uniform sampler2D texPostBloomDither;
 
 // for fluid dynamics
 uniform vec2 texelSize;
@@ -32,20 +35,32 @@ uniform float iColorDissipation;
 uniform float iVelocityDissipation;
 uniform float iMaxInitialVelocity;
 uniform float iCurlStrength;
+uniform float iPressure;
+uniform int pressureIterations;
+
+// for new böbbels
 uniform float iSpawnSeed;
+uniform float iSpawnAge;
 uniform vec3 iSpawnColorHSV;
 uniform float iSpawnHueGradient;
+uniform float iSpawnRandomizeHue;
 
-// for debugging:
-uniform int doRenderVelocity;
+uniform int doDebugRender;
 
 // for post processing
+uniform float iBloomIntensity;
+uniform float iBloomThreshold;
+uniform float iBloomSoftKnee;
+uniform vec2 iBloomDitherScale;
 uniform float iSunraysWeight;
 uniform float iSunraysIterations;
 uniform float iSunraysDensity;
 uniform float iSunraysDecay;
 uniform float iSunraysExposure;
 uniform float iGamma;
+uniform float iVignetteInner;
+uniform float iVignetteOuter;
+uniform float iVignetteScale;
 
 // for smoe other day
 uniform float iNoiseFreq;
@@ -734,10 +749,48 @@ vec4 blur() {
     return sum;
 }
 
+vec3 cmap_dream210(float t) {
+    return vec3(0.19, 0.24, 0.40)
+    +t*(vec3(3.42, -1.41, 4.13)
+    +t*(vec3(-21.95, 22.09, -7.62)
+    +t*(vec3(66.28, -51.41, -6.87)
+    +t*(vec3(-80.01, 41.55, 23.40)
+    +t*(vec3(33.21, -11.33, -11.18)
+    +t*(vec3(-0.94, 0.52, -1.86)
+    ))))));
+}
+
+// This is where I got creative with the name..!
+void postprocessing(inout vec3 col, in vec2 uv) {
+    col = cmap_dream210(clamp(max3(col), 0., 1.));
+    col = pow(col, vec3(1./iGamma));
+
+    float vignetteShade = dot(st - 0.5, st - 0.5) * iVignetteScale;
+    col *= smoothstep(iVignetteInner, iVignetteOuter, vignetteShade);
+}
+
+vec4 linearValue(sampler2D tex, float scaling) {
+    float red = texture(tex, st).r * scaling;
+    return vec4(
+        max(0., red),
+        -min(0., red),
+        abs(red) > 1.,
+        1.
+    );
+}
+
 #define INIT_VELOCITY_PASS 0
 #define INIT_IMAGE_PASS 1
-#define PROCESS_VELOCITY_PASS(x) (10+x)
+#define INIT_PRESSURE_PASS 2
+#define INIT_CURL_FROM_VELOCITY 3
+#define PROCESS_VELOCITY_VORTICITY 12
+#define PROCESS_DIVERGENCE_FROM_VELOCITY 13
+#define PROCESS_PRESSURE 14
+#define PROCESS_GRADIENT_SUBTRACTION 15
+#define PROCESS_ADVECTION 16
 #define PROCESS_FLUID_COLOR_PASS 50
+#define POST_PASS_BLOOM_PREFILTER 70
+#define POST_PASS_BLOOM_BLUR 71
 #define POST_PASS_SUNRAYS_MASK 80
 #define POST_PASS_SUNRAYS_ACTUAL 81
 #define POST_PASS_SUNRAYS_BLUR 82
@@ -754,9 +807,10 @@ void main() {
     previous = texture(texPrevious, st);
     velocity = texture(texVelocity, st).xy;
 
-    vec2 spawnCenter = hash22(vec2(1.2, 1.1) * iSpawnSeed);
-    const float spawnSize = 0.5;
-    float d, velL, velR, velU, velD;
+    vec2 spawnRandom = hash22(vec2(1.2, 1.1) * iSpawnSeed);
+    vec2 spawnCenter = vec2(spawnRandom.x, spawnRandom.y);
+    float spawnSize = clamp(iSpawnAge, 0.18, 1.); // <-- put iSpawnAge in there
+    float d, velL, velR, velU, velD, pL, pR, pU, pD, div;
 
     // this switch has a principle:
     // return; to declare the current rendering done.
@@ -772,9 +826,10 @@ void main() {
             // <-- hash22(x) is _pseudo_random_, i.e. same x results in same "random" value
             // we want randomVelocity.x != randomVelocity.y, thus the 0.1 offset
             // but the overall randomVelocity will only differ when sampleSeed differs.
-            // vec2 initialVelocity = randomVelocity * iMaxInitialVelocity;
+            //vec2 initialVelocity = randomVelocity;
             // <-- would be random, but can also direct towards / away from center
-            vec2 initialVelocity = uv * iMaxInitialVelocity;
+            // vec2 initialVelocity = uv * iMaxInitialVelocity;
+            vec2 initialVelocity = randomVelocity + uv * iMaxInitialVelocity;
             uv = uv - spawnCenter;
             d = sdCircle(uv, spawnSize);
             d = smoothstep(0.02, 0., d);
@@ -791,6 +846,7 @@ void main() {
             d = sdCircle(uv, spawnSize);
             float a = smoothstep(0.02, 0., d) * exp(-dot(uv, uv) / spawnSize);
             vec3 spawnColor = iSpawnColorHSV;
+            spawnColor.x += (360. * hash(iSpawnSeed + 0.12) - 180.) * iSpawnRandomizeHue;
             spawnColor.x += pow(-min(0., d), 0.5) * iSpawnHueGradient;
             vec3 spawn = a * hsv2rgb(spawnColor);
             // spawn.r += pow(-min(0., d), 0.5) * 1.6;
@@ -800,7 +856,7 @@ void main() {
             // fragColor = vec4(spawn.rgb, 1.);
             return;
 
-        case PROCESS_VELOCITY_PASS(1):
+        case INIT_CURL_FROM_VELOCITY:
             // this just calculates the "curl" (scalar => only red) for the next pass
             // understand the curl as kind of "orthogonal to the gradient": (x, y) -> (-y, x)
             velL = +texture(texVelocity, stL).y;
@@ -808,9 +864,9 @@ void main() {
             velU = -texture(texVelocity, stU).x;
             velD = -texture(texVelocity, stD).x;
             float vorticity = (velR - velL) + (velU - velD);
-            fragColor = vec4(vorticity, 0., 0., 1.);
+            fragColor.r = vorticity;
             return;
-        case PROCESS_VELOCITY_PASS(2):
+        case PROCESS_VELOCITY_VORTICITY:
             // the curl from the previous pass is here the "previous.r"
             float curlHere = texture(texCurl, st).x;
             float curlL = texture(texCurl, stL).x;
@@ -818,17 +874,13 @@ void main() {
             float curlU = texture(texCurl, stU).x;
             float curlD = texture(texCurl, stD).x;
             vec2 force = vec2(abs(curlU) - abs(curlD), abs(curlR) - abs(curlL));
-            if (length(force) == 0.) {
-                break;
-            }
-            // TODO: check performance difference between this check and no-branching
-            // : force /(length(force) + 0.0001;
-            force *= iCurlStrength * curlHere * normalize(force) * vec2(1, -1);
+            force /= length(force) + 0.0001;
+            force *= iCurlStrength * curlHere * c.yz;
             velocity += force * deltaTime;
-            velocity = clamp(velocity, -1000., 1000.);
-            fragColor = vec4(velocity, 0., 1.);
+            // velocity = clamp(velocity, -1000., 1000.);
+            fragColor.xy = velocity;
             return;
-        case PROCESS_VELOCITY_PASS(3):
+        case PROCESS_DIVERGENCE_FROM_VELOCITY:
             // this handles divergence at the borders
             velL = texture(texVelocity, stL).x;
             velR = texture(texVelocity, stR).x;
@@ -848,21 +900,32 @@ void main() {
             if (stR.x > 1.0) { velR = -velocity.x; }
             if (stU.y > 1.0) { velU = -velocity.y; }
             if (stD.y < 0.0) { velD = -velocity.y; }
-            // the divergence texture is scalar / one-dimensional / a single value,
-            float divergence = 0.5 * (velR - velL + velU - velD);
-            // i.e. in terms of usually RGBA; this considers just "red"
-            fragColor = vec4(divergence, 0., 0., 1.);
+            // the divergence texture is scalar / one-dimensional / a single "red" value,
+            div = 0.5 * (velR - velL + velU - velD);
+            fragColor.r = div;
             return;
-        case PROCESS_VELOCITY_PASS(4):
-            // init pressure
-            break;
-        case PROCESS_VELOCITY_PASS(5):
-            // propagate pressure
-            break;
-        case PROCESS_VELOCITY_PASS(6):
-            // incompressible flow: vel -> vel - nabla pressuree
-            break;
-        case PROCESS_VELOCITY_PASS(7):
+        case INIT_PRESSURE_PASS:
+            fragColor = iPressure * texture(texPressure, st);
+            return;
+        case PROCESS_PRESSURE:
+            pL = texture(texPressure, stL).x;
+            pR = texture(texPressure, stR).x;
+            pU = texture(texPressure, stU).x;
+            pD = texture(texPressure, stD).x;
+            div = texture(texDivergence, st).x;
+            float pressure = 0.25 * (pL + pR + pU + pD - div);
+            fragColor.r = pressure;
+            return;
+
+        case PROCESS_GRADIENT_SUBTRACTION:
+            pL = texture(texPressure, stL).x;
+            pR = texture(texPressure, stR).x;
+            pU = texture(texPressure, stU).x;
+            pD = texture(texPressure, stD).x;
+            velocity.xy -= vec2(pR - pL, pU - pD);
+            fragColor.rg = velocity;
+            return;
+        case PROCESS_ADVECTION:
             fragColor = simulateAdvection(texVelocity, iVelocityDissipation);
             return;
 
@@ -871,6 +934,27 @@ void main() {
             // this does not go through right now
             fragColor = simulateAdvection(texPrevious, iColorDissipation);
             return;
+
+        case POST_PASS_BLOOM_PREFILTER: {
+            float knee = iBloomThreshold * iBloomSoftKnee + 1.e-4;
+            vec3 curve = vec3(iBloomThreshold - knee, knee * 2., 0.25 / knee);
+            vec3 col = texture(texPrevious, st).rgb;
+            float br = max3(col);
+            float rq = clamp(br - curve.x, 0., curve.y);
+            rq = curve.z * rq * rq;
+            col *= max(rq, br - iBloomThreshold) / max(br, 1.e-4);
+            fragColor = vec4(col, 1.);
+            return;
+        }
+        case POST_PASS_BLOOM_BLUR: {
+            fragColor = 0.25 * (
+                texture(texPrevious, stL) +
+                texture(texPrevious, stR) +
+                texture(texPrevious, stU) +
+                texture(texPrevious, stD)
+            );
+            return;
+        }
 
         case POST_PASS_SUNRAYS_MASK:
             float br = max3(previous.rgb);
@@ -885,12 +969,18 @@ void main() {
             return;
 
         case RENDER_TO_SCREEN_PASS:
-            if (doRenderVelocity > 0) {
-                if (doRenderVelocity == 1) {
+            if (doDebugRender > 0) {
+                if (doDebugRender == 1) {
                     fragColor = 0.5 * texture(texVelocity, st) + 0.5;
                 }
-                if (doRenderVelocity == 2) {
-                    fragColor = 0.5 * texture(texCurl, st) + 0.5;
+                else if (doDebugRender == 2) {
+                    fragColor = linearValue(texCurl, 0.2);
+                }
+                else if (doDebugRender == 3) {
+                    fragColor = linearValue(texPressure, 0.01);
+                }
+                else if (doDebugRender == 4) {
+                    fragColor = linearValue(texDivergence, 1.);
                 }
                 fragColor.a = 1.;
                 return;
@@ -902,12 +992,22 @@ void main() {
             const vec3 bg = c.yyy;
             fragColor.rgb = makeSurplusWhite(previous.rgb);
             fragColor.rgb = previous.rgb + (1. - previous.a) * bg;
-            // 2. mix post-processing-sunrays in from their texture
+            // 2. mix post-processing (bloom & sunrays) in
             float sunrays = texture(texPostSunrays, st).r;
             fragColor.rgb *= sunrays;
+            vec3 bloom = texture(texPostBloom, st).rgb;
+            bloom *= iBloomIntensity;
+            bloom *= sunrays;
+            float dither = texture(texPostBloomDither, st * iBloomDitherScale).r;
+            dither = dither * 2. - 1.;
+            bloom += dither / 255.;
+            bloom = max(
+                1.055 * pow(max(bloom, c.yyy), vec3(0.4167)) - 0.055,
+                c.yyy
+            );
+            fragColor.rgb += bloom;
             // fragColor.a = max3(fragColor.rgb);
-
-            fragColor.rgb = pow(fragColor.rgb, vec3(1./iGamma));
+            postprocessing(fragColor.rgb, uv);
             fragColor.a = 1.;
             return;
         default:

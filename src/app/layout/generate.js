@@ -133,7 +133,7 @@ export const addControlsToPage = (elements, state, controls, autoRenderOnLoad) =
     if (elements.toggles.length > 0) {
         elements.toggleButtons = addFreeRow({
             parent: elements.controls,
-            label: "Toggles:",
+            label: "",
             content: elements.toggles,
         });
     }

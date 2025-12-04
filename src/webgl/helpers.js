@@ -188,6 +188,7 @@ export function createFramebufferWithTexture(gl, options, fbIndex = undefined) {
         extraDataTexture: null,
         width: opt.width,
         height: opt.height,
+        texelSize: [1/opt.width, 1/opt.height],
         params: opt,
         // <-- Speichern wir hier, weil wir bei einem Resize reagieren müssen
         //     TODO: mache ich aber noch nicht! Canvas-Resizing braucht F5-Reload.
@@ -226,7 +227,7 @@ export function createPingPongFramebuffersWithTexture(gl, options) {
         ping: 0,
     };
     pp.pong = () => 1 - pp.ping;
-    pp.currentWriteAndRead = () => [
+    pp.currentWriteReadOrder = () => [
         pp.fb[pp.ping],
         pp.fb[pp.pong()]
     ];

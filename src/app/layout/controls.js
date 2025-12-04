@@ -60,7 +60,7 @@ export function createInputElements(state, control) {
     const expected = state.expectedUniforms.find(
         uniform => uniform.name === control.name
     );
-    if (!expected) {
+    if (!expected && !control.notAnUniform) {
         console.warn("Could not find expected uniform", control.name, "(is it declared?), ", control, state);
         return;
     }
@@ -86,7 +86,7 @@ export function createInputElements(state, control) {
     const activelyUsed = state.activeUniforms.find(
         uniform => uniform.name === control.name
     );
-    if (!activelyUsed) {
+    if (!activelyUsed && !control.notAnUniform) {
         return;
     }
 
@@ -566,6 +566,9 @@ export function createResetAllButton(elements, state, controls) {
                 updateVecLabel(label, state, control);
                 sessionStoreControlState(state, control);
             }
+        }
+        if (controls.onReset) {
+            controls.onReset();
         }
         initMouseState(state, true);
         state.resetSignal = true;
