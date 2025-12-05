@@ -1,5 +1,6 @@
 import {compile, createStaticVertexBuffer, initVertices} from "../webgl/setup.js";
 import {evaluateReadData} from "../webgl/helpers.js";
+import {REGEX} from "../glslCode/definitions.js";
 
 const basicVertexShaderSource =
     `#version 300 es
@@ -36,6 +37,33 @@ export function initBasicState(gl, sources) {
     gl.useProgram(state.program);
 
     return state;
+}
+
+export function overwriteDefines(shaderSource, defineMap) {
+    /** Die Funktion dient dazu, in Shadern, in denen Optionen über #define-Flags geschaffen wurden
+     *  (gibt es in den frühen Showcases teilweise mit sehr viel unterschiedlichen Resultaten),
+     *  direkt im Schritt vor dem Compilieren die #defines einfach zu ersetzen.
+     *  Man gibt also die defineMap ein, die einem definierten Symbol (in GENAU dieser Schreibweise!) dann
+     *  - einen beliebigen Wert (numerisch oder String, bool wird zu 0/1) zuordnet
+     *    (dieser Wert wird dann genauso da hingesetzt, d.h. komplexe Macros sind möglich, aber wozu würde man das...)
+     *    oder
+     *  - "null" zuordnet: Dann wird der #define in diesem Showcase entfernt (auskommentiert)
+     *    oder
+     *  - auslässt (oder "undefined" zuordnet, das ist für JS gleich), dann wird dieser #define nicht verändert.
+     */
+    return shaderSource.replaceAll(REGEX.DEFINE_DIRECTIVE, (match, name, ...rest) => {
+        let overwrite = defineMap[name];
+        if (overwrite === undefined) {
+            return match;
+        }
+        if (overwrite === null) {
+            return "///" + match;
+        }
+        if (typeof (overwrite) === "boolean") {
+            overwrite = +overwrite;
+        }
+        return `#define ${name} ${overwrite}`;
+    });
 }
 
 export async function readPixelsAndEvaluate(gl, resolution, resultBuffer, targetElement) {

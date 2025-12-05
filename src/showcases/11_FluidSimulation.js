@@ -19,8 +19,6 @@ export default {
 
         // TODO: check difference with IndexBuffer / drawElements() some day...
 
-        console.info("Max. Fragment Texture Units", gl.getParameter(gl.MAX_TEXTURE_IMAGE_UNITS));
-
         if (!state.program) {
             return state;
         }

@@ -9,7 +9,7 @@ const MAGIC_SYMBOLS = [
 
 export const REGEX = {
     DEFINE_DIRECTIVE:
-        /^\s*#define\s*(?<name>\w*)(?<args>\(.*?\))?\s*(?<value>.*)\s*$/mg,
+        /^[ \t]*#define\s*(?<name>\w*)(?<args>\(.*?\))?\s*(?<value>.*)\s*$/mg,
     SHADER_VARIABLE:
         /^\b(layout\s*\(location\s*=\s*(?<location>\d+)\)\s*)?(?<keyword>out|uniform|varying|attribute)\s*(?<type>\w+)\s*(?<name>\w*);/mg,
     CONSTANT:
