@@ -28,13 +28,14 @@ function withPlaybackFeatures(state) {
         dt: 0,
         running: false,
         fps: null,
-        at: {
+        range: {
             max: 60,
-            extend: 50,
+            autoExtendMargin: 10,
         },
         loop: {
             start: null,
             end: null,
+            active: false,
         },
         markers: [],
         signal: {

@@ -50,6 +50,17 @@ function runLoop(renderFunction, state, elements, timestamp) {
         state.time += state.play.dt
         state.iFrame = state.iFrame + 1;
         doFpsMeasurement(state);
+
+        if (state.play.loop.active) {
+            const lastSecond = state.play.loop.end ?? state.play.range.max;
+            if (state.time > lastSecond) {
+                state.time = state.play.loop.start ?? 0;
+                state.iFrame = 0;
+                // Keine bessere Idee für den Frame-Index...
+                // Wegnullen vermutlich besser als einfach zu ignorieren.
+            }
+        }
+
         state.play.previous.timestamp = timestamp;
     }
 

@@ -265,3 +265,20 @@
 #uniform-controls > .separator-row:last-child {
     display: none;
 }
+
+
+svg text.clickable {
+    font-weight: bold;
+    cursor: pointer;
+}
+
+svg text.clickable:hover {
+    transform: translate(-1px, -1px);
+    stroke: purple;
+    text-shadow: 0 0 1px #ff00bb22;
+}
+
+svg text.clickable:active {
+    stroke: #747bff;
+    transform: none;
+}

@@ -1,3 +1,4 @@
+import {clamp} from "../../math.js";
 
 export function createTimeSeeker(parent, state) {
     parent.innerHTML =
@@ -10,25 +11,39 @@ export function createTimeSeeker(parent, state) {
         virgin: true,
         parent,
         svg,
-        track: svgChild(svg, "rect", "seek-track", {
-            fill: "darkmagenta"
+        track: svgChild(svg, "rect", {
+            id: "seek-track",
+            fill: "rebeccapurple"
         }),
         ticks: {
-            intervalSec: 10,
-            pattern: svgChild(svg, "pattern", "track-ticks", {
-                width: 100,
-                height: 24,
+            intervalSec: 4,
+            pattern: svgChild(svg, "pattern", {
+                id: "track-ticks",
+                height: "100%",
                 patternUnits: "userSpaceOnUse"
             }),
-            markers: svgChild(svg, "rect", "seek-markers", {
+            markers: svgChild(svg, "rect", {
+                id: "seek-markers",
                 fill: "url(#track-ticks)",
             }),
         },
-        handle: svgChild(svg, "rect", "seek-handle", {
-            fill: "none",
+        handle: svgChild(svg, "rect", {
+            id: "seek-handle",
         }),
-        value: svgChild(svg, "text", "time-value", {
+        value: svgChild(svg, "text", {
+            id: "time-value",
+            class: "clickable",
             "text-anchor": "end",
+            textContent: "løl.",
+            // <-- set some number-measure-style text to measure it later... ~\´()_o`/~
+            title: "Click to enter value, Right Click to enter max value."
+        }),
+        loop: svgChild(svg, "text", {
+            id: "loop-symbol",
+            class: "clickable",
+            "text-anchor": "middle",
+            textContent: "\u21ba", // \u21A9",
+            title: "Loop? (Right Click this for Range Input)"
         }),
         rect: {
             bounds: null,
@@ -37,8 +52,9 @@ export function createTimeSeeker(parent, state) {
             handle: null,
             value: null,
         },
-        handleRange: {
+        handleBar: {
             min: 0,
+            max: 0,
             span: null,
         },
         callback: {
@@ -54,8 +70,6 @@ export function createTimeSeeker(parent, state) {
             toUpdate: false,
         }
     };
-    el.value.textContent = "løl.";
-    // <-- set some number-measure-style text to measure it later... ()_o
 
     el.callback.resize = () => {
         const r = el.rect;
@@ -63,32 +77,34 @@ export function createTimeSeeker(parent, state) {
         const unit = {
             step: r.bounds.width / 36,
             text: el.value.getBBox().height,
+            tick: 3,
+            padding: 4
         };
         r.track = {
             width: 30 * unit.step,
             x: 0,
-            height: r.bounds.height - 8,
-            y: 4,
-            rx: 2,
+            height: r.bounds.height - 2 * unit.padding,
+            y: unit.padding,
+            rx: unit.padding / 2,
         };
         r.handle = {
             width: unit.step,
-            height: r.bounds.height - 4,
-            y: 2
+            x: unit.padding / 2,
+            height: r.bounds.height - unit.padding,
+            y: unit.padding / 2
         };
-        el.handleRange = {
-            min: r.track.x,
-            span: r.track.width - r.handle.width,
-        };
+        el.handleBar.span = r.track.width - r.handle.width;
+        el.handleBar.min = r.track.x + r.handle.x;
+        el.handleBar.max = el.handleBar.min + el.handleBar.span;
         r.markers = {
             x: 0,
-            width: el.handleRange.span + 8,
+            width: r.track.width,
             y: r.track.y / 2,
             height: r.bounds.height - r.track.y,
         };
         r.value = {
-            width: r.bounds.width - r.track.x - r.track.width,
-            x: r.track.x + r.track.width + 3 * unit.step,
+            width: unit.step,
+            x: r.track.x + r.track.width + 2.5 * unit.step,
             height: r.bounds.height,
             y: unit.text - r.track.y / 2,
         };
@@ -96,16 +112,21 @@ export function createTimeSeeker(parent, state) {
         withRect(el.ticks.markers, r.markers);
         withRect(el.handle, r.handle);
         withRect(el.value, r.value);
+        withRect(el.loop, {
+            ...r.value,
+            x: r.value.x + r.value.width,
+            width: unit.step,
+        });
         if (el.virgin) {
             el.ticks.pattern.append(
-                svgChild(svg, "rect", "", {
-                    x: r.handle.width / 2,
-                    width: 2,
+                svgChild(svg, "rect", {
+                    x: r.handle.width / 2 + el.handleBar.min / 2,
+                    width: unit.tick,
                     height: r.bounds.height,
-                    fill: "darkorange",
+                    fill: "#ffffff77",
                 })
             );
-            el.ticks.pattern.setAttribute("width", intervalPixels());
+            el.ticks.pattern.setAttribute("width", intervalPixels(el, state));
             delete el.virgin;
         }
         if (el.remember.toUpdate) {
@@ -120,10 +141,7 @@ export function createTimeSeeker(parent, state) {
             el.remember.toUpdate = true;
             return;
         }
-        el.handle.setAttribute(
-            "stroke",
-            state.play.running ? "black" : "darkorange"
-        );
+        applyStateDependantStyling(el, state);
         if (!state.play.running) {
             if (el.remember.timestamp === state.play.previous.timestamp) {
                 return;
@@ -132,11 +150,8 @@ export function createTimeSeeker(parent, state) {
             }
         }
         el.value.textContent = state.time.toFixed(2);
-        maybeExtendMaximum();
-        el.handle.setAttribute(
-            "x",
-            secondsAsPixels(state.time, el, state, el.handleRange.min)
-        );
+        mightAutoExtendRange();
+        moveHandle(el, state);
     };
 
     el.do.jump = ({to = undefined, delta = undefined, min = undefined, max = undefined}) => {
@@ -149,6 +164,7 @@ export function createTimeSeeker(parent, state) {
         if (state.time > max) {
             state.time = max;
         }
+        mightAutoExtendRange();
     };
 
     el.do.toggle = () => {
@@ -160,46 +176,92 @@ export function createTimeSeeker(parent, state) {
         }
     };
 
+    el.do.toggleLoop = ({start, end, active} = {}) => {
+        if (start !== undefined) {
+            state.play.loop.start = start;
+        }
+        if (end !== undefined) {
+            state.play.loop.end = end;
+        }
+        state.play.loop.active =
+            active ?? !state.play.loop.active;
+    }
+
     addDocumentListeners(el, state);
     addMouseInteraction(el, state);
 
     return el;
 
-    function maybeExtendMaximum() {
-        const extendMax = state.time - state.play.at.extend;
-        if (extendMax <= 0) {
+    function mightAutoExtendRange() {
+        if (state.play.loop.active) {
             return;
         }
-        state.play.at.max += extendMax;
-        state.play.at.extend += extendMax;
-        el.ticks.pattern.setAttribute("width", intervalPixels());
+        const extendAbove = state.play.range.max - state.play.range.autoExtendMargin;
+        const extend = state.time - extendAbove;
+        if (extend <= 0) {
+            return;
+        }
+        adjustMaxRange(el, state, {delta: extend});
     }
+}
 
-    function intervalPixels() {
-        return secondsAsPixels(el.ticks.intervalSec, el, state);
-    }
+function intervalPixels(el, state) {
+    return secondsAsPixels(el.ticks.intervalSec, el, state);
 }
 
 function secondsAsPixels(seconds, el, state, offset = 0) {
     // String is a no-cost inlined version to make linters happy while passing a number
     // i.e. .toString() would actually calculate something needlessly, thus be not-good.
-    return String(el.handleRange.span * seconds / state.play.at.max + offset);
+    // console.log("SAP", el.handleBar.span, seconds, state.play.range.max, offset, "=", String(el.handleBar.span * seconds / state.play.range.max + offset));
+    return String(el.handleBar.span * seconds / state.play.range.max + offset);
 }
 
-function pixelsAsSeconds(pixelWidth, el, state) {
-    return pixelWidth * (state.play.at.max / el.handleRange.span);
+function pixelsAsSeconds(handlePosition, el, state) {
+    return (handlePosition - el.handleBar.min) * (state.play.range.max / el.handleBar.span);
 }
 
-function svgChild(svg, tag, id = "", attributes = {}) {
-    const child = document.createElementNS(svg.namespaceURI, tag);
-    if (id) {
-        child.id = id;
+function moveHandle(el, state) {
+    const handleX = secondsAsPixels(state.time, el, state, el.handleBar.min);
+    el.handle.setAttribute("x", handleX);
+}
+
+function adjustMaxRange(el, state, {delta, max, omitUpdate}) {
+    max ??= state.play.range.max;
+    delta ??= 0;
+    state.play.range.max = max + delta;
+    el.ticks.pattern.setAttribute("width", intervalPixels(el, state));
+    if (omitUpdate) {
+        return;
     }
-    for (const attribute of Object.entries(attributes)) {
-        child.setAttribute(...attribute);
+    moveHandle(el, state);
+}
+
+function svgChild(svg, tag, attributes = {}) {
+    const child = document.createElementNS(svg.namespaceURI, tag);
+    for (const [name, value] of Object.entries(attributes)) {
+        if (name === "textContent") {
+            child.textContent = String(value);
+        } else if (name === "title") {
+            const grandchild =
+                svgChild(svg, "title", {textContent: value});
+            child.appendChild(grandchild);
+        } else {
+            child.setAttribute(name, String(value));
+        }
     }
     svg.appendChild(child);
     return child;
+}
+
+function applyStateDependantStyling(el, state) {
+    el.handle.setAttribute(
+        "stroke",
+        state.play.running ? "black" : "darkorange"
+    );
+    el.loop.setAttribute(
+        "stroke",
+        state.play.loop.active ? "darkgreen" : "gray"
+    );
 }
 
 function withRect(element, rect) {
@@ -245,6 +307,15 @@ function addDocumentListeners(el, state) {
     const stored = JSON.parse(sessionStorage.getItem(storageKey) ?? "null");
     if (stored && stored.play) {
         state.play.running = stored.play.running;
+        if (stored.range) {
+            state.play.range = stored.range
+        }
+        if (stored.loop) {
+            state.play.loop = stored.loop;
+        }
+        if (stored.markers) {
+            state.play.markers = stored.markers;
+        }
         state.time = stored.time ?? 0;
         state.iFrame = stored.frame ?? -1;
     }
@@ -256,7 +327,7 @@ function addMouseInteraction(el, state) {
         offset: 0,
         initial: 0,
         original: {},
-        animationFrame: null,
+        throttleFrame: null,
         ctm: null,
     };
 
@@ -269,64 +340,99 @@ function addMouseInteraction(el, state) {
 
     el.svg.addEventListener("mousedown", event => {
         event.preventDefault();
-        const pos = mousePosition(el, event);
+        const pos = mousePosition(event);
         if (event.target === el.handle) {
-            drag.original = readFloatAttributes(el.handle, "x", "opacity");
+            drag.original = parseFloatAttributes(el.handle, "x", "opacity");
+            drag.original.rangeMax = state.play.range.max;
             drag.offset = pos.x - drag.original.x;
             drag.initial = pos.x;
             drag.ghost = el.handle.cloneNode(true);
             el.svg.appendChild(drag.ghost);
-            drag.ghost.id = "dragging-handle";
+            drag.ghost.id = "ghost-handle";
             drag.ghost.setAttribute("opacity", 1);
+            drag.ghost.setAttribute("fill", "currentColor");
             el.handle.setAttribute("opacity", 0.4);
         }
     }, {
         passive: false
     });
 
-    el.svg.addEventListener("mousemove", event => {
+    document.addEventListener("mousemove", event => {
         if (!drag.ghost) {
             return;
         }
         event.preventDefault();
-        if (drag.animationFrame) {
-            cancelAnimationFrame(drag.animationFrame);
-        }
-        drag.animationFrame = requestAnimationFrame(() => {
-            const mouseX = mousePosition(el, event).x;
-            console.log("CTM?", el.ctm);
-            const x = Math.max(0,
-                Math.min(el.handleRange.span,
-                    mouseX - drag.offset,
-                ));
+        cancelAnimationFrame(drag.throttleFrame);
+        const mouseX = mousePosition(event).x;
+        drag.throttleFrame = requestAnimationFrame(() => {
+            const x = clamp(mouseX - drag.offset, el.handleBar.min, el.handleBar.max);
             seekPixel(x);
             drag.ghost.setAttribute("x", x);
-            drag.animationFrame = null;
+            drag.throttleFrame = null;
         });
     }, {
         passive: false
     });
 
-
     document.addEventListener("mouseup", event => {
         if (!drag.ghost) {
             return;
         }
+        cancelAnimationFrame(drag.throttleFrame);
+        const elementBelow = document.elementFromPoint(event.clientX, event.clientY);
+        const dropOnGhost = elementBelow === drag.ghost;
         const dropX = parseFloat(drag.ghost.getAttribute("x"));
+        if (dropOnGhost) {
+            seekPixel(dropX - drag.initial);
+        } else {
+            adjustMaxRange(el, state, {
+                max: drag.original.rangeMax
+            });
+        }
         el.svg.removeChild(drag.ghost);
         drag.ghost = null;
         el.handle.setAttribute("opacity", drag.original.opacity);
-        const doApply = false;
-        if (doApply) {
-            seekPixel(dropX - drag.initial);
-        }
     });
 
-    function seekPixel(delta) {
+    el.handle.addEventListener("dblclick", () => {
+        el.do.toggle();
+    });
+
+    el.value.addEventListener("click", () => {
+        promptForSecondToJump(el, state);
+    });
+    el.value.addEventListener("contextmenu", (event) => {
+        event.preventDefault();
+        const second =
+            promptFloat(el, state.play.range.max, "Enter new MAX Second:");
+        if (second) {
+            state.play.range.max = second;
+        }
+    });
+    el.loop.addEventListener("click", () => {
+        el.do.toggleLoop();
+    });
+    el.loop.addEventListener("contextmenu", (event) => {
+        event.preventDefault();
+        const seconds = promptFloatArray(
+            el,
+            [state.play.loop.start, state.play.loop.end],
+            "Enter new Loop START and END Second (Space-Separated, any NaN for max. interval):",
+        );
+        if (seconds.length !== 2) {
+            alert(`Discard Input: ${seconds} because it has not 2 elements.`);
+            return;
+        }
+        [state.play.loop.start = state.play.loop.end] = seconds;
+        state.play.loop.active = true;
+    });
+
+    function seekPixel(pixelWidth) {
+        const second = pixelsAsSeconds(pixelWidth, el, state);
         el.do.jump({
-            delta: pixelsAsSeconds(delta, el, state),
+            to: second,
             min: 0,
-            max: state.play.at.max
+            max: state.play.range.max
         });
     }
 
@@ -341,10 +447,42 @@ function addMouseInteraction(el, state) {
     }
 }
 
-function readFloatAttributes(element, ...attributes) {
+function parseFloatAttributes(element, ...attributes) {
     const result = {}
     for (const attribute of attributes) {
-        result[attribute] = parseFloat(element.getAttribute(attribute));
+        const value = parseFloat(element.getAttribute(attribute));
+        if (!Number.isNaN(value)) {
+            result[attribute] = value;
+        }
     }
     return result;
+}
+
+function parseFloatLeniently(input) {
+    const result = parseFloat(input.replace(",", "."));
+    return Number.isNaN(result) ? null : result;
+}
+
+export function promptFloat(el, defaultValue, message) {
+    const input = window.prompt(
+        message ?? "Enter new Value:",
+        (defaultValue ?? "").toString()
+    );
+    return parseFloatLeniently(input);
+}
+
+export function promptForSecondToJump(el, state) {
+    const time = promptFloat(el, state.time, "Jump to Second:");
+    el.do.jump({to: time});
+}
+
+export function promptFloatArray(el, defaultValues, message, separator = " ") {
+    const input = window.prompt(
+        message ?? `Enter new values. separated with \"${separator}\":`,
+        defaultValues.join(separator)
+    );
+    return input
+        .split(separator)
+        .filter(s => s.length > 0)
+        .map(parseFloatLeniently);
 }

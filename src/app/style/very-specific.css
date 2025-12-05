@@ -14,15 +14,17 @@
     min-height: 4px;
 }
 
-#seek-handle {
-    cursor: ew-resize;
-    pointer-events: visibleFill;
+#seek-handle, #ghost-handle {
+    cursor: move;
+    pointer-events: visiblefill;
+    stroke: currentColor;
     stroke-width: 4px;
+    fill: none;
     transition: color 0.5s ease;
 }
 
-#time-value {
-    font-weight: bold;
+#seek-handle:hover {
+    fill: currentColor;
 }
 
 #fps {

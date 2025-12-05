@@ -10,6 +10,7 @@ import {initializePresetStore} from "../database.js";
 import {createMainControlBar} from "./controls/bar.js";
 import {takeMilliSeconds} from "../measuring.js";
 import {updateResolutionInState} from "../../webgl/helpers/resolution.js";
+import {promptForSecondToJump, promptSecondAndJump} from "./controls/time.js";
 
 
 const generatePage = (glContext, elements, state, controls) => {
@@ -154,13 +155,10 @@ export const addMainControls = (elements, state, controls) => {
                 seeker.do.jump({to: 0});
                 break;
             case "End":
-                seeker.do.jump({to: state.play.at.extend});
+                seeker.do.jump({to: state.play.range.max});
                 break;
             case "Insert":
-                const time = window.prompt("Enter Second:", state.time.toString());
-                if (time) {
-                    seeker.do.jump({to: +time});
-                }
+                promptForSecondToJump(seeker, state.time);
                 break;
             case "i":
                 console.info(state, elements);
