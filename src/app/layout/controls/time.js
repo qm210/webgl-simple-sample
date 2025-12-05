@@ -13,8 +13,13 @@ export function createTimeSeeker(parent, state) {
         svg,
         track: svgChild(svg, "rect", {
             id: "seek-track",
-            fill: "rebeccapurple"
+            fill: "#590059"
         }),
+        markers: {
+            loop: svgChild(svg, "rect", {
+
+            })
+        },
         ticks: {
             intervalSec: 4,
             pattern: svgChild(svg, "pattern", {
@@ -31,20 +36,25 @@ export function createTimeSeeker(parent, state) {
             id: "seek-handle",
         }),
         value: svgChild(svg, "text", {
-            id: "time-value",
             class: "clickable",
             "text-anchor": "end",
             textContent: "løl.",
             // <-- set some number-measure-style text to measure it later... ~\´()_o`/~
             title: "Click to enter value, Right Click to enter max value."
         }),
-        loop: svgChild(svg, "text", {
-            id: "loop-symbol",
-            class: "clickable",
-            "text-anchor": "middle",
-            textContent: "\u21ba", // \u21A9",
-            title: "Loop? (Right Click this for Range Input)"
-        }),
+        icons: {
+            toggle: svgChild(svg, "text", {
+                class: "clickable",
+                "text-anchor": "middle",
+                title: "Toggle Play/Stop"
+            }),
+            loop: svgChild(svg, "text", {
+                class: "clickable",
+                "text-anchor": "middle",
+                textContent: "\u21ba", // \u21A9",
+                title: "Loop? (Right Click this for Range Input)"
+            }),
+        },
         rect: {
             bounds: null,
             track: null,
@@ -112,11 +122,12 @@ export function createTimeSeeker(parent, state) {
         withRect(el.ticks.markers, r.markers);
         withRect(el.handle, r.handle);
         withRect(el.value, r.value);
-        withRect(el.loop, {
-            ...r.value,
-            x: r.value.x + r.value.width,
-            width: unit.step,
-        });
+        let x = r.value.x + r.value.width;
+        for (const icon of Object.values(el.icons)) {
+            r.icon = {...r.value, x, width: unit.step};
+            withRect(icon, r.icon);
+            x += r.icon.width;
+        }
         if (el.virgin) {
             el.ticks.pattern.append(
                 svgChild(svg, "rect", {
@@ -167,8 +178,8 @@ export function createTimeSeeker(parent, state) {
         mightAutoExtendRange();
     };
 
-    el.do.toggle = () => {
-        if (state.play.running) {
+    el.do.toggle = (force = undefined) => {
+        if (state.play.running || force === false) {
             state.play.running = false;
         } else {
             state.play.running = true;
@@ -254,14 +265,23 @@ function svgChild(svg, tag, attributes = {}) {
 }
 
 function applyStateDependantStyling(el, state) {
-    el.handle.setAttribute(
-        "stroke",
-        state.play.running ? "black" : "darkorange"
-    );
-    el.loop.setAttribute(
-        "stroke",
-        state.play.loop.active ? "darkgreen" : "gray"
-    );
+    if (state.play.running) {
+        el.handle.setAttribute("stroke", "black");
+        el.icons.toggle.textContent = "\u23f9";
+        el.icons.toggle.setAttribute("color", "red");
+    } else {
+        el.handle.setAttribute("stroke", "darkorange");
+        el.icons.toggle.textContent = "\u25b6";
+        el.icons.toggle.setAttribute("color", "black");
+    }
+
+    if (state.play.loop.active) {
+        el.icons.loop.setAttribute("stroke", "darkgreen");
+    } else {
+        el.icons.loop.setAttribute("stroke", "gray");
+    }
+
+
 }
 
 function withRect(element, rect) {
@@ -339,13 +359,15 @@ function addMouseInteraction(el, state) {
     });
 
     el.svg.addEventListener("mousedown", event => {
-        event.preventDefault();
         const pos = mousePosition(event);
         if (event.target === el.handle) {
             drag.original = parseFloatAttributes(el.handle, "x", "opacity");
             drag.original.rangeMax = state.play.range.max;
-            drag.offset = pos.x - drag.original.x;
+            drag.original.wasRunning = state.play.running;
+            el.do.toggle(false);
+
             drag.initial = pos.x;
+            drag.offset = pos.x - drag.original.x;
             drag.ghost = el.handle.cloneNode(true);
             el.svg.appendChild(drag.ghost);
             drag.ghost.id = "ghost-handle";
@@ -392,15 +414,19 @@ function addMouseInteraction(el, state) {
         el.svg.removeChild(drag.ghost);
         drag.ghost = null;
         el.handle.setAttribute("opacity", drag.original.opacity);
+        el.do.toggle(drag.original.wasRunning);
     });
 
     el.handle.addEventListener("dblclick", () => {
+        console.log("was?", state.play.running);
         el.do.toggle();
+        console.log("iiiis?", state.play.running);
     });
 
     el.value.addEventListener("click", () => {
         promptForSecondToJump(el, state);
     });
+
     el.value.addEventListener("contextmenu", (event) => {
         event.preventDefault();
         const second =
@@ -409,11 +435,14 @@ function addMouseInteraction(el, state) {
             state.play.range.max = second;
         }
     });
-    el.loop.addEventListener("click", () => {
+
+    el.icons.loop.addEventListener("click", () => {
         el.do.toggleLoop();
     });
-    el.loop.addEventListener("contextmenu", (event) => {
+
+    el.icons.loop.addEventListener("contextmenu", (event) => {
         event.preventDefault();
+        console.log(state.play.loop);
         const seconds = promptFloatArray(
             el,
             [state.play.loop.start, state.play.loop.end],

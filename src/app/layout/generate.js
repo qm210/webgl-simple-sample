@@ -10,7 +10,7 @@ import {initializePresetStore} from "../database.js";
 import {createMainControlBar} from "./controls/bar.js";
 import {takeMilliSeconds} from "../measuring.js";
 import {updateResolutionInState} from "../../webgl/helpers/resolution.js";
-import {promptForSecondToJump, promptSecondAndJump} from "./controls/time.js";
+import {promptForSecondToJump} from "./controls/time.js";
 
 
 const generatePage = (glContext, elements, state, controls) => {

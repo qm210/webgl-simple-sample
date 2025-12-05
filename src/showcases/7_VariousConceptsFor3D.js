@@ -132,8 +132,7 @@ function render(gl, state) {
 
 function defineUniformControlsBelow() {
     return [{
-        type: "separator",
-        title: "Kamera - Transformation"
+        separator: "Kamera - Transformation"
     }, {
         type: "cursorInput",
         name: "iCamOffset",
@@ -160,8 +159,7 @@ function defineUniformControlsBelow() {
         min: 0.001,
         max: 20,
     }, {
-        type: "separator",
-        title: "Kamera - Pfad-Automatisierung"
+        separator: "Kamera - Pfad-Automatisierung"
     }, {
         type: "bool",
         name: "doUseCameraPath",
@@ -212,8 +210,7 @@ function defineUniformControlsBelow() {
         description: "Kamera-Geschwindigkeit näherungsweise konstant anpassen.\n" +
             "(weil die Gesamtlänge des Pfads vereinfacht nur linear bestimmt wird...)",
     }, {
-        type: "separator",
-        title: "Szene - Troubleshooting"
+        separator: "Szene - Troubleshooting"
     }, {
         type: "bool",
         name: "justTheBoxes",
@@ -225,8 +222,7 @@ function defineUniformControlsBelow() {
         defaultValue: false,
         description: "Für die Orientierung (Abstand je 0.5 in Richtung X/Z\)",
     }, {
-        type: "separator",
-        title: "Beleuchtungsmodell"
+        separator: "Beleuchtungsmodell"
     }, {
         type: "float",
         name: "iDirectionalLightStrength",
@@ -318,8 +314,7 @@ function defineUniformControlsBelow() {
         min: 0.,
         max: 1.,
     }, {
-        type: "separator",
-        title: "Textur Pyramide"
+        separator: "Textur Pyramide"
     }, {
         type: "bool",
         name: "showPyramidTextureGrid",
@@ -352,8 +347,7 @@ function defineUniformControlsBelow() {
         description: "Andere Idee: Die Texturkoordinaten schlicht Grundriss gleichsetzen.\n" +
             "(entspricht Interpretation als Draufsicht; wird auch stark verzerrt.)"
     }, {
-        type: "separator",
-        title: "Eulerwinkel-Drehung am Zylinder"
+        separator: "Eulerwinkel-Drehung am Zylinder"
     }, {
         type: "float",
         name: "iCylinderRotateYSpeed",
@@ -373,8 +367,7 @@ function defineUniformControlsBelow() {
         min: -2,
         max: 2,
     }, {
-        type: "separator",
-        title: "Post-Processing"
+        separator: "Post-Processing"
     }, {
         type: "float",
         name: "iDistanceFogExponent",
@@ -408,8 +401,7 @@ function defineUniformControlsBelow() {
         max: 4.,
         log: true,
     }, {
-        type: "separator",
-        title: "Pseudo-Noise-Berge"
+        separator: "Pseudo-Noise-Berge"
     }, {
         type: "float",
         name: "iNoiseLevel",
@@ -454,8 +446,7 @@ function defineUniformControlsBelow() {
         name: "useNormalizedFBM",
         defaultValue: false,
     }, {
-        type: "separator",
-        title: "Zur freien Verwendung..."
+        separator: "Zur freien Verwendung..."
     }, {
         type: "float",
         name: "iFree0",

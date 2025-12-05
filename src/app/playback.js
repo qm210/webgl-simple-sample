@@ -76,7 +76,7 @@ function runLoop(renderFunction, state, elements, timestamp) {
     }
 
     elements.controlBar.time.update();
-    elements.fps.display.textContent = state.fps;
+    elements.fps.display.textContent = state.play.fps;
 
     if (state.play.signal.stop) {
         state.play.reachedStop = true;
@@ -110,7 +110,7 @@ const fpsMeter = {
 };
 
 function resetFpsMeasurement(state) {
-    state.fps = null;
+    state.play.fps = null;
     fpsMeter.frames = null;
     fpsMeter.measureAtTime = null;
     fpsMeter.measuredFps = null;
@@ -140,17 +140,17 @@ function doFpsMeasurement(state) {
     fpsMeter.direct.lastTime = state.time;
     fpsMeter.direct.lastFrame = state.iFrame;
 
-    state.fps = 0;
+    state.play.fps = 0;
     let weight = 0;
     if (fpsMeter.direct.fps !== null) {
-        state.fps += 0.33 * fpsMeter.direct.fps;
+        state.play.fps += 0.33 * fpsMeter.direct.fps;
         weight += 0.5;
     }
     if (fpsMeter.measuredFps !== null) {
-        state.fps += fpsMeter.measuredFps;
+        state.play.fps += fpsMeter.measuredFps;
         weight += 1;
     }
-    state.fps = weight > 0 ? (state.fps / weight).toFixed(0) : "?";
+    state.play.fps = weight > 0 ? (state.play.fps / weight).toFixed(0) : "?";
 }
 
 export function whilePausingRendering(state, callFunction) {

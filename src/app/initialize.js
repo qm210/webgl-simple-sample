@@ -37,7 +37,10 @@ function withPlaybackFeatures(state) {
             end: null,
             active: false,
         },
-        markers: [],
+        markers: [], // yet unused
+        sync: {
+            bpm: null // yet unused
+        },
         signal: {
             reset: false,
             stop: false,
