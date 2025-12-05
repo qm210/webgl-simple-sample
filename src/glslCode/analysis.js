@@ -128,8 +128,6 @@ export async function extendAnalysis(analyzed) {
     analyzed.symbols = parseSymbols(analyzed.source);
     analyzed.functions = enhancedFunctionsWithBody(analyzed);
     enhanceSymbols(analyzed);
-
-    console.log("Analyzed Shader", analyzed);
     return analyzed;
 }
 

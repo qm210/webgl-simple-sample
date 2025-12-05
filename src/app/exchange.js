@@ -1,5 +1,4 @@
-import {createSmallButton} from "./layout/controls.js";
-import {createPreset, deletePreset, initializePresetStore, loadPresets} from "./database.js";
+import {createPreset, deletePreset, loadPresets} from "./database.js";
 import {createDiv} from "./layout/dom.js";
 
 const HEADER = {
@@ -12,7 +11,7 @@ const uniformNameMap = {
     iResolution: "resolution",
 };
 
-function bundleUniforms(state) {
+export function bundleUniforms(state) {
     const result = {
         ...HEADER,
         name: undefined,
@@ -54,7 +53,7 @@ function unpackBundle(state, json) {
     }
 }
 
-function updateFromBundle(json, state, elements) {
+export function updateFromBundle(json, state, elements) {
     unpackBundle(state, json);
     for (const uniform of json.uniforms) {
         const input = elements.uniforms[uniform.name]?.control;
@@ -64,53 +63,6 @@ function updateFromBundle(json, state, elements) {
         input.value = uniform.value;
     }
     console.info("Updated from", json, state, elements);
-}
-
-export function createClipboardButtons(elements, state) {
-    const copyButton = createSmallButton("→ Clipboard", "right-align");
-    const pasteButton = createSmallButton("Paste", "right-align");
-
-    copyButton.addEventListener("click", async () => {
-        const originalContent = copyButton.textContent;
-        try {
-            const json = bundleUniforms(state);
-            await navigator.clipboard.writeText(
-                JSON.stringify(json, null, 4)
-            );
-            console.info("Copied to Clipboard", json);
-            copyButton.textContent = "✔ copied";
-        } catch (error) {
-            console.error(error);
-            copyButton.textContent = "✘ failed";
-        }
-        setTimeout(() => {
-            copyButton.textContent = originalContent;
-        }, 1000);
-    });
-
-    pasteButton.addEventListener("click", async () => {
-        const originalContent = pasteButton.textContent;
-        const originalState = {...state};
-        try {
-            const text = await navigator.clipboard.readText();
-            const json = JSON.parse(text);
-            updateFromBundle(json, state, elements);
-            pasteButton.textContent = "✔ pasted";
-        } catch (error) {
-            console.error(error);
-            state = {...originalState};
-            pasteButton.textContent = "✘ failed";
-            pasteButton.style.color = "red";
-            pasteButton.style.outlineColor = "red";
-        }
-        setTimeout(() => {
-            pasteButton.textContent = originalContent;
-            pasteButton.style.color = "";
-            pasteButton.style.outlineColor = "";
-        }, 1000);
-    });
-
-    return [copyButton, pasteButton];
 }
 
 const OPTION = {

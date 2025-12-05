@@ -1,12 +1,13 @@
-import {startRenderLoop} from "../webgl/render.js";
-import {createTextureFromImage} from "../webgl/helpers.js";
+import {startRenderLoop} from "../app/playback.js";
 
 import fragmentShaderSource from "../shaders/texturePlayground.glsl";
-import {compile, createStaticVertexBuffer, initVertices} from "../webgl/setup.js";
+import {compile, initVertices} from "../webgl/setup.js";
 import vertexShaderSource from "../shaders/vertex.basic.glsl";
 import image0 from "../textures/frame.png";
 import image1 from "../textures/hubble_extreme_deep_field.jpg";
 import image2 from "../textures/mysterious_capybara.png";
+import {createTextureFromImage} from "../webgl/helpers/textures.js";
+import {createStaticVertexBuffer} from "../webgl/helpers/setup.js";
 
 export default {
     title: "Texture Playground",
@@ -75,9 +76,6 @@ export default {
             );
         },
         uniforms: [{
-            type: "label",
-            name: "iTime",
-        }, {
             type: "float",
             name: "iGamma",
             defaultValue: 1,

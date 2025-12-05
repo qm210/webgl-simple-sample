@@ -1,14 +1,16 @@
-import {startRenderLoop} from "../webgl/render.js";
-import {
-    createFramebufferWithTexture,
-    createPingPongFramebuffersWithTexture, createTextureFromImage, halfFloatOptions, resolutionScaled,
-    updateResolutionInState
-} from "../webgl/helpers.js";
+import {startRenderLoop} from "../app/playback.js";
 import {initBasicState} from "./common.js";
 
 import vertexShaderSource from "../shaders/vertex.basicWithDifferentials.glsl"
 import fragmentShaderSource from "../shaders/fluidPlayground.glsl";
 import ditherImage from "../textures/dither.png";
+import {resolutionScaled, updateResolutionInState} from "../webgl/helpers/resolution.js";
+import {createTextureFromImage} from "../webgl/helpers/textures.js";
+import {
+    createFramebufferWithTexture,
+    createPingPongFramebuffersWithTexture,
+    halfFloatOptions
+} from "../webgl/helpers/framebuffers.js";
 
 export default {
     title: "Fluid Dynamics Playground",
@@ -416,7 +418,7 @@ const SPAWN_EVERY_SECONDS = 2.5;
 
 function render(gl, state) {
     gl.uniform1f(state.location.iTime, state.time);
-    gl.uniform1f(state.location.deltaTime, state.deltaTime);
+    gl.uniform1f(state.location.deltaTime, state.play.dt);
     gl.uniform2fv(state.location.iResolution, state.resolution);
     gl.uniform1i(state.location.iFrame, state.iFrame);
     gl.uniform1f(state.location.iGamma, state.iGamma);

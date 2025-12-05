@@ -1,10 +1,11 @@
-import {compile, createStaticVertexBuffer, initVertices} from "../webgl/setup.js";
-import {startRenderLoop} from "../webgl/render.js";
-import {evaluateReadData} from "../webgl/helpers.js";
+import {compile, initVertices} from "../webgl/setup.js";
+import {startRenderLoop} from "../app/playback.js";
 
 import fragmentShaderSource from "../shaders/noisePlayground.glsl";
 import vertexShaderSource from "../shaders/vertex.basic.glsl";
 import {initBasicState, readPixelsAndEvaluate} from "./common.js";
+import {evaluateReadData} from "../webgl/helpers/framebuffers.js";
+import {createStaticVertexBuffer} from "../webgl/helpers/setup.js";
 
 export default {
     title: "Noise Playground",

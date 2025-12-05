@@ -1,17 +1,18 @@
-import {addButton, createInputElements, addFreeRow, createResetAllButton} from "./controls.js";
+import {createInputElements, addFreeRow} from "./controls/uniforms.js";
 import {registerShaderCode} from "./shaderCode.js";
-import {appendButton, appendElement, createDiv, createElement} from "./dom.js";
+import {addButton, appendButton, appendElement, createDiv, createElement} from "./dom.js";
 import {createScrollStackOn, scrollToFirstInterestingLine} from "../events.js";
 import {deferExtendedAnalysis} from "../../glslCode/deferredAnalysis.js";
-import {shiftTime} from "../../webgl/render.js";
 import {setCanvasResolution} from "../../webgl/setup.js";
-import {updateResolutionInState} from "../../webgl/helpers.js";
 import {addCanvasMouseInteraction} from "../mouse.js";
-import {createClipboardButtons, createPresetSelector, refreshPresets} from "../exchange.js";
+import {createPresetSelector, refreshPresets} from "../exchange.js";
 import {initializePresetStore} from "../database.js";
+import {createMainControlBar} from "./controls/bar.js";
+import {takeMilliSeconds} from "../measuring.js";
+import {updateResolutionInState} from "../../webgl/helpers/resolution.js";
 
 
-const generatePage = (glContext, elements, state, controls, autoRenderOnLoad = true) => {
+const generatePage = (glContext, elements, state, controls) => {
 
     if (!state.program) {
         elements.workingShader.remove();
@@ -65,26 +66,25 @@ const generatePage = (glContext, elements, state, controls, autoRenderOnLoad = t
         .then(scrollToFirstInterestingLine);
 
     addCanvasMouseInteraction(elements, state);
-    addControlsToPage(elements, state, controls, autoRenderOnLoad);
+    addMainControls(elements, state, controls);
+    addUniformControls(elements, state, controls);
     addDisplayControls(elements, state, glContext);
 
     state.selectedPreset = null;
-    elements.db = undefined;
     initializePresetStore()
         .then(db => {
             elements.db = db;
             refreshPresets(elements, state);
         });
 
-    elements.pageLoadingMs = performance.now() - elements.initialMs;
+    elements.measured.pageLoadingMs = takeMilliSeconds(elements.measured.initialMs);
 };
 
 export default generatePage;
 
-
-export const addControlsToPage = (elements, state, controls, autoRenderOnLoad) => {
+export const addMainControls = (elements, state, controls) => {
     if (!state.program) {
-        elements.controls.innerHTML = `
+        elements.controlBar.innerHTML = `
             <div class="error" style="text-align: right;">
                 Nothing to render, because compilation failed.
             </div>
@@ -92,50 +92,97 @@ export const addControlsToPage = (elements, state, controls, autoRenderOnLoad) =
         return;
     }
 
-    if (autoRenderOnLoad) {
-        controls.onRender();
-    } else {
-        addButton({
-            parent: elements.controls,
-            title: "Render!",
-            onClick: controls.onRender,
-        });
-    }
+    const {seeker} = createMainControlBar(elements, state, controls);
 
-    elements.iTime = addFreeRow({
-        parent: elements.controls,
-        label: "iTime",
-        id: "iTime",
-        valuePrefix: "=",
-        content: [
-            createDiv("", "full-spacer"),
-            ...createClipboardButtons(elements, state),
-            createDiv("", "spacer"),
-            createResetAllButton(elements, state, controls)
-        ]
-    });
-
-    elements.toggles = [];
     for (const control of controls.toggles ?? []) {
-        const toggleIndex = elements.toggles.length;
-        elements.toggles.push(
+        const toggleIndex = elements.controlBar.buttons.length;
+        elements.controlBar.buttons.push(
             addButton({
                 title: control.label(),
                 style: control.style,
-                onClick: async () => {
+                onClick: async (...args) => {
+                    console.log("büttØn?", args);
                     await control.onClick();
-                    const self = elements.toggles[toggleIndex];
+                    const self = elements.controlBar.buttons[toggleIndex];
                     self.textContent = control.label();
                 }
             })
         );
     }
-    if (elements.toggles.length > 0) {
-        elements.toggleButtons = addFreeRow({
-            parent: elements.controls,
-            label: "",
-            content: elements.toggles,
+    if (elements.controlBar.buttons.length > 0) {
+        addFreeRow({
+            parent: elements.controlBar.frame,
+            content: elements.controlBar.buttons,
         });
+    }
+
+    let printNextKey;
+    document.addEventListener("keydown", event => {
+        if (printNextKey) {
+            console.log("Key:", event.key, event.code);
+            printNextKey = false;
+        }
+        // Some global time control features, by pressing Ctrl + something.
+        if (!event.ctrlKey) {
+            return;
+        }
+        if (document.activeElement !== document.body) {
+            return;
+        }
+        let preventBrowserBehaviour = true;
+        // cf. playback.js for how the state variables work
+        switch (event.key) {
+            case "Backspace":
+                state.play.signal.reset = true;
+                break;
+            case " ":
+                seeker.do.toggle();
+                break;
+            case "ArrowLeft":
+                seeker.do.jump({delta: -1});
+                break;
+            case "ArrowRight":
+                seeker.do.jump({delta: +1});
+                break;
+            case "ArrowUp":
+                seeker.do.jump({delta: +0.05});
+                break;
+            case "ArrowDown":
+                seeker.do.jump({delta: -0.05});
+                break;
+            case "Home":
+                seeker.do.jump({to: 0});
+                break;
+            case "End":
+                seeker.do.jump({to: state.play.at.extend});
+                break;
+            case "Insert":
+                const time = window.prompt("Enter Second:", state.time.toString());
+                if (time) {
+                    seeker.do.jump({to: +time});
+                }
+                break;
+            case "i":
+                console.info(state, elements);
+                printNextKey = true;
+                break;
+            case "u":
+                openUniformInputHelper();
+                break;
+            default:
+                preventBrowserBehaviour = false;
+                break;
+        }
+        if (preventBrowserBehaviour) {
+            event.preventDefault();
+            event.stopPropagation();
+        }
+    });
+};
+
+export const addUniformControls = (elements, state, controls) => {
+    if (!state.program) {
+        return;
     }
 
     const groups = collectGroups(controls);
@@ -143,13 +190,9 @@ export const addControlsToPage = (elements, state, controls, autoRenderOnLoad) =
     for (const control of controls.uniforms) {
 
         if (control.type === "label") {
-            if (elements[control.name] !== undefined) {
-                continue;
-            }
-            // <-- skip overwriting one defined per default (i.e. iTime)
             elements[control.name] =
                 addFreeRow({
-                    parent: elements.controls,
+                    parent: elements.uniformControls,
                     label: control.name,
                     id: control.name,
                     content: createDiv("=", "value-label"),
@@ -157,23 +200,23 @@ export const addControlsToPage = (elements, state, controls, autoRenderOnLoad) =
             continue;
         }
         else if (control.type === "button") {
-            elements.controlButtons[control.name] = addButton({
+            elements.buttons[control.name] = addButton({
                 title: control.label,
                 onClick: () =>
-                    control.onClick(elements.controlButtons[control.name], control)
+                    control.onClick(elements.buttons[control.name], control)
             });
             elements[control.name] =
                 addFreeRow({
-                    parent: elements.controls,
+                    parent: elements.uniformControls,
                     label: "",
                     id: control.name,
-                    content: elements.controlButtons[control.name]
+                    content: elements.buttons[control.name]
                 })
             continue;
         }
-        else if (control.type === "separator" || control.separator) {
+        else if (control.separator) {
             addFreeRow({
-                parent: elements.controls,
+                parent: elements.uniformControls,
                 content: createDiv(control.separator ?? control.title, "separator"),
                 isSeparator: true,
             });
@@ -188,68 +231,22 @@ export const addControlsToPage = (elements, state, controls, autoRenderOnLoad) =
         if (!input) {
             continue;
         }
-        elements.controls.appendChild(input.name);
-        elements.controls.appendChild(input.value);
+        elements.uniformControls.appendChild(input.name);
+        elements.uniformControls.appendChild(input.value);
         if (control.boolean) {
-            elements.controls.appendChild(input.control);
-            elements.controls.appendChild(input.description);
+            elements.uniformControls.appendChild(input.control);
+            elements.uniformControls.appendChild(input.description);
         } else {
-            elements.controls.appendChild(input.min);
-            elements.controls.appendChild(input.control);
-            elements.controls.appendChild(input.max);
+            elements.uniformControls.appendChild(input.min);
+            elements.uniformControls.appendChild(input.control);
+            elements.uniformControls.appendChild(input.max);
         }
         if (input.reset) {
-            elements.controls.appendChild(input.reset);
+            elements.uniformControls.appendChild(input.reset);
         }
         elements.uniforms[control.name] = input;
     }
 
-    document.addEventListener("keydown", event => {
-        // Some global time control features, by pressing Ctrl + something.
-        if (!event.ctrlKey) {
-            return;
-        }
-        if (document.activeElement !== document.body) {
-            return;
-        }
-        let preventBrowserBehaviour = true;
-        // cf. render.js for how the state variables work
-        switch (event.key) {
-            case "Backspace":
-                state.resetSignal = true;
-                break;
-            case " ":
-                if (state.timeRunning) {
-                    state.timeRunning = false;
-                } else {
-                    state.timeRunning = true;
-                    state.startTime = null;
-                }
-                break;
-            case "ArrowLeft":
-                shiftTime(state, -1);
-                break;
-            case "ArrowRight":
-                shiftTime(state, +1);
-                break;
-            case "ArrowUp":
-                shiftTime(state, +0.05);
-                break;
-            case "ArrowDown":
-                shiftTime(state, -0.05);
-                break;
-            case "u":
-                openUniformInputHelper();
-                break;
-            default:
-                preventBrowserBehaviour = false;
-                break;
-        }
-        if (preventBrowserBehaviour) {
-            event.preventDefault();
-            event.stopPropagation();
-        }
-    });
 };
 
 function renderErrorConsole(state) {
@@ -309,12 +306,14 @@ function addDisplayControls(elements, state, glContext) {
     const info = appendElement(elements.displayControls, "", "div", "fps-box");
     elements.fps = {
         label: createElement("label", "FPS"),
-        display: createDiv("", "fps"),
+        display: createDiv(),
     }
+    elements.fps.display.id = "fps";
     info.appendChild(elements.fps.label);
     info.appendChild(elements.fps.display);
     info.addEventListener("click", () => {
-        state.debugSignal = true;
+        state.play.signal.takeRenderTime = true;
+        console.log(state.play);
     });
 
     elements.presets = createPresetSelector(elements, state);

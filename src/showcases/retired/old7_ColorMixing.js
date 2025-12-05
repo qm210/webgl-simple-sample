@@ -1,5 +1,5 @@
 import standardSetup from "./old3_SimpleGeometry.js";
-import {startRenderLoop} from "../../webgl/render.js";
+import {startRenderLoop} from "../../app/playback.js";
 
 import fragmentShaderSource from "../../shaders/spring-2025/colorMixing.glsl";
 

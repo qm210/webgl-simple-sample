@@ -1,4 +1,4 @@
-import {startRenderLoop} from "../webgl/render.js";
+import {startRenderLoop} from "../app/playback.js";
 
 import fragmentShaderSource from "../shaders/noisePlaygroundExtended.glsl";
 import {initBasicState, readPixelsAndEvaluate} from "./common.js";

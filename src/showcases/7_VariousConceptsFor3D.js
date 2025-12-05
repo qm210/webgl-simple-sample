@@ -1,10 +1,10 @@
-import {startRenderLoop} from "../webgl/render.js";
+import {startRenderLoop} from "../app/playback.js";
 import {initBasicState} from "./common.js";
-import {createTextureFromImage} from "../webgl/helpers.js";
 import fragmentShaderSource from "../shaders/raymarchingPlusVariousConcepts.glsl";
 import imageFrame from "../textures/frame.png";
 import imageSpace from "../textures/hubble_extreme_deep_field.jpg";
 import imageRock from "../textures/Rock032_1K-JPG_Color.jpg";
+import {createTextureFromImage} from "../webgl/helpers/textures.js";
 
 export default {
     title: "Various 3D Concepts",

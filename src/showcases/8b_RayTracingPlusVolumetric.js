@@ -1,4 +1,4 @@
-import {startRenderLoop} from "../webgl/render.js";
+import {startRenderLoop} from "../app/playback.js";
 import {initBasicState} from "./common.js";
 import fragmentShaderSource from "../shaders/raytracingPlusVolumetricMarching.glsl";
 

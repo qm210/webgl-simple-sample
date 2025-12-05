@@ -1,30 +1,17 @@
-import {createDiv, createElement, createSpan} from "./dom.js";
-import {initMouseState} from "../mouse.js";
+import {createDiv, createElement, createSmallButton, createSpan} from "../dom.js";
 
-export function addButton({parent, onClick, onRightClick, title = "", className = "", style}) {
-    const button = document.createElement("button");
-    button.textContent = title;
-    if (className) {
-        button.className = className;
+export function sessionStoreControlState(state, control) {
+    if (state[control.name] === control.defaultValue) {
+        sessionStorage.removeItem(control.storageKey);
+    } else {
+        sessionStorage.setItem(
+            control.storageKey,
+            JSON.stringify(state[control.name])
+        );
     }
-    if (style) {
-        for (const key in style) {
-            button.style[key] = style[key];
-        }
-    }
-    if (onClick) {
-      button.addEventListener("click", onClick);
-    }
-    if (onRightClick) {
-      button.addEventListener("contextmenu", onRightClick);
-    }
-    if (parent) {
-        parent.appendChild(button);
-    }
-    return button;
 }
 
-export const addFreeRow = ({parent, label, id, content, valuePrefix, isSeparator}) => {
+export function addFreeRow({parent, label, id, content, isSeparator}) {
     const name = createElement("label", label);
     const container = createDiv("", "free-row");
     const value = createDiv("", "value-label");
@@ -40,11 +27,6 @@ export const addFreeRow = ({parent, label, id, content, valuePrefix, isSeparator
     if (isSeparator) {
         container.classList.add("separator-row");
     } else {
-        if (valuePrefix) {
-            container.appendChild(
-                createDiv(valuePrefix, "value-label")
-            );
-        }
         container.appendChild(value);
     }
     if (content instanceof Array) {
@@ -53,7 +35,7 @@ export const addFreeRow = ({parent, label, id, content, valuePrefix, isSeparator
         container.appendChild(content);
     }
     return {container, name, value, content};
-};
+}
 
 export function createInputElements(state, control) {
 
@@ -117,24 +99,6 @@ export function createInputElements(state, control) {
             console.warn("Control type", control.type, "has no elements definition (yet)", control);
             return undefined;
     }
-}
-
-function sessionStoreControlState(state, control) {
-    if (state[control.name] === control.defaultValue) {
-        sessionStorage.removeItem(control.storageKey);
-    } else {
-        sessionStorage.setItem(
-            control.storageKey,
-            JSON.stringify(state[control.name])
-        );
-    }
-}
-
-export function createSmallButton(title, ...extraClasses) {
-    const button = document.createElement("button");
-    button.classList.add("small-button", ...extraClasses);
-    button.textContent = title;
-    return button;
 }
 
 const createInputControlElements = (control) => {
@@ -467,7 +431,7 @@ const asCursorInput = (elements, state, control) => {
     }
 }
 
-function updateVecLabel(labelElement, state, control) {
+export function updateVecLabel(labelElement, state, control) {
     let value = state[control.name];
     if (value instanceof Array) {
         value = value
@@ -552,27 +516,3 @@ export const asBoolInput = (elements, state, control) => {
     }
 };
 
-export function createResetAllButton(elements, state, controls) {
-    const button = createSmallButton("Reset All", "right-align");
-    button.addEventListener("click", event => {
-        const allResetButtons = elements.controls.querySelectorAll("button.reset");
-        for (const button of allResetButtons) {
-            button.click();
-        }
-        for (const control of controls.uniforms) {
-            if (control.type === "cursorInput") {
-                state[control.name] = control.defaultValue;
-                const label = elements.uniforms[control.name].value;
-                updateVecLabel(label, state, control);
-                sessionStoreControlState(state, control);
-            }
-        }
-        if (controls.onReset) {
-            controls.onReset();
-        }
-        initMouseState(state, true);
-        state.resetSignal = true;
-        event.target.blur();
-    });
-    return button;
-}

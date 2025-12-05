@@ -1,135 +1,3 @@
-export function createShader(gl, type, source) {
-    let shader = gl.createShader(type);
-    let error = "";
-
-    gl.shaderSource(shader, source);
-    gl.compileShader(shader);
-
-    if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-        error = gl.getShaderInfoLog(shader);
-        gl.deleteShader(shader);
-        shader = null;
-    }
-
-    return {shader, error};
-}
-
-export function takeMilliSeconds(since = 0) {
-    return +(performance.now() - since).toFixed(3);
-}
-
-/**
- * Helper function for aspectRatio
- * @param geometry {width, height, aspectRatio} - canvas dimensions, specify any two
- * @return {{width, height}} - the resolution in integer pixels.
- */
-export function asResolution({width, height, aspectRatio}) {
-    if (aspectRatio) {
-        return {
-            width: Math.round(height * aspectRatio),
-            height: Math.round(height),
-        };
-    }
-    return {
-        width: Math.round(width || height * aspectRatio),
-        height: Math.round(height ?? width / aspectRatio),
-    };
-}
-
-export function resolutionScaled(newHeight, oldWidth, oldHeight) {
-    const resolution = {
-        width: Math.floor(newHeight * oldWidth / oldHeight),
-        height: Math.floor(newHeight),
-    };
-    resolution.asVec2 = [resolution.width, resolution.height];
-    resolution.texelSize = [1 / resolution.width, 1 / resolution.height];
-    return resolution;
-}
-
-/**
- * @return {{width, height}}
- */
-export function initialOrStoredResolution(canvas, geometry) {
-    const canvasRect = canvas.getBoundingClientRect();
-    geometry.height = loadStoredResolutionHeight()
-        ?? geometry.height
-        ?? canvasRect.height;
-    if (!geometry.aspectRatio && !geometry.width) {
-        geometry.width = canvasRect.width;
-    }
-    return asResolution(geometry);
-}
-
-function loadStoredResolutionHeight() {
-    const resolution = JSON.parse(localStorage.getItem("qm.resolution") ?? "null");
-    return resolution?.height ?? null;
-}
-
-export function storeResolution(width, height) {
-    localStorage.setItem("qm.resolution", JSON.stringify({width, height}));
-}
-
-export function loadImage(imageSource, onLoad) {
-    const img = new Image();
-    img.onload = () => onLoad(img);
-    img.src = imageSource;
-    return img;
-}
-
-export function createTextureFromImage(gl, imageSource, options) {
-    const opt = options ?? {};
-
-    // Texturen brauchen einerseits die Parameter, die beschreiben, wie eine Textur skaliert
-    // und außerhalb der Koordinaten (0..1) interpretiert werden soll,
-    // und die Spezifikation des Datentyps, Anzahl Kanäle, Farbtiefe.
-
-    // S, T: Alte Konvention für die Texel-Koordinaten (Heute oft UV, für OpenGL aber nicht.)
-    // Wrap: CLAMP_TO_EDGE, REPEAT, MIRRORED_REPEAT (in ES / WebGl: no border colors)
-    opt.wrapS ??= gl.CLAMP_TO_EDGE;
-    opt.wrapT ??= gl.CLAMP_TO_EDGE;
-    // Filter: LINEAR, NEAREST
-    opt.minFilter ??= gl.LINEAR;
-    opt.magFilter ??= gl.LINEAR;
-    // Wir lassen hier das Konzept der "Mipmaps" aus. Es geht da darum,
-    // verschiedene Versionen einen Textur für verschiedene Skalierungen darzustellen,
-    // was wir hier nur insofern wissen müssen, dass MIN_FILTER so etwas erwartet und deswegen,
-    // wenn man dessen glTexParameteri()-Call auslässt, die Textur erstmal gar nicht funktioniert.
-    // Das Argument "lod" (Level of Detail) in einigen Funktionen hängt auch an diesen Mipmaps -> Bei uns 0.
-
-    // Spezifikation des Datentyps (damit auch Anzahl Kanäle / Farbtiefe)
-    // ACHTUNG: Diese müssen aufeinander abgestimmt sein. Wird sonst Fehler geben.
-    // https://registry.khronos.org/OpenGL-Refpages/gl4/html/glTexImage2D.xhtml
-    opt.dataType ??= gl.UNSIGNED_BYTE;
-    opt.dataFormat ??= gl.RGBA;
-    opt.internalFormat ??= gl.RGBA;
-    // Anmerkung: internalFormat = gl.SRGB8_ALPHA8 kann bei Bildern oft sinnvoll sein
-
-    const texture = gl.createTexture();
-    gl.bindTexture(gl.TEXTURE_2D, texture);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, opt.wrapS);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, opt.wrapT);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, opt.minFilter);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, opt.magFilter);
-
-    loadImage(imageSource, (img) => {
-        // Laden im Browser notwendigerweise asynchron. Flackert ggf. auch kurz.
-        // Wichtig: Textur neu binden, weil der Zustand von gl.TEXTURE_2D jetzt unklar ist.
-        gl.bindTexture(gl.TEXTURE_2D, texture);
-        gl.texImage2D(
-            gl.TEXTURE_2D,
-            0,
-            opt.internalFormat,
-            opt.dataFormat,
-            opt.dataType,
-            img
-        );
-        // Notiz: Weil das hier im Browser ist, ist die Auflösung des Bilds im HTMLImageElement "img"
-        //        bereits bekannt. Im Allgemeinen würde man die Auflösung hier auch noch spezifizieren.
-    });
-
-    return texture;
-}
-
 export function createFramebufferWithTexture(gl, options, fbIndex = undefined) {
     const opt = options ?? {};
     opt.width ??= gl.drawingBufferWidth;
@@ -172,7 +40,7 @@ export function createFramebufferWithTexture(gl, options, fbIndex = undefined) {
     const fbo = gl.createFramebuffer();
     gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
 
-    gl.framebufferTexture2D(gl.FRAMEBUFFER, opt.attachment, gl.TEXTURE_2D, texture, 0 );
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, opt.attachment, gl.TEXTURE_2D, texture, 0);
 
     const status = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
     warnAboutBadFramebufferStatus(gl, status);
@@ -188,7 +56,7 @@ export function createFramebufferWithTexture(gl, options, fbIndex = undefined) {
         extraDataTexture: null,
         width: opt.width,
         height: opt.height,
-        texelSize: [1/opt.width, 1/opt.height],
+        texelSize: [1 / opt.width, 1 / opt.height],
         params: opt,
         // <-- Speichern wir hier, weil wir bei einem Resize reagieren müssen
         //     TODO: mache ich aber noch nicht! Canvas-Resizing braucht F5-Reload.
@@ -261,7 +129,7 @@ export function recreateFramebufferWithTexture(gl, framebuffer) {
     const fbo = gl.createFramebuffer();
     gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
 
-    gl.framebufferTexture2D(gl.FRAMEBUFFER, old.attachment, gl.TEXTURE_2D, texture, 0 );
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, old.attachment, gl.TEXTURE_2D, texture, 0);
 
     const status = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
     warnAboutBadFramebufferStatus(gl, status);
@@ -308,14 +176,6 @@ export function takePingPongFramebuffers(state) {
         write: state.framebuffer[pingIndex],
         read: state.framebuffer[pongIndex],
     }
-}
-
-export function updateResolutionInState(state, glContext) {
-    const width = glContext.drawingBufferWidth;
-    const height = glContext.drawingBufferHeight;
-    state.resolution = [width, height];
-    state.texelSize = [1/width, 1/height];
-    return {width, height};
 }
 
 export function clearFramebuffers(gl, state) {

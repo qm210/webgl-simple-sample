@@ -1,4 +1,4 @@
-import {startRenderLoop} from "../webgl/render.js";
+import {startRenderLoop} from "../app/playback.js";
 import {initBasicState} from "./common.js";
 import fragmentShaderSource from "../shaders/raytracingFirstSteps.glsl";
 
@@ -29,8 +29,7 @@ export default {
             );
         },
         uniforms: [{
-            type: "separator",
-            title: "Szene / Kamera - Einstellungen"
+            separator: "Szene / Kamera - Einstellungen"
         }, {
             type: "float",
             name: "iFieldOfViewDegrees",
@@ -50,8 +49,7 @@ export default {
             min: -0.5,
             max: 0.5,
         }, {
-            type: "separator",
-            title: "Ray Marching & Tracing - Parameter"
+            separator: "Ray Marching & Tracing - Parameter"
         }, {
             type: "float",
             name: "iRayMarchingIterations",
@@ -104,8 +102,7 @@ export default {
             description: "Strahl beim Neuausrichtung minimal vorverschieben, um nicht\n" +
                 "im worst case im Übergang hängenzubleiben (seltenes Problem)",
         }, {
-            type: "separator",
-            title: "Beleuchtungsmodell"
+            separator: "Beleuchtungsmodell"
         }, {
             type: "vec3",
             name: "vecDirectionalLight",
@@ -202,8 +199,7 @@ export default {
             max: 200,
             step: 1,
         }, {
-            type: "separator",
-            title: "Materialien"
+            separator: "Materialien"
         }, {
             type: "float",
             name: "iMetalReflectance",
@@ -224,8 +220,7 @@ export default {
             min: 0.01,
             max: 10.,
         }, {
-            type: "separator",
-            title: "Nachbearbeitung"
+            separator: "Nachbearbeitung"
         }, {
             type: "float",
             name: "iToneMapExposure",
@@ -245,8 +240,7 @@ export default {
             min: 0.,
             max: 4.,
         }, {
-            type: "separator",
-            title: "Pseudo-Noise - Berge"
+            separator: "Pseudo-Noise - Berge"
         }, {
             type: "float",
             name: "iNoiseLevel",

@@ -1,4 +1,31 @@
-.fps {
+#time-controls {
+    display: flex;
+    justify-content: stretch;
+    flex: 1;
+}
+
+#time-seek {
+    flex: 1;
+    height: 24px;
+}
+
+#time-seek > rect {
+    min-width: 4px;
+    min-height: 4px;
+}
+
+#seek-handle {
+    cursor: ew-resize;
+    pointer-events: visibleFill;
+    stroke-width: 4px;
+    transition: color 0.5s ease;
+}
+
+#time-value {
+    font-weight: bold;
+}
+
+#fps {
     font-size: smaller;
     font-weight: bold;
     opacity: 0.6;

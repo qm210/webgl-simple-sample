@@ -34,13 +34,6 @@ export function createSpan({text, id, classes, title, data}) {
     return span;
 }
 
-export function appendButton(parent, text, onClickHandler) {
-    const button = document.createElement("button");
-    button.textContent = text;
-    button.addEventListener("click", onClickHandler);
-    parent.appendChild(button);
-}
-
 export function assignGloballyUniqueClass(element, className) {
     if (!element) {
         return;
@@ -59,4 +52,41 @@ export function findParentOfClass(element, className) {
         result = result.parentElement;
     }
     return result;
+}
+
+export function appendButton(parent, text, onClickHandler) {
+    const button = document.createElement("button");
+    button.textContent = text;
+    button.addEventListener("click", onClickHandler);
+    parent.appendChild(button);
+}
+
+export function addButton({parent, onClick, onRightClick, title = "", className = "", style}) {
+    const button = document.createElement("button");
+    button.textContent = title;
+    if (className) {
+        button.className = className;
+    }
+    if (style) {
+        for (const key in style) {
+            button.style[key] = style[key];
+        }
+    }
+    if (onClick) {
+        button.addEventListener("click", onClick);
+    }
+    if (onRightClick) {
+        button.addEventListener("contextmenu", onRightClick);
+    }
+    if (parent) {
+        parent.appendChild(button);
+    }
+    return button;
+}
+
+export function createSmallButton(title, ...extraClasses) {
+    const button = document.createElement("button");
+    button.classList.add("small-button", ...extraClasses);
+    button.textContent = title;
+    return button;
 }

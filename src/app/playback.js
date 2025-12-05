@@ -15,90 +15,75 @@
  */
 
 export function startRenderLoop(renderFunction, state, elements) {
-    cancelAnimationFrame(state.animationFrame);
-    state.startTime = null;
-    state.timeRunning = true;
-    state.deltaTime = 0;
-    state.iFrame = -1;
-    state.resetSignal = false;
-    state.stopSignal = false;
-    state.stopReached = false;
-    state.debugSignal = false;
-    state.fps = null;
-    state.animation = (timestamp) =>
-        runLoop(renderFunction, state, elements, timestamp);
-    state.animationFrame = requestAnimationFrame(state.animation);
-}
-
-export function whilePausingRendering(state, callFunction) {
-    state.stopSignal = true;
-    let safetyIndex = 0;
-    while (!state.stopReached) {
-        safetyIndex++;
-        if (safetyIndex > 10000) {
-            console.error("whilePausingRendering() / runLoop() broken, stopSignal never reached!");
-            break;
-        }
+    if (!state.program) {
+        console.error("Cannot startRenderLoop() with no-shader-program-at-all!");
+        return;
     }
-    callFunction();
-    const continueAt = 0.001 * performance.now();
-    state.startTime += continueAt - state.time;
-    state.stopSignal = state.stopReached = false;
-    state.animationFrame = requestAnimationFrame(state.animation);
+    cancelAnimationFrame(state.play.animationFrame);
+    state.play.running ??= true;
+    state.iFrame = -1;
+    state.play.previous.timestamp = null;
+    state.play.dt = 0;
+    state.play.fps = null;
+    state.play.signal.reset = false;
+    state.play.signal.stop = false;
+    state.play.signal.reachedStop = false;
+    state.play.signal.takeRenderTime = false;
+    state.play.animate = (timestamp) =>
+        runLoop(renderFunction, state, elements, timestamp);
+    state.play.animationFrame = requestAnimationFrame(state.play.animate);
 }
 
 function runLoop(renderFunction, state, elements, timestamp) {
-    if (state.resetSignal) {
+    if (state.play.signal.reset) {
         resetLoop(state);
     }
-    if (state.startTime === null) {
-        state.startTime = timestamp;
-    }
-    if (state.timeRunning) {
-        const previousTime = state.time;
-        state.time = 0.001 * (timestamp - state.startTime);
-        state.deltaTime = previousTime ? (state.time - previousTime) : 0;
+
+    state.play.dt = 0;
+    if (state.play.running) {
+        if (state.play.previous.timestamp === null) {
+            state.play.previous.timestamp = timestamp;
+        } else {
+            state.play.previous.time = state.time;
+        }
+        state.play.dt = 0.001 * (timestamp - state.play.previous.timestamp);
+        state.time += state.play.dt
         state.iFrame = state.iFrame + 1;
         doFpsMeasurement(state);
+        state.play.previous.timestamp = timestamp;
     }
 
-    if (state.debugSignal) {
+    if (state.play.signal.takeRenderTime) {
         console.time("render");
     }
 
     renderFunction(state);
 
-    if (state.debugSignal) {
+    if (state.play.signal.takeRenderTime) {
         console.timeEnd("render");
-        console.info(state);
-        state.debugSignal = false;
+        state.play.signal.takeRenderTime = false;
     }
 
-    elements.iTime.value.textContent = state.time.toFixed(2) + " sec";
+    elements.controlBar.time.update();
     elements.fps.display.textContent = state.fps;
 
-    if (state.stopSignal) {
-        state.stopReached = true;
+    if (state.play.signal.stop) {
+        state.play.reachedStop = true;
         resetFpsMeasurement(state);
         return;
     }
 
-    requestAnimationFrame(state.animation);
-}
-
-export function shiftTime(state, seconds) {
-    state.time += seconds;
-    state.startTime -= 1000 * seconds;
+    requestAnimationFrame(state.play.animate);
 }
 
 export function resetLoop(state) {
-    state.startTime = null;
+    state.play.previous.timestamp = null;
+    state.play.signal.reset = false;
+    state.play.signal.stop = false;
+    state.play.reachedStop = false;
+    state.play.running = true;
     state.time = 0;
     state.iFrame = -1;
-    state.timeRunning = true;
-    state.resetSignal = false;
-    state.stopSignal = false;
-    state.stopReached = false;
 }
 
 const fpsMeter = {
@@ -111,7 +96,7 @@ const fpsMeter = {
         lastFrame: null,
         fps: null,
     }
-}
+};
 
 function resetFpsMeasurement(state) {
     state.fps = null;
@@ -155,4 +140,21 @@ function doFpsMeasurement(state) {
         weight += 1;
     }
     state.fps = weight > 0 ? (state.fps / weight).toFixed(0) : "?";
+}
+
+export function whilePausingRendering(state, callFunction) {
+    state.play.signal.stop = true;
+    let safetyIndex = 0;
+    while (!state.play.reachedStop) {
+        safetyIndex++;
+        if (safetyIndex > 10000) {
+            console.error("whilePausingRendering() / runLoop() broken, Stop Signal never reached!");
+            break;
+        }
+    }
+    callFunction();
+    const continueAt = 0.001 * performance.now();
+    state.play.previous.timestamp += continueAt - state.time;
+    state.play.signal.stop = state.play.reachedStop = false;
+    state.animationFrame = requestAnimationFrame(state.play.animate);
 }

@@ -1,9 +1,5 @@
 import standardSetup from "./old3_SimpleGeometry.js";
-import {startRenderLoop} from "../../webgl/render.js";
-import {createTextureFromImage} from "../../webgl/helpers.js";
 
-// multiPassMain.glsl ist fast wie texturesAdvanced.glsl
-// aber was ist anders?
 import fragmentShaderSource from "../../shaders/spring-2025/multiPassMain.glsl";
 import postFragmentShaderSource from "../../shaders/spring-2025/multiPassPost.glsl";
 
@@ -11,6 +7,8 @@ import imageFrame from "../../textures/frame.png";
 import imageSpace from "../../textures/hubble_extreme_deep_field.jpg";
 import imageWood from "../../textures/Wood066_1K-JPG_Color.jpg";
 import imageBumpMap from "../../textures/funny_bumpmap.png";
+import {createTextureFromImage} from "../../webgl/helpers/textures.js";
+import {startRenderLoop} from "../../app/playback.js";
 
 const ACTIVATE_POST_PROCESSING = true;
 

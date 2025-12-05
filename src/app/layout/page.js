@@ -1,5 +1,4 @@
 
-
 export default function initLayout(rootId) {
 
     const root = document.getElementById(rootId);
@@ -12,7 +11,10 @@ export default function initLayout(rootId) {
             <canvas id="canvas"></canvas>
             <div id="display-controls"></div>            
           </div>
-          <div id="shader-controls"></div>
+          <div id="control-frame">
+            <div id="main-controls"></div>
+          </div>
+          <div id="uniform-controls"></div>
         </div>
       </div>
     `;
@@ -23,18 +25,43 @@ export default function initLayout(rootId) {
         workingShader: document.getElementById("working-program"),
         canvasFrame: document.getElementById("canvas-frame"),
         canvas: document.getElementById("canvas"),
-        controls: document.getElementById("shader-controls"),
         displayControls: document.getElementById("display-controls"),
-        controlButtons: {},
+        controlBar: {
+            frame: document.getElementById("control-frame"),
+            main: document.getElementById("main-controls"),
+            buttons: [],
+            time: {
+                frame: emptyDiv({id: "time-controls"}),
+                value: emptyDiv({className: "value-label"}),
+                update: void 0,
+                seeker: emptyDiv({id: "time-seek"}),
+            }
+        },
+        buttons: {},
+        uniformControls: document.getElementById("uniform-controls"),
         uniforms: {},
-        initialMs: performance.now(),
-        pageLoadingMs: null,
+        db: undefined,
+        measured: {
+            initialMs: performance.now(),
+            pageLoadingMs: null,
+        }
     };
 
     keepScrollPosition(elements.shaders, "shaders.scroll");
-    keepScrollPosition(elements.controls, "controls.scroll");
+    keepScrollPosition(elements.uniformControls, "uniforms.scroll");
 
     return elements;
+}
+
+function emptyDiv({id, className}) {
+    const element = document.createElement("div");
+    if (id) {
+        element.id = id;
+    }
+    if (className) {
+        element.className = className;
+    }
+    return element;
 }
 
 export function setFromUrlParameters(paramMap) {

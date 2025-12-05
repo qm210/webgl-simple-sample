@@ -1,11 +1,11 @@
 import standardSetup from "./retired/old3_SimpleGeometry.js";
-import {startRenderLoop} from "../webgl/render.js";
-import {createFramebufferWithTexture, takePingPongFramebuffers} from "../webgl/helpers.js";
+import {startRenderLoop} from "../app/playback.js";
 
 // dieses Beispiel basiert auf dem bekannten "Ray Tracing In One Weekend" von Peter Shirley
 // https://raytracing.github.io/books/RayTracingInOneWeekend.html#wherenext?
 // bzw. seiner Shader-Toy-Implementierung, big credits an "reinder":
 import fragmentShaderSource from "../shaders/specific/stochasticRayTracing_RIOW.glsl";
+import {createFramebufferWithTexture, takePingPongFramebuffers} from "../webgl/helpers/framebuffers.js";
 
 export default {
     title: "Stochastic Ray Tracing",

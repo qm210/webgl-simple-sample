@@ -1,6 +1,6 @@
+import {startRenderLoop} from "../../app/playback.js";
+import {createTextureFromImage} from "../../webgl/helpers/textures.js";
 import standardSetup from "./old3_SimpleGeometry.js";
-import {createTextureFromImage} from "../../webgl/helpers.js";
-import {startRenderLoop} from "../../webgl/render.js";
 
 import fragmentShaderSource from "../../shaders/spring-2025/texturesAdvanced_K.glsl";
 import image0 from "../../textures/frame.png";

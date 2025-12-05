@@ -1,8 +1,8 @@
-import {startRenderLoop} from "../webgl/render.js";
-import {createFramebufferWithTexture} from "../webgl/helpers.js";
+import {startRenderLoop} from "../app/playback.js";
 
 import fragmentShaderSource from "../shaders/performancePlayground.glsl";
 import {initBasicState} from "./common.js";
+import {createFramebufferWithTexture} from "../webgl/helpers/framebuffers.js";
 
 export default {
     title: "Performance Considerations",
@@ -165,6 +165,18 @@ export default {
             max: 30,
             step: 0.01,
         }, {
+            type: "float",
+            name: "iFloorMorphing",
+            defaultValue: 0,
+            min: -20,
+            max: 20,
+        }, {
+            type: "float",
+            name: "iFloorHorror",
+            defaultValue: 0,
+            min: -1,
+            max: 2,
+        }, {
             separator: "Zur freien Verwendung..."
         }, {
             type: "float",
@@ -246,6 +258,8 @@ function render(gl, state, elements) {
     gl.uniform1f(state.location.iNoiseScale, state.iNoiseScale);
     gl.uniform1f(state.location.iNoiseLevel, state.iNoiseLevel);
     gl.uniform1f(state.location.iNoiseFreq, state.iNoiseFreq);
+    gl.uniform1f(state.location.iFloorHorror, state.iFloorHorror);
+    gl.uniform1f(state.location.iFloorMorphing, state.iFloorMorphing);
     gl.uniform1i(state.location.iNoiseOctaves, state.iNoiseOctaves);
     gl.uniform1i(state.location.nMarchingSteps, state.nMarchingSteps);
     gl.uniform1i(state.location.nShadowMarchingSteps, state.nShadowMarchingSteps);

@@ -105,7 +105,18 @@
     }
 }
 
-#shader-controls {
+#control-frame {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    width: 100%;
+    padding-right: 8px;
+    overflow: hidden;
+    font-family: monospace;
+    font-size: var(--font-size-base);
+}
+
+#uniform-controls {
     flex: 1;
     display: grid;
     grid-template-columns: auto auto auto 1fr auto auto;
@@ -117,13 +128,8 @@
     overflow-y: auto;
 }
 
-button.render-button {
-    width: 100%;
-    min-height: 3rem;
-    font-size: var(--font-size-large);
-}
-
-#shader-controls > div {
+#control-frame > div,
+#uniform-controls > div {
     display: flex;
     flex-direction: row;
     width: 100%;
@@ -131,23 +137,23 @@ button.render-button {
     align-items: center;
 }
 
-#shader-controls > div {
+#uniform-controls > div {
     font-family: monospace;
     gap: 0.5rem;
 }
 
-#shader-controls > div.value-label {
+#uniform-controls > div.value-label {
     padding-left: 0.25rem;
     padding-right: 0.5rem;
     white-space: nowrap;
     font-size: var(--font-size-label);
 }
 
-#shader-controls > div > label {
+#uniform-controls > div > label {
     white-space: nowrap;
 }
 
-#shader-controls .unused {
+#uniform-controls .unused {
     opacity: 0.5;
 }
 
@@ -174,9 +180,13 @@ button.render-button {
     flex: 1;
 }
 
-.free-row .spacer {
+.spacer {
     flex: 0;
     min-width: 1rem;
+}
+
+.spacer.half {
+    min-width: 0.5rem;
 }
 
 .free-row .right-align {
@@ -251,7 +261,7 @@ button.render-button {
     white-space: nowrap;
 }
 
-#shader-controls > .separator-row:has(+ .separator-row),
-#shader-controls > .separator-row:last-child {
+#uniform-controls > .separator-row:has(+ .separator-row),
+#uniform-controls > .separator-row:last-child {
     display: none;
 }

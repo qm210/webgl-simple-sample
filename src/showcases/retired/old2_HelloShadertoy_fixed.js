@@ -42,10 +42,7 @@ export default {
                 () => renderLoop(gl, state, elements)
             )
         },
-        uniforms: [{
-            type: "label",
-            name: "iTime",
-        }]
+        uniforms: []
     })
 }
 
@@ -59,7 +56,7 @@ function renderLoop(gl, state, elements) {
 
     gl.drawArrays(gl.TRIANGLES, 0, 6);
 
-    elements.iTime.value.textContent = state.time.toFixed(2) + " sec";
+    elements.controlBar.time.update(state);
 
     requestAnimationFrame(() => renderLoop(gl, state, elements))
 }

@@ -1,12 +1,12 @@
-import {startRenderLoop} from "../webgl/render.js";
-import {
-    createPingPongFramebuffersWithTexture, createTextureFromImage, updateResolutionInState
-} from "../webgl/helpers.js";
+import {startRenderLoop} from "../app/playback.js";
 
 import vertexShaderSource from "../shaders/vertex.basicWithDifferentials.glsl"
 import fragmentShaderSource from "../shaders/moreProcessingPlayground.glsl";
 import {initBasicState} from "./common.js";
 import image from "../textures/210_schnoerkel.png";
+import {createTextureFromImage} from "../webgl/helpers/textures.js";
+import {createPingPongFramebuffersWithTexture} from "../webgl/helpers/framebuffers.js";
+import {updateResolutionInState} from "../webgl/helpers/resolution.js";
 
 export default {
     title: "Framebuffer Postprocessing",
@@ -162,7 +162,7 @@ let write, read;
 
 function render(gl, state) {
     gl.uniform1f(state.location.iTime, state.time);
-    gl.uniform1f(state.location.deltaTime, state.deltaTime);
+    gl.uniform1f(state.location.deltaTime, state.play.dt);
     gl.uniform2fv(state.location.iResolution, state.resolution);
     gl.uniform2fv(state.location.texelSize, state.texelSize);
     gl.uniform1i(state.location.iFrame, state.iFrame);

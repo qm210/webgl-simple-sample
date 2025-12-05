@@ -1,0 +1,54 @@
+import {maybeAdjustForCompatibility} from "../webgl/helpers/compatibility.js";
+import {takeMilliSeconds} from "./measuring.js";
+
+export function createInitialState(sources) {
+    sources.fragment = maybeAdjustForCompatibility(sources.fragment);
+    const state = {
+        source: {
+            vertex: sources.vertex,
+            fragment: sources.fragment,
+        },
+        error: {
+            vertex: "",
+            fragment: "",
+            linker: "",
+        },
+        program: undefined,
+        activeUniforms: [],
+        location: {},
+        framebuffer: [],
+        createdAt: takeMilliSeconds(),
+    };
+    return withPlaybackFeatures(state);
+}
+
+function withPlaybackFeatures(state) {
+    state.time = 0;
+    state.play = {
+        dt: 0,
+        running: false,
+        fps: null,
+        at: {
+            max: 60,
+            extend: 50,
+        },
+        loop: {
+            start: null,
+            end: null,
+        },
+        markers: [],
+        signal: {
+            reset: false,
+            stop: false,
+            takeRenderTime: false,
+            reachedStop: false
+        },
+        previous: {
+            timestamp: null,
+            time: null,
+        },
+        animate: void 0,
+        animationFrame: null,
+    };
+    return state;
+}

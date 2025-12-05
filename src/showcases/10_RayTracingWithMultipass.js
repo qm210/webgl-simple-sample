@@ -1,7 +1,8 @@
-import {startRenderLoop} from "../webgl/render.js";
+import {startRenderLoop} from "../app/playback.js";
 import {initBasicState} from "./common.js";
 import fragmentShaderSource from "../shaders/raytracingWithMultipass.glsl";
-import {createFramebufferWithTexture, updateResolutionInState} from "../webgl/helpers.js";
+import {createFramebufferWithTexture} from "../webgl/helpers/framebuffers.js";
+import {updateResolutionInState} from "../webgl/helpers/resolution.js";
 
 export default {
     title: "Ray Tracing: First Steps",
@@ -241,8 +242,7 @@ export default {
             name: "useNormalizedFBM",
             defaultValue: false,
         }, {
-            type: "separator",
-            title: "Post-Processing: Tiefenunschärfe (Depth of Field)"
+            separator: "Post-Processing: Tiefenunschärfe (Depth of Field)"
         }, {
             type: "float",
             name: "iDofFocusDistance",
@@ -273,8 +273,7 @@ export default {
             defaultValue: false,
             description: ""
         }, {
-            type: "separator",
-            title: "Post-Processing: Chromatische Farbabweichung"
+            separator: "Post-Processing: Chromatische Farbabweichung"
         }, {
             type: "vec2",
             name: "iChromaticAbberation",
@@ -282,8 +281,7 @@ export default {
             min: -5,
             max: 5,
         }, {
-            type: "separator",
-            title: "Zur freien Verwendung..."
+            separator: "Zur freien Verwendung..."
         }, {
             type: "float",
             name: "iFree0",

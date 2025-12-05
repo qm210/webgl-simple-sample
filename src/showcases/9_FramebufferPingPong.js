@@ -1,9 +1,10 @@
 import standardSetup from "./retired/old3_SimpleGeometry.js";
-import {startRenderLoop} from "../webgl/render.js";
-import {createFramebufferWithTexture, createTextureFromImage, takePingPongFramebuffers} from "../webgl/helpers.js";
+import {startRenderLoop} from "../app/playback.js";
 
 import fragmentShaderSource from "../shaders/framebufferPingPong.glsl";
 import someSampleImage from "../textures/mysterious_capybara.png";
+import {createTextureFromImage} from "../webgl/helpers/textures.js";
+import {createFramebufferWithTexture, takePingPongFramebuffers} from "../webgl/helpers/framebuffers.js";
 
 export default {
     title: "Stochastic Ray Tracing",
@@ -58,10 +59,7 @@ export default {
                 elements
             );
         },
-        uniforms: [{
-            type: "label",
-            name: "iTime",
-        }]
+        uniforms: []
     })
 };
 

@@ -1,6 +1,6 @@
-import standardSetup from "./old3_SimpleGeometry.js";
-import {startRenderLoop} from "../../webgl/render.js";
+import {startRenderLoop} from "../../app/playback.js";
 
+import standardSetup from "./old3_SimpleGeometry.js";
 import fragmentShaderSource from "../../shaders/specific/volumetricClouds.glsl";
 // <-- huge credits to Christopher Wallis for the original
 //     https://www.shadertoy.com/view/tsScDG

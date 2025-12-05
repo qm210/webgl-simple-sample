@@ -1,13 +1,10 @@
-import {startRenderLoop} from "../webgl/render.js";
-import {
-    createFramebufferWithTexture,
-    createPingPongFramebuffersWithTexture,
-    updateResolutionInState
-} from "../webgl/helpers.js";
+import {startRenderLoop} from "../app/playback.js";
 
 import vertexShaderSource from "../shaders/vertex.basicWithDifferentials.glsl"
 import fragmentShaderSource from "../shaders/multipassPlayground.glsl";
 import {initBasicState} from "./common.js";
+import {createFramebufferWithTexture, createPingPongFramebuffersWithTexture} from "../webgl/helpers/framebuffers.js";
+import {updateResolutionInState} from "../webgl/helpers/resolution.js";
 
 export default {
     title: "Multi-Pass Playground",
@@ -98,9 +95,6 @@ export default {
             );
         },
         uniforms: [{
-            type: "label",
-            name: "iTime",
-        }, {
             type: "float",
             name: "iNoiseLevel",
             defaultValue: 1,

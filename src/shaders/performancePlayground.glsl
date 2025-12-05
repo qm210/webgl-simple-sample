@@ -23,6 +23,8 @@ uniform float iNoiseScale;
 uniform int nShadowMarchingSteps;
 uniform int nMarchingSteps;
 uniform int iNoiseOctaves;
+uniform float iFloorHorror;
+uniform float iFloorMorphing;
 uniform sampler2D textureA;
 uniform sampler2D textureB;
 
@@ -450,6 +452,11 @@ vec2 iBox( in vec3 ro, in vec3 rd, in vec3 rad )
     min( min( t2.x, t2.y ), t2.z ) );
 }
 
+float floorHeight(vec3 pos) {
+    float noise = iNoiseLevel * fbmA(pos * iNoiseFreq, iNoiseOctaves);
+    return max(0., noise);
+}
+
 struct Marched {
     float distance; // <-- das heißt wirklich oft einfach nur "t". Wir machen es _hier_mal_explizit_.
     int material;
@@ -470,7 +477,7 @@ Marched opUnion(Marched res1, float distance2, int material2, float color2)
 
 Marched map( in vec3 pos, bool modified)
 {
-    float floorY = max(0., iNoiseLevel * fbmA(pos * iNoiseFreq, iNoiseOctaves));
+    float floorY = floorHeight(pos);
     Marched res = Marched(pos.y - floorY, FLOOR_MATERIAL, 0.);
 
     float nObjectsX = nObjectsProDim;
@@ -485,9 +492,12 @@ Marched map( in vec3 pos, bool modified)
         vec3 rand1 = hash31(1. + x/100. + z/10.);
         vec3 center = vec3(
             (x + shiftX)/spacing,
-            floorY + 0.7,
+            0.7, // 0.7 + floorHeight(pos),
             (z + shiftZ)/spacing
         );
+        center.y += floorHeight(mix(center, pos, iFloorHorror));
+        // center.y += mix(floorHeight(center), floorHeight(pos), iFloorHorror);
+
         // Lässt sich... sin() vereinfachen, wenn er nur aus optischen Gründen
         // gewählt wird? Versuche z.B. sin_approx() von oben
 //        if (modified) {

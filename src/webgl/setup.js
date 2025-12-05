@@ -1,6 +1,8 @@
-import {createShader, initialOrStoredResolution, storeResolution, takeMilliSeconds} from "./helpers.js";
-import {maybeAdjustForCompatibility} from "./compatibility.js";
 import {loadExtensions} from "./extensions.js";
+import {takeMilliSeconds} from "../app/measuring.js";
+import {initialOrStoredResolution, storeResolution} from "./helpers/resolution.js";
+import {collectActiveUniforms, createShader} from "./helpers/setup.js";
+import {createInitialState} from "../app/initialize.js";
 
 /**
  *
@@ -50,42 +52,6 @@ export function setCanvasResolution(canvas, glContext, width, height) {
     canvas.height = height;
     glContext.viewport(0, 0, width, height);
     storeResolution(width, height);
-}
-
-export function createStaticVertexBuffer(gl, vertexArray) {
-    const positions = new Float32Array(vertexArray);
-    const buffer = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-    gl.bufferData(gl.ARRAY_BUFFER, positions, gl.STATIC_DRAW);
-    return buffer;
-}
-
-export function createStaticIndexBuffer(gl, indexArray) {
-    const indices = new Uint16Array(indexArray);
-    const buffer = gl.createBuffer();
-    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, buffer);
-    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, indices, gl.STATIC_DRAW);
-    return buffer;
-}
-
-function createInitialState(sources) {
-    sources.fragment = maybeAdjustForCompatibility(sources.fragment);
-    return {
-        source: {
-            vertex: sources.vertex,
-            fragment: sources.fragment,
-        },
-        error: {
-            vertex: "",
-            fragment: "",
-            linker: "",
-        },
-        program: undefined,
-        activeUniforms: [],
-        location: {},
-        framebuffer: [],
-        createdAt: takeMilliSeconds(),
-    };
 }
 
 /**
@@ -141,18 +107,3 @@ export function initVertices(gl, state, variableName) {
     );
 }
 
-function collectActiveUniforms(gl, state) {
-    // In einfachen Fällen findet man solche Aufrufe entweder im Setup- oder im Rendercode:
-    //   state.location.iTime = gl.getUniformLocation(state.program, "iTime");
-    //   state.location.iResolution = gl.getUniformLocation(state.program, "iResolution");
-    //   state.location.iMouse = gl.getUniformLocation(state.program, "iMouse");
-    //   etc...
-    // -> seit die Showcases teilweise sehr viele Uniforms haben, lesen wir sie aber immer automatisch:
-    // Vorteil: getActiveUniform() sagt uns auch direkt, ob ein uniform überhaupt verwendet (gelesen) wird.
-    const uniformCount = gl.getProgramParameter(state.program, gl.ACTIVE_UNIFORMS);
-    for (let u = 0; u < uniformCount; u++) {
-        const uniform = gl.getActiveUniform(state.program, u);
-        state.activeUniforms.push(uniform);
-        state.location[uniform.name] = gl.getUniformLocation(state.program, uniform.name);
-    }
-}
