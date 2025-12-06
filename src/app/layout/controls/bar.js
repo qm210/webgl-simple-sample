@@ -8,7 +8,7 @@ import {createTimeSeeker} from "./time.js";
 export function createMainControlBar(elements, state, controls) {
     const seeker = createTimeSeeker(elements.controlBar.time.seeker, state);
     elements.controlBar.time.frame.append(
-        createDiv("Time:", "value-label"),
+        createDiv("Time", "value-label"),
         createDiv("", "half spacer"),
         elements.controlBar.time.seeker,
     );

@@ -270,6 +270,8 @@
 svg text.clickable {
     font-weight: bold;
     cursor: pointer;
+    text-anchor: middle;
+    user-select: none;
 }
 
 svg text.clickable:hover {

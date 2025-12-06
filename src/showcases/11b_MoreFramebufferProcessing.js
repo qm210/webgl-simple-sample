@@ -3,7 +3,7 @@ import {startRenderLoop} from "../app/playback.js";
 import vertexShaderSource from "../shaders/vertex.basicWithDifferentials.glsl"
 import fragmentShaderSource from "../shaders/moreProcessingPlayground.glsl";
 import {initBasicState} from "./common.js";
-import image from "../textures/210_schnoerkel.png";
+import image from "../textures/dream210/210_schnoerkel.png";
 import {createTextureFromImage} from "../webgl/helpers/textures.js";
 import {createPingPongFramebuffersWithTexture} from "../webgl/helpers/framebuffers.js";
 import {updateResolutionInState} from "../webgl/helpers/resolution.js";

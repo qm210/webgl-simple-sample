@@ -15,9 +15,9 @@ export function createTimeSeeker(parent, state) {
             id: "seek-track",
             fill: "#590059"
         }),
-        markers: {
+        area: {
             loop: svgChild(svg, "rect", {
-
+                fill: "#DD9944"
             })
         },
         ticks: {
@@ -45,13 +45,16 @@ export function createTimeSeeker(parent, state) {
         icons: {
             toggle: svgChild(svg, "text", {
                 class: "clickable",
-                "text-anchor": "middle",
                 title: "Toggle Play/Stop"
+            }),
+            rewind: svgChild(svg, "text", {
+                class: "clickable",
+                textContent: "\u23ee",
+                title: "Rewind (Press again to return to this point, ONCE)",
             }),
             loop: svgChild(svg, "text", {
                 class: "clickable",
-                "text-anchor": "middle",
-                textContent: "\u21ba", // \u21A9",
+                textContent: "\u21ba",
                 title: "Loop? (Right Click this for Range Input)"
             }),
         },
@@ -97,32 +100,38 @@ export function createTimeSeeker(parent, state) {
             y: unit.padding,
             rx: unit.padding / 2,
         };
+        withRect(el.track, r.track);
         r.handle = {
             width: unit.step,
             x: unit.padding / 2,
             height: r.bounds.height - unit.padding,
             y: unit.padding / 2
         };
+        withRect(el.handle, r.handle);
         el.handleBar.span = r.track.width - r.handle.width;
         el.handleBar.min = r.track.x + r.handle.x;
         el.handleBar.max = el.handleBar.min + el.handleBar.span;
+        r.loop = {
+            ...r.track,
+            y: r.track.height * 0.9,
+            height: r.track.height * 0.3,
+        };
+        withRect(el.area.loop, r.loop);
         r.markers = {
             x: 0,
             width: r.track.width,
             y: r.track.y / 2,
             height: r.bounds.height - r.track.y,
         };
+        withRect(el.ticks.markers, r.markers);
         r.value = {
             width: unit.step,
-            x: r.track.x + r.track.width + 2.5 * unit.step,
+            x: r.track.x + r.track.width + 1.5 * unit.step,
             height: r.bounds.height,
             y: unit.text - r.track.y / 2,
         };
-        withRect(el.track, r.track);
-        withRect(el.ticks.markers, r.markers);
-        withRect(el.handle, r.handle);
         withRect(el.value, r.value);
-        let x = r.value.x + r.value.width;
+        let x = r.value.x + r.value.width + 0.5 * unit.step;
         for (const icon of Object.values(el.icons)) {
             r.icon = {...r.value, x, width: unit.step};
             withRect(icon, r.icon);
@@ -196,7 +205,9 @@ export function createTimeSeeker(parent, state) {
         }
         state.play.loop.active =
             active ?? !state.play.loop.active;
-    }
+
+        stretchLoopMarker(el, state);
+    };
 
     addDocumentListeners(el, state);
     addMouseInteraction(el, state);
@@ -234,6 +245,18 @@ function pixelsAsSeconds(handlePosition, el, state) {
 function moveHandle(el, state) {
     const handleX = secondsAsPixels(state.time, el, state, el.handleBar.min);
     el.handle.setAttribute("x", handleX);
+}
+
+function stretchLoopMarker(el, state) {
+    const startSec = state.play.loop.start ?? 0;
+    const endSec = Math.min(
+        state.play.loop.end ?? state.play.range.max,
+        state.play.range.max
+    );
+    const startX = secondsAsPixels(startSec, el, state, el.handleBar.min);
+    const endX = secondsAsPixels(endSec, el, state, el.handleBar.min);
+    el.area.loop.setAttribute("x", startX);
+    el.area.loop.setAttribute("width", String(endX - startX));
 }
 
 function adjustMaxRange(el, state, {delta, max, omitUpdate}) {
@@ -277,11 +300,13 @@ function applyStateDependantStyling(el, state) {
 
     if (state.play.loop.active) {
         el.icons.loop.setAttribute("stroke", "darkgreen");
+        el.area.loop.setAttribute("opacity", String(1));
     } else {
         el.icons.loop.setAttribute("stroke", "gray");
+        el.area.loop.setAttribute("opacity", String(0.4));
     }
 
-
+    el.icons.rewind.setAttribute("opacity", state.time === 0. ? "0.5" : "1")
 }
 
 function withRect(element, rect) {
@@ -291,21 +316,6 @@ function withRect(element, rect) {
     element.setAttribute("height", rect.height ?? 1);
     element.setAttribute("rx", rect.rx ?? 0);
     return element;
-}
-
-function withRelativeRect(element, source, factors = {}) {
-    const bounds = source.getBBox();
-    const rect = {
-        x: bounds.x,
-        y: bounds.y,
-        width: bounds.width,
-        height: bounds.height,
-        rx: source.getAttribute("rx") || 0
-    };
-    for (const [attribute, value] of Object.entries(factors)) {
-        rect[attribute] *= value;
-    }
-    return withRect(element, rect);
 }
 
 function addDocumentListeners(el, state) {
@@ -365,7 +375,6 @@ function addMouseInteraction(el, state) {
             drag.original.rangeMax = state.play.range.max;
             drag.original.wasRunning = state.play.running;
             el.do.toggle(false);
-
             drag.initial = pos.x;
             drag.offset = pos.x - drag.original.x;
             drag.ghost = el.handle.cloneNode(true);
@@ -374,6 +383,8 @@ function addMouseInteraction(el, state) {
             drag.ghost.setAttribute("opacity", 1);
             drag.ghost.setAttribute("fill", "currentColor");
             el.handle.setAttribute("opacity", 0.4);
+        } else if (event.target === el.track) {
+            seekPixel(pos.x);
         }
     }, {
         passive: false
@@ -405,7 +416,7 @@ function addMouseInteraction(el, state) {
         const dropOnGhost = elementBelow === drag.ghost;
         const dropX = parseFloat(drag.ghost.getAttribute("x"));
         if (dropOnGhost) {
-            seekPixel(dropX - drag.initial);
+            seekPixel(dropX);
         } else {
             adjustMaxRange(el, state, {
                 max: drag.original.rangeMax
@@ -415,12 +426,6 @@ function addMouseInteraction(el, state) {
         drag.ghost = null;
         el.handle.setAttribute("opacity", drag.original.opacity);
         el.do.toggle(drag.original.wasRunning);
-    });
-
-    el.handle.addEventListener("dblclick", () => {
-        console.log("was?", state.play.running);
-        el.do.toggle();
-        console.log("iiiis?", state.play.running);
     });
 
     el.value.addEventListener("click", () => {
@@ -436,6 +441,10 @@ function addMouseInteraction(el, state) {
         }
     });
 
+    el.icons.toggle.addEventListener("click", () => {
+        el.do.toggle();
+    });
+
     el.icons.loop.addEventListener("click", () => {
         el.do.toggleLoop();
     });
@@ -443,21 +452,33 @@ function addMouseInteraction(el, state) {
     el.icons.loop.addEventListener("contextmenu", (event) => {
         event.preventDefault();
         console.log(state.play.loop);
-        const seconds = promptFloatArray(
+        const answer = promptFloatArray(
             el,
             [state.play.loop.start, state.play.loop.end],
             "Enter new Loop START and END Second (Space-Separated, any NaN for max. interval):",
         );
-        if (seconds.length !== 2) {
-            alert(`Discard Input: ${seconds} because it has not 2 elements.`);
+        if (answer.length !== 2) {
+            alert(`Discard Input: ${answer} because it has not 2 elements.`);
             return;
         }
-        [state.play.loop.start = state.play.loop.end] = seconds;
-        state.play.loop.active = true;
+        el.do.toggleLoop({
+            start: answer[0],
+            end: answer[1],
+            active: true
+        });
     });
 
-    function seekPixel(pixelWidth) {
-        const second = pixelsAsSeconds(pixelWidth, el, state);
+    el.icons.rewind.addEventListener("click", () => {
+        if (state.time === 0 && state.play.previous.time) {
+            el.do.jump({to: state.play.previous.time})
+        } else {
+            el.do.jump({to: 0})
+        }
+
+    });
+
+    function seekPixel(x) {
+        const second = pixelsAsSeconds(x, el, state);
         el.do.jump({
             to: second,
             min: 0,
@@ -488,6 +509,9 @@ function parseFloatAttributes(element, ...attributes) {
 }
 
 function parseFloatLeniently(input) {
+    if (!input) {
+        return null;
+    }
     const result = parseFloat(input.replace(",", "."));
     return Number.isNaN(result) ? null : result;
 }

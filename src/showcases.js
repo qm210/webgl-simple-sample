@@ -17,13 +17,14 @@ import showcase10 from "./showcases/10_RayTracingWithMultipass.js"
 import showcase11Unfinished from "./showcases/11_FluidSimulation.js";
 import showcaseFb210 from "./showcases/11b_MoreFramebufferProcessing.js";
 import showcase12 from "./showcases/12_PerformancePlayground.js";
+import showcase13 from "./showcases/13_Fonts.js";
 import showcaseRIOW from "./showcases/RIOW_StochasticRayTracing.js";
 import showcaseOld8 from "./showcases/retired/old8_Multipass.js";
 import showcaseOld11 from "./showcases/retired/old11_Volumetric.js";
 import showcaseX from "./showcases/X_SimulationPlayground.js";
 import showcaseZClouds from "./showcases/Z_NR4_Clouds.js";
 
-const defaultShowcase = showcase12;
+const defaultShowcase = showcase13;
 
 const MAP_PATH = {
     // Zum Anfang ein sehr, sehr langweiliger Anfang.
@@ -61,6 +62,8 @@ const MAP_PATH = {
 
     // --> Hier machen wir im Dezember weiter - "12": Performance-Somewhat-Deep-Dive.
     "12": showcase12,
+
+    "13": showcase13,
 
     // spezifische Referenzen, die ich mal rangezogen habe, aber nicht zum Durchkauen gedacht.
     "iq": showcaseIQ, // same as "6b"

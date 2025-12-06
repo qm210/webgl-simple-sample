@@ -2,7 +2,7 @@ import {startRenderLoop} from "../app/playback.js";
 
 import fragmentShaderSource from "../shaders/xSimulationPlayground.glsl";
 import {initBasicState} from "./common.js";
-import schnoergl210 from "../textures/210_schnoerkel.png";
+import schnoergl210 from "../textures/dream210/210_schnoerkel.png";
 import {createTextureFromImage} from "../webgl/helpers/textures.js";
 import {createFramebufferWithTexture} from "../webgl/helpers/framebuffers.js";
 
