@@ -302,7 +302,7 @@ function applyStateDependantStyling(el, state) {
         el.icons.loop.setAttribute("stroke", "darkgreen");
         el.area.loop.setAttribute("opacity", String(1));
     } else {
-        el.icons.loop.setAttribute("stroke", "gray");
+        el.icons.loop.setAttribute("stroke", "silver");
         el.area.loop.setAttribute("opacity", String(0.4));
     }
 
@@ -346,8 +346,10 @@ function addDocumentListeners(el, state) {
         if (stored.markers) {
             state.play.markers = stored.markers;
         }
-        state.time = stored.time ?? 0;
-        state.iFrame = stored.frame ?? -1;
+        if (!state.play.running) {
+            state.time = stored.time ?? 0;
+            state.iFrame = stored.frame ?? -1;
+        }
     }
 }
 

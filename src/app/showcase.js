@@ -21,7 +21,9 @@ export function prepareShowcase(showcase, glContext) {
 
     state.expectedUniforms = readUniforms(
         state.source.fragment,
-        state.post?.source.fragment
+        state.source.vertex,
+        state.post?.source.fragment,
+        state.post?.source.vertex
     );
 
     return state;

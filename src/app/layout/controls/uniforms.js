@@ -137,8 +137,7 @@ const createInputControlElements = (control) => {
 };
 
 export const asFloatInput = (elements, state, control) => {
-    control.defaultValue ??= control.log ? 1 : 0;
-    elements.reset.textContent = `reset: ${control.defaultValue}`;
+    prepareControls(control);
     asSlider(elements.control, control);
     updateSlider(elements, state, control, true);
 
@@ -163,6 +162,8 @@ export const asFloatInput = (elements, state, control) => {
             valueFrom(event, control)
         );
     });
+
+    elements.reset.textContent = `reset: ${control.defaultValue}`;
     elements.reset.addEventListener("click", () => {
         elements.updateValue(
             control.defaultValue
@@ -184,15 +185,6 @@ function valueFrom(event, control) {
 }
 
 function asSlider(inputElement, control) {
-    control.step ??=
-        control.min > 0 && control.min < 0.01
-            ? 0.001 : 0.01;
-    if (control.log && control.min > 0 && control.max > control.min) {
-        control.step = Math.min(control.min, 0.001);
-        control.min = Math.log10(control.min);
-        control.max = Math.log10(control.max);
-    }
-    control.digits = control.integer ? 0 : -Math.log10(control.step);
     if (control.min !== undefined) {
         inputElement.min = control.min;
     }
@@ -204,6 +196,27 @@ function asSlider(inputElement, control) {
     inputElement.style.flex = "1";
 }
 
+function prepareControls(control) {
+    if (!control.step) {
+        control.step = maybeMap(control.min, min =>
+            (min > 0 && min < 0.01) ? 0.001 : 0.01
+        );
+    }
+    if (control.log && control.min > 0 && control.max > control.min) {
+        control.step = maybeMap(control.min, m => Math.max(m, 0.001));
+        control.min = maybeMap(control.min, Math.log10);
+        control.max = maybeMap(control.max, Math.log10);
+    }
+    if (control.defaultValue === undefined) {
+        control.defaultValue = maybeMap(control.log, log => log ? 1 : 0);
+    }
+    control.digits = control.integer
+        ? 0
+        : control.step instanceof Array
+            ? -Math.log10(control.step[0])
+            : -Math.log10(control.step);
+}
+
 function updateSlider(elements, state, control, full = false, givenValue = undefined) {
     let value = givenValue ?? state[control.name];
     value = round(value, control.step);
@@ -211,16 +224,12 @@ function updateSlider(elements, state, control, full = false, givenValue = undef
         value = Math.log10(value);
     }
     if (full) {
-        const defaultMin =
-            value === 0 ? -1
-            : value > 0 ? 0
-            : 2 * value;
-        const defaultMax =
-            value === 0 ? +1
-            : value < 0 ? 0
-            : 2 * value;
-        elements.control.min = round(control.min ?? defaultMin, control.step);
-        elements.control.max = round(control.max ?? defaultMax, control.step);
+        const variableMin =
+            value === 0 ? -1 : value > 0 ? 0 : 2 * value;
+        const variableMax =
+            value === 0 ? +1 : value < 0 ? 0 : 2 * value;
+        elements.control.min = round(control.min ?? variableMin, control.step);
+        elements.control.max = round(control.max ?? variableMax, control.step);
         elements.min.textContent = toDigits(elements.control.min, control);
         elements.max.textContent = toDigits(elements.control.max, control);
     }
@@ -242,6 +251,12 @@ function round(value, step) {
     return Math.round(value / step) * step;
 }
 
+function maybeMap(value, func) {
+    return value instanceof Array
+        ? value.map(func)
+        : func(value);
+}
+
 const toVec = (dim, value) =>
     Array(dim).fill(null).map(_ => value);
 
@@ -254,6 +269,7 @@ const randomVec = (control) =>
         });
 
 export const asVecInput = (elements, state, control) => {
+    prepareControls(control);
     elements.control = document.createElement("div");
     elements.control.style.gap = "0.25rem";
 
@@ -276,6 +292,9 @@ export const asVecInput = (elements, state, control) => {
     if (control.sameStep) {
         control.step = toVec(control.dim, control.step);
     }
+    if (!(control.defaultValue instanceof Array)) {
+        control.defaultValue = toVec(control.dim, control.defaultValue);
+    }
     if (!(state[control.name] instanceof Array)) {
         // fixes bad data from the Browser Storage
         state[control.name] = toVec(control.dim, state[control.name]);
@@ -289,7 +308,8 @@ export const asVecInput = (elements, state, control) => {
             min: control.min[index],
             max: control.max[index],
             step: control.step[index],
-            debugOriginal: control,
+            log: control.log,
+            digits: control.digits,
         };
         const forComponent = createInputControlElements(componentControl);
         elementsForComponent.push(forComponent);
