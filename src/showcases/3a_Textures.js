@@ -1,13 +1,14 @@
-import {startRenderLoop} from "../webgl/render.js";
-import {createTextureFromImage} from "../webgl/helpers.js";
+import {startRenderLoop} from "../app/playback.js";
 
 import originalFragmentShaderSource from "../shaders/texturePlayground.glsl";
-import {compile, createStaticVertexBuffer, initVertices} from "../webgl/setup.js";
+import {compile, initVertices} from "../webgl/setup.js";
 import vertexShaderSource from "../shaders/vertex.basic.glsl";
 import image0 from "../textures/frame.png";
 import image1 from "../textures/hubble_extreme_deep_field.jpg";
 import image2 from "../textures/mysterious_capybara.png";
 import {overwriteDefines} from "./common.js";
+import {createStaticVertexBuffer} from "../webgl/helpers/setup.js";
+import {createTextureFromImage} from "../webgl/helpers/textures.js";
 
 const fragmentShaderSource = overwriteDefines(originalFragmentShaderSource, {
     SHOW_SAMPLE_TEXTURE: 1,

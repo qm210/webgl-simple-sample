@@ -1,5 +1,5 @@
-import {startRenderLoop} from "../webgl/render.js";
-import {createTextureFromImage} from "../webgl/helpers.js";
+import {startRenderLoop} from "../app/playback.js";
+import {createTextureFromImage} from "../webgl/helpers/textures.js";
 
 import fragmentShaderSource from "../shaders/texturePlayground_mehrUniforms.glsl";
 import vertexShaderSource from "../shaders/vertex.basic.glsl";
