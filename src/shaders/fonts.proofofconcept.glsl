@@ -126,7 +126,7 @@ void main() {
     float gradient = fwidth(d);
     float mask = smoothstep(0., 0.33, gradient);
     glow *= mask * smoothstep(iFree5, iFree4, abs(d));
-    glow = pow(glow, vec3(iFree2));
+    glow = pow(glow, vec3(1. + iFree2));
 
     float shape = smoothstep(0.01, 0., d);
     fragColor.rgb = mix(fragColor.rgb, c.yyy, 0.4 * shape);
