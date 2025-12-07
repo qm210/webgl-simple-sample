@@ -52,7 +52,7 @@ vec3 grayscale(vec3 col) {
 //          aber auch die if (false) {...} anschauen oder die uniforms mal ändern
 //          gerne auch "irgendwo anders dranhängen" :)
 #define SHOW_SAMPLE_TEXTURE 0
-#define SHOW_STARFIELD 0
+#define SHOW_STARFIELD 1
 #define APPLY_ST_CORRECTION_FOR_TEXTURE2 1
 #define APPLY_BLENDING_METHODS 1
 #define APPLY_MANUAL_RGB_SHIFT 0

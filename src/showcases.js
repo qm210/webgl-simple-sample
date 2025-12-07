@@ -3,6 +3,10 @@ import showcase2 from "./showcases/2_GeometryPlayground.js";
 import showcase2b from "./showcases/2_GeometryPlayground_sdBox.js";
 import showcase2c from "./showcases/2_GeometryPlayground_grid.js";
 import showcase3 from "./showcases/3_Textures.js";
+import showcase3a from "./showcases/3a_Textures.js";
+import showcase3b from "./showcases/3b_Textures.js";
+import showcase3c from "./showcases/3c_Textures.js";
+import showcase3d from "./showcases/3d_Textures.js";
 import showcase4 from "./showcases/4_ColorPlayground.js";
 import showcase5 from "./showcases/5a_Noise.js";
 import showcase5b from "./showcases/5b_NoiseExtended.js";
@@ -33,8 +37,12 @@ const MAP_PATH = {
     "2": showcase2,
     "2b": showcase2b,
     "2c": showcase2c,
-    // Texturen Basics
+    // Texturen Basics (ist derselbe schader, nur nach den verschiedenen #define-Optionen aufgeschlüsselt:
     "3": showcase3,
+    "3a": showcase3a,
+    "3b": showcase3b,
+    "3c": showcase3c,
+    "3d": showcase3d,
     // Farbräume
     "4": showcase4,
     // Prozedurales Rauschen (Perlin Noise, FBM) -- nachgereicht, weil wir Ähnliches besprochen haben (z.B. Voronoi)
