@@ -61,6 +61,12 @@ float glyph(in vec2 uv, int ascii, out vec2 step) {
     return clamp(-sdf/fwidth(sdf) + 0.5, 0., 1.0);
 }
 
+float sdRect(in vec2 uv, in vec2 size)
+{
+    vec2 q = abs(uv)-size;
+    return length(max(q,0.0)) + min(max(q.x,q.y),0.0);
+}
+
 // that is a bad idea:
 float maskedSdGlyph(in vec2 uv, int ascii, out vec2 size) {
     // seems to be zero at the straight edges for infinite distance. that is bad.
@@ -90,15 +96,21 @@ void main() {
     vec3 colGradient = 0.5 + 0.5*cos(iTime+st.xyx+vec3(0,2,4));
     fragColor = vec4(colGradient, 1.);
 
-    vec2 step;
+
+    vec2 dims;
     vec2 cursor = uv - vec2(-1.44, 0.);
     cursor *= 0.8;
-    float d = 1.e5;
-    d = min(d, sdGlyph(cursor, 81, step));
+    float d = 100., dR = 100.;
 
-    cursor.x -= step.x;
-    d = min(d, sdGlyph(cursor, 77, step));
-    cursor.x -= step.x;
+    vec2 pos = cursor + c.yx * 0.2 * sin(iTime * 1.4);
+    d = min(d, sdGlyph(pos, 81, dims));
+    dR = min(dR, sdRect(pos, 0.5 * dims));
+    cursor.x -= dims.x;
+
+    pos = cursor - c.yx * 0.15 * cos(iTime);
+    d = min(d, sdGlyph(pos, 77, dims));
+    dR = min(dR, sdRect(pos, 0.5 * dims));
+    cursor.x -= dims.x;
 
     //#define JUST_QUICK_OUTPUT
 //    #ifdef JUST_QUICK_OUTPUT
@@ -116,47 +128,55 @@ void main() {
     glow *= mask * smoothstep(iFree5, iFree4, abs(d));
     glow = pow(glow, vec3(iFree2));
 
-    fragColor.rgb += glow;
-
     float shape = smoothstep(0.01, 0., d);
     fragColor.rgb = mix(fragColor.rgb, c.yyy, 0.4 * shape);
+
+    // understanding the "size / dims / step" out in its scaling: rect around the M
+    float dRectMBorder = abs(dR) - 0.001;
+    // float dRectMHard = smoothstep(0.01, 0., dRectM);
+    // float dRectMSmooth = smoothstep(0.1, 0., dRectM);
+    dR = smoothstep(0.001, 0., dR);
+    // fragColor.rgb = mix(fragColor.rgb, c.yyy, dRectM);
+
+    fragColor.rgb += glow * dR;
 
     // <-- UP TO HERE: QM WITH GLOW
 
     cursor *= 1.25;
     cursor.x -= 0.1;
-    d = glyph(cursor, 115, step);
+    d = glyph(cursor, 115, dims);
     fragColor.rgb = mix(fragColor.rgb, iTextColor, d);
-    cursor.x -= step.x;
-    d = glyph(cursor, 97, step);
+    cursor.x -= dims.x;
+    d = glyph(cursor, 97, dims);
     fragColor.rgb = mix(fragColor.rgb, iTextColor, d);
-    cursor.x -= step.x;
-    d = glyph(cursor, 121, step);
+    cursor.x -= dims.x;
+    d = glyph(cursor, 121, dims);
     fragColor.rgb = mix(fragColor.rgb, iTextColor, d);
-    cursor.x -= step.x;
+    cursor.x -= dims.x;
     cursor.x += 0.04;
-    d = glyph(cursor, 115, step);
+    d = glyph(cursor, 115, dims);
     fragColor.rgb = mix(fragColor.rgb, iTextColor, d);
-    cursor.x -= step.x;
+    cursor.x -= dims.x;
     cursor.x -= 0.2;
-    d = glyph(cursor, 72, step);
+    d = glyph(cursor, 72, dims);
     fragColor.rgb = mix(fragColor.rgb, iTextColor, d);
-    cursor.x -= step.x;
+    cursor.x -= dims.x;
     cursor.x += 0.04;
-    d = glyph(cursor, 105, step);
+    d = glyph(cursor, 105, dims);
     fragColor.rgb = mix(fragColor.rgb, iTextColor, d);
-    cursor.x -= step.x;
+    cursor.x -= dims.x;
     cursor.x -= 0.2;
     const vec3 textColor2 = vec3(0.8, 1., 0.5);
     cursor *= 0.5;
-    d = glyph(cursor, 92, step);
+    d = glyph(cursor, 92, dims);
     fragColor.rgb = mix(fragColor.rgb, textColor2, d);
-    cursor.x -= step.x;
-    d = glyph(cursor, 111, step);
+    cursor.x -= dims.x;
+    d = glyph(cursor, 111, dims);
     fragColor.rgb = mix(fragColor.rgb, textColor2, d);
-    cursor.x -= step.x - 0.04;
-    d = glyph(cursor, 47, step);
+    cursor.x -= dims.x - 0.04;
+    d = glyph(cursor, 47, dims);
     fragColor.rgb = mix(fragColor.rgb, textColor2, d);
-    cursor.x -= step.x;
+    cursor.x -= dims.x;
+
 }
 
