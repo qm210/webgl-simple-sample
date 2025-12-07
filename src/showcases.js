@@ -27,8 +27,9 @@ import showcaseOld8 from "./showcases/retired/old8_Multipass.js";
 import showcaseOld11 from "./showcases/retired/old11_Volumetric.js";
 import showcaseX from "./showcases/X_SimulationPlayground.js";
 import showcaseZClouds from "./showcases/Z_NR4_Clouds.js";
+import dream210 from "./showcases/D210_Dream.js";
 
-const defaultShowcase = showcase13;
+const defaultShowcase = dream210;
 
 const MAP_PATH = {
     // Zum Anfang ein sehr, sehr langweiliger Anfang.
@@ -85,6 +86,7 @@ const MAP_PATH = {
     "210": showcaseX,
     "fb210": showcaseFb210,
     "nr4": showcaseZClouds,
+    "d210": dream210,
 };
 
 export function selectShowcase() {
