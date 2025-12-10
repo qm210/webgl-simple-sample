@@ -26,7 +26,7 @@ function withPlaybackFeatures(state) {
     state.time = 0;
     state.play = {
         dt: 0,
-        running: false,
+        running: undefined,
         fps: null,
         range: {
             max: 60,
