@@ -84,7 +84,7 @@ export function createPresetSelector(elements, state) {
 
     const container = document.createElement("div");
     container.appendChild(selector);
-    container.appendChild(createDiv("Presets...", "presets-hint"));
+    container.appendChild(createDiv("Presets...", "small-link"));
 
     let ignoreChangeEvent = false;
     selector.addEventListener("change", async event => {

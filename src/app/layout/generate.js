@@ -291,6 +291,7 @@ const PAGE_FONT = {
     cssProperty: "--font-size-factor",
     storageKey: "qm.fontsize.factor"
 };
+const NO_CODE_STORAGE_KEY = "qm.no-code";
 
 function addDisplayControls(elements, state, glContext) {
     const canvasControls = createDiv();
@@ -305,6 +306,13 @@ function addDisplayControls(elements, state, glContext) {
     appendButton(fontControls, "￬", pageFontResize(0.95));
     appendElement(fontControls, "font", "label");
     pageFontInitialize();
+
+    const codeToggle = createDiv("code?", "small-link");
+    fontControls.appendChild(codeToggle);
+    codeToggle.addEventListener("click", toggleShaderCode);
+    if (localStorage.getItem(NO_CODE_STORAGE_KEY)) {
+        toggleShaderCode();
+    }
 
     const info = appendElement(elements.displayControls, "", "div", "fps-box");
     elements.fps = {
@@ -329,7 +337,7 @@ function addDisplayControls(elements, state, glContext) {
             width = Math.max(Math.round(width * factor), 1);
             height = Math.max(Math.round(height * factor), 1);
             setCanvasResolution(elements.canvas, glContext, width, height);
-            updateResolutionInState(state, gl);
+            updateResolutionInState(state, glContext);
             /*
             // TODO: must recreate framebuffers, but for that we need a short break from rendering
             whilePausingRendering(state, () => {
@@ -353,6 +361,15 @@ function addDisplayControls(elements, state, glContext) {
     function pageFontInitialize() {
         const currentFactor = JSON.parse(localStorage.getItem(PAGE_FONT.storageKey) ?? "1");
         document.documentElement.style.setProperty(PAGE_FONT.cssProperty, currentFactor);
+    }
+
+    function toggleShaderCode() {
+        elements.layout.classList.toggle("no-code");
+        if (elements.layout.classList.contains("no-code")) {
+            localStorage.setItem(NO_CODE_STORAGE_KEY, "true");
+        } else {
+            localStorage.removeItem(NO_CODE_STORAGE_KEY);
+        }
     }
 }
 

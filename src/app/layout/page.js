@@ -20,6 +20,7 @@ export default function initLayout(rootId) {
     `;
 
     const elements = {
+        layout: document.getElementById("layout"),
         shaders: document.getElementById("shaders"),
         console: document.getElementById("console"),
         workingShader: document.getElementById("working-program"),

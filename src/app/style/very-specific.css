@@ -45,10 +45,11 @@
     cursor: pointer;
 }
 
-.presets-hint {
+.small-link {
     font-size: small;
     text-decoration: underline;
     cursor: pointer;
+    white-space: nowrap;
 }
 
 .readout-stats {
