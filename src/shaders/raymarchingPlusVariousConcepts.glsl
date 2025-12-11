@@ -418,9 +418,7 @@ Hit texturedSdSphere(vec3 p, float s)
 
 Hit texturedSdBox( vec3 p, vec3 b, float rounding) {
     vec3 q = abs(p) - b;
-    b.x -= rounding;
-    b.y -= rounding;
-    b.z -= rounding;
+    b -= rounding;
     float d = length(max(q,0.0)) + min(max(q.x,max(q.y,q.z)),0.0);
     d -= 2. * rounding;
 
