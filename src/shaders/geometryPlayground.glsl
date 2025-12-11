@@ -100,7 +100,7 @@ float polar(vec2 v) {
 
 float arrow(inout vec3 col, in vec2 uv, vec2 from, vec2 to) {
     const float arrowSize = .04;
-    to = mix(to, from, arrowSize);
+    to = mix(to, from, 2. * arrowSize);
     vec2 head = uv - to;
     head *= rotate(-piHalf - polar(to - from));
     float dHead = sdEquilateralTriangle(head, arrowSize);
@@ -139,8 +139,8 @@ vec3 getNormal(vec3 p) {
 }
 
 const vec2 samplePoints[3] = vec2[3](
-    vec2(1.0, -0.2),
-    vec2(1.0, -0.4),
+    vec2(.89, -0.2),
+    vec2(.9, -0.4),
     vec2(1.35, -0.1)
 );
 
