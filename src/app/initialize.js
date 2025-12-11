@@ -27,7 +27,7 @@ function withPlaybackFeatures(state) {
     state.play = {
         dt: 0,
         running: undefined,
-        fps: null,
+        fps: "?",
         range: {
             max: 60,
             autoExtendMargin: 10,

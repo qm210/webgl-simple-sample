@@ -97,60 +97,51 @@ export function resetLoop(state) {
     state.iFrame = -1;
 }
 
+const createFpsAverager = (sampleSize) => ({
+    samples: Array(sampleSize).fill(0),
+    index: 0,
+    taken: 0,
+    sum: 0,
+    fps: null,
+});
+
 const fpsMeter = {
-    frames: null,
-    measureAtTime: null,
-    durationSeconds: 1,
-    measuredFps: null,
-    direct: {
-        lastTime: null,
-        lastFrame: null,
-        fps: null,
-    }
+    current: null,
+    last: {
+        time: null,
+        frame: null,
+    },
+    avg: createFpsAverager(100)
 };
 
 function resetFpsMeasurement(state) {
     state.play.fps = null;
-    fpsMeter.frames = null;
-    fpsMeter.measureAtTime = null;
-    fpsMeter.measuredFps = null;
-    fpsMeter.direct.lastTime = null;
-    fpsMeter.direct.lastFrame = null;
-    // fpsMeter.direct.fps = null;
+    fpsMeter.last = {
+        time: null,
+        frame: null,
+    };
+    fpsMeter.avg = createFpsAverager(fpsMeter.avg.samples.length);
 }
 
 function doFpsMeasurement(state) {
-    // counting method
-    if (fpsMeter.measureAtTime === null) {
-        fpsMeter.measureAtTime = state.time + fpsMeter.durationSeconds;
-        fpsMeter.frames = 0;
-    } else {
-        fpsMeter.frames++;
-        if (state.time > fpsMeter.measureAtTime) {
-            fpsMeter.measuredFps = fpsMeter.frames / fpsMeter.durationSeconds;
-            fpsMeter.measureAtTime = null;
+    if (fpsMeter.last.time !== null) {
+        fpsMeter.current =
+            (state.iFrame - fpsMeter.last.frame) /
+            (state.time - fpsMeter.last.time);
+        fpsMeter.avg.sum -= fpsMeter.avg.samples[fpsMeter.avg.index];
+        fpsMeter.avg.samples[fpsMeter.avg.index] = fpsMeter.current;
+        fpsMeter.avg.sum += fpsMeter.current;
+        if (fpsMeter.avg.taken < fpsMeter.avg.samples.length) {
+            fpsMeter.avg.taken++;
         }
+        fpsMeter.avg.index = (fpsMeter.avg.index + 1) % fpsMeter.avg.taken;
+        fpsMeter.avg.fps = fpsMeter.avg.sum / fpsMeter.avg.taken;
     }
-    // direct rate
-    if (fpsMeter.direct.lastTime !== null) {
-        fpsMeter.direct.fps =
-            (state.iFrame - fpsMeter.direct.lastFrame)
-            / (state.time - fpsMeter.direct.lastTime);
-    }
-    fpsMeter.direct.lastTime = state.time;
-    fpsMeter.direct.lastFrame = state.iFrame;
+    fpsMeter.last.time = state.time;
+    fpsMeter.last.frame = state.iFrame;
 
-    state.play.fps = 0;
-    let weight = 0;
-    if (fpsMeter.direct.fps !== null) {
-        state.play.fps += 0.33 * fpsMeter.direct.fps;
-        weight += 0.5;
-    }
-    if (fpsMeter.measuredFps !== null) {
-        state.play.fps += fpsMeter.measuredFps;
-        weight += 1;
-    }
-    state.play.fps = weight > 0 ? (state.play.fps / weight).toFixed(0) : "?";
+    state.play.fps = (fpsMeter.avg.fps ?? fpsMeter.current)
+        ?.toFixed(1) ?? "?";
 }
 
 export function whilePausingRendering(state, callFunction) {
