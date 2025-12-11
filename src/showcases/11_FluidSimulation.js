@@ -507,7 +507,7 @@ function render(gl, state) {
 
     // Use Velocity to calculate a fresh Scalar: Curl
 
-    gl.uniform1i(state.location.iPassIndex, PASS.INIT_CURL_FROM_VELOCITY),
+    gl.uniform1i(state.location.iPassIndex, PASS.INIT_CURL_FROM_VELOCITY)
 
     // Note: need to unbind the curl texture itself when we want to write to its framebuffer.
     //       we _could_ clean this up right after the next step (or avoid a third texture unit altogether)

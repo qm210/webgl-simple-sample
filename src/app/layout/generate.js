@@ -187,6 +187,11 @@ export const addUniformControls = (elements, state, controls) => {
 
     for (const control of controls.uniforms) {
 
+        if (elements[control.name] !== undefined) {
+            console.error("SKIP control", control, "- already defined!", elements[control.name]);
+            continue;
+        }
+
         if (control.type === "label") {
             elements[control.name] =
                 addFreeRow({

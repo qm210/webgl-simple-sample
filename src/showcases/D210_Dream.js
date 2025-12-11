@@ -336,12 +336,6 @@ export default {
             step: 0.01,
         }, {
             type: "float",
-            name: "iNoiseScaleB",
-            defaultValue: 2.8,
-            min: 0.01,
-            max: 10,
-        }, {
-            type: "float",
             name: "iCloudAbsorptionCoeff",
             defaultValue: 0.9,
             min: 0.001,
@@ -581,6 +575,138 @@ export default {
             min: 0.1,
             max: 10,
         }, {
+            separator: "Noise Base",
+        }, {
+            type: "float",
+            name: "iNoiseLevelA",
+            defaultValue: 0.6,
+            min: -1,
+            max: 1,
+        }, {
+            type: "float",
+            name: "iNoiseLevelB",
+            defaultValue: 0.6,
+            min: -1,
+            max: 1,
+        }, {
+            type: "float",
+            name: "iNoiseLevelC",
+            defaultValue: 0,
+            min: -1,
+            max: 1,
+        }, {
+            type: "float",
+            name: "iNoiseScaleA",
+            defaultValue: 1,
+            min: 0.01,
+            max: 10,
+        }, {
+            type: "float",
+            name: "iNoiseScaleB",
+            defaultValue: 1,
+            min: 0.01,
+            max: 10,
+        }, {
+            type: "float",
+            name: "iNoiseScaleC",
+            defaultValue: 1,
+            min: 0.01,
+            max: 10,
+        }, {
+            type: "vec2",
+            name: "iOverallNoiseShift",
+            defaultValue: [1, 1],
+            min: 0,
+            max: 10,
+        }, {
+            type: "float",
+            name: "iOverallScale",
+            defaultValue: 2,
+            min: 0.01,
+            max: 10.,
+        }, {
+            type: "float",
+            name: "iNoiseMorphingA",
+            defaultValue: 0,
+            min: 0,
+            max: 6.28,
+        }, {
+            type: "float",
+            name: "iNoiseMorphingB",
+            defaultValue: 1.,
+            min: 0,
+            max: 6.28,
+        }, {
+            type: "float",
+            name: "iNoiseMorphingC",
+            defaultValue: 2.,
+            min: 0,
+            max: 6.28,
+        }, {
+            type: "float",
+            name: "iOverallHashOffset",
+            defaultValue: 0,
+            min: -1,
+            max: 1,
+            step: 0.01
+        }, {
+            type: "float",
+            name: "iTurbulenceNormFactor",
+            defaultValue: 0.33,
+            min: 0.001,
+            max: 1.,
+        }, {
+            type: "float",
+            name: "iTurbulenceMeanOffset",
+            defaultValue: 0.18,
+            min: 0.,
+            max: 0.5,
+        }, {
+            type: "vec2",
+            name: "iMarbleSqueeze",
+            defaultValue: [0, 0],
+            min: 0.0,
+            max: 20.,
+            step: 0.01
+        }, {
+            type: "float",
+            name: "iMarbleGranularity",
+            defaultValue: 7.5,
+            min: 0.01,
+            max: 50,
+        }, {
+            type: "float",
+            name: "iMarbleGradingExponent",
+            defaultValue: 1,
+            min: 0.01,
+            max: 5.,
+        }, {
+            type: "float",
+            name: "iMarbleRange",
+            defaultValue: 0.5,
+            min: 0.01,
+            max: 1.,
+        }, {
+            type: "float",
+            name: "iColorStrength",
+            defaultValue: 0.,
+            min: 0,
+            max: 1,
+        }, {
+            type: "vec3",
+            name: "iColorCosineFreq",
+            defaultValue: [11, 20, 30],
+            min: 0,
+            max: 31.42,
+            step: 0.01,
+        }, {
+            type: "vec3",
+            name: "iColorCosinePhase",
+            defaultValue: [0, 1, 0.5],
+            min: 0,
+            max: 6.283,
+            step: 0.01,
+        }, {
             separator: "Zur freien Verwendung..."
         }, {
             type: "float",
@@ -645,11 +771,16 @@ const PASS = {
     RENDER_CLOUDS: 61,
 
     // PLACEHOLDERS
+    TEXTURE_STUFF_0: 70,
+    TEXTURE_STUFF_1: 71,
+    TEXTURE_STUFF_2: 72,
     TEXT_RENDERING_0: 80,
     TEXT_RENDERING_1: 81,
     TEXT_RENDERING_2: 82,
+    TEXT_RENDERING_3: 83,
 
-    RENDER_FINALLY_TO_SCREEN: 99
+    RENDER_NOISE_BASE: 90,
+    RENDER_FINALLY_TO_SCREEN: 100
 };
 
 
@@ -690,6 +821,39 @@ function render(gl, state) {
     gl.uniform1f(state.location.iFree4, state.iFree4);
     gl.uniform1f(state.location.iFree5, state.iFree5);
 
+    // SOURCE: NOISE BASE -
+
+    gl.uniform1f(state.location.iTime, state.time);
+    gl.uniform2fv(state.location.iResolution, state.resolution);
+    gl.uniform1f(state.location.iGridOpacity, state.iGridOpacity);
+    gl.uniform2fv(state.location.iOverallNoiseShift, state.iOverallNoiseShift);
+    gl.uniform1f(state.location.iOverallScale, state.iOverallScale);
+    gl.uniform1f(state.location.iOverallHashOffset, state.iOverallHashOffset);
+    gl.uniform1f(state.location.iNoiseLevelA, state.iNoiseLevelA);
+    gl.uniform1f(state.location.iNoiseLevelB, state.iNoiseLevelB);
+    gl.uniform1f(state.location.iNoiseLevelC, state.iNoiseLevelC);
+    gl.uniform1f(state.location.iNoiseScaleA, state.iNoiseScaleA);
+    gl.uniform1f(state.location.iNoiseScaleB, state.iNoiseScaleB);
+    gl.uniform1f(state.location.iNoiseScaleC, state.iNoiseScaleC);
+    gl.uniform1f(state.location.iNoiseMorphingA, state.iNoiseMorphingA);
+    gl.uniform1f(state.location.iNoiseMorphingB, state.iNoiseMorphingB);
+    gl.uniform1f(state.location.iNoiseMorphingC, state.iNoiseMorphingC);
+    gl.uniform1i(state.location.iFractionalOctaves, state.iFractionalOctaves);
+    gl.uniform1f(state.location.iFractionalScale, state.iFractionalScale);
+    gl.uniform1f(state.location.iFractionalDecay, state.iFractionalDecay);
+    gl.uniform1f(state.location.iTurbulenceNormFactor, state.iTurbulenceNormFactor);
+    gl.uniform1f(state.location.iTurbulenceMeanOffset, state.iTurbulenceMeanOffset);
+    gl.uniform2fv(state.location.iMarbleSqueeze, state.iMarbleSqueeze);
+    gl.uniform1f(state.location.iMarbleGranularity, state.iMarbleGranularity);
+    gl.uniform1f(state.location.iMarbleGradingExponent, state.iMarbleGradingExponent);
+    gl.uniform1f(state.location.iMarbleRange, state.iMarbleRange);
+    gl.uniform1f(state.location.iColorStrength, state.iColorStrength);
+    gl.uniform3fv(state.location.iColorCosineFreq, state.iColorCosineFreq);
+    gl.uniform3fv(state.location.iColorCosinePhase, state.iColorCosinePhase);
+
+    // FOR THE FIRST TEST
+    gl.drawArrays(gl.TRIANGLES, 0, 6);
+
     // SOURCE: FONTS -- TEXTURE8 für MSDF-Png
 
     gl.uniform3fv(state.location.iTextColor, state.iTextColor);
@@ -712,7 +876,6 @@ function render(gl, state) {
     gl.uniform1i(state.location.iCloudNoiseCount, state.iCloudNoiseCount);
     gl.uniform1i(state.location.iLightNoiseCount, state.iLightNoiseCount);
     gl.uniform3fv(state.location.iNoiseScale, state.iNoiseScale);
-    gl.uniform1f(state.location.iNoiseScaleB, state.iNoiseScaleB);
     gl.uniform1f(state.location.iCloudAbsorptionCoeff, state.iCloudAbsorptionCoeff);
     gl.uniform1f(state.location.iCloudAnisoScattering, state.iCloudAnisoScattering);
     gl.uniform3fv(state.location.vecSunPosition, state.vecSunPosition);
