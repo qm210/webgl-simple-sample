@@ -96,6 +96,7 @@ export function createPingPongFramebuffersWithTexture(gl, options) {
     };
     pp.pong = () => 1 - pp.ping;
     pp.currentWriteReadOrder = () => [
+        // TODO: better name: currentRoles()
         pp.fb[pp.ping],
         pp.fb[pp.pong()]
     ];
