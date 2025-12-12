@@ -1150,15 +1150,15 @@ function createUniforms() {
         }, {
             type: "float",
             name: "iNoiseLevelA",
-            defaultValue: 0.6,
-            min: -1,
-            max: 1,
+            defaultValue: 0.0,
+            min: -2,
+            max: 2,
         }, {
             type: "float",
             name: "iNoiseLevelB",
-            defaultValue: 0.6,
-            min: -1,
-            max: 1,
+            defaultValue: 0.0,
+            min: -2,
+            max: 2,
         }, {
             type: "float",
             name: "iNoiseLevelC",

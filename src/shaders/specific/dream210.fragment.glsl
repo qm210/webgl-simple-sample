@@ -213,10 +213,14 @@ float noiseStack(vec2 p){
 void noiseBase(in vec2 uv, inout vec3 col) {
     uv *= iOverallScale;
     uv += iOverallNoiseShift;
-    float noiseClouds = noiseStack(uv) * iNoiseLevelA;
-    float noiseMarble = noiseAbsoluteStackWithFurtherProcessing(uv) * iNoiseLevelC;
-    float totalNoise = noiseClouds * noiseMarble;
-    totalNoise = clamp(totalNoise, 0., 1.);
+    float noiseClouds = noiseStack(uv);
+    float noiseMarble = noiseAbsoluteStackWithFurtherProcessing(uv);
+    float totalNoise = (
+        iNoiseLevelA * noiseClouds +
+        iNoiseLevelB * (noiseClouds * noiseMarble) +
+        iNoiseLevelC * noiseMarble
+    );
+    // totalNoise = clamp(totalNoise, 0., 1.);
     col = mix(
         vec3(totalNoise),
         cmap_dream210(totalNoise * iColorStrength),
@@ -406,14 +410,14 @@ void finalComposition(in vec2 uv) {
     vec4 noiseBase = texture(texNoiseBase, st);
 
     vec4 tex = texture(texTexts, vec3(st, 1));
-    fragColor.rgb = mix(fragColor.rgb, c.xyw, tex.a);
+    fragColor.rgb = mix(noiseBase.rgb, c.xyw * tex.rgb, tex.a);
 
     vec3 col = fragColor.rgb;
 
     vec2 uvCenter = 0.15 * vec2(sin(3. * iTime), cos(3. * iTime));
-    tex = textureCenteredAt(texMonaCity, (uv - uvCenter) * 0.5);
+    tex = textureCenteredAt(texMonaRainbow, (uv - uvCenter) * 0.5);
     float pos210 = floor(mod(2. * iTime, 3.)) * 0.333;
-    vec4 tex2 = textureToArea(texMonaSchnoergel, uv, vec4(-.5, -.5, .5, .5), vec4(pos210, 0., pos210 + 0.333, 1.));
+    vec4 tex2 = textureToArea(texMonaSchnoergel, uv, vec4(.7, -.5, 1.7, .5), vec4(pos210, 0., pos210 + 0.333, 1.));
     tex.a *= 1. - tex2.a;
     fragColor.rgb = mix(fragColor.rgb, tex.rgb, tex.a);
     fragColor.rgb *= 1. - 0.3 * tex2.a;
