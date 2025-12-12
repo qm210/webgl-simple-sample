@@ -1,5 +1,5 @@
 import {maybeAdjustForCompatibility} from "../webgl/helpers/compatibility.js";
-import {takeMilliSeconds} from "./measuring.js";
+import {takeMilliSeconds} from "./jsHelpers.js";
 
 export function createInitialState(sources) {
     sources.fragment = maybeAdjustForCompatibility(sources.fragment);

@@ -66,6 +66,62 @@ export function createFramebufferWithTexture(gl, options, fbIndex = undefined) {
     };
 }
 
+export function createFramebufferWithTextureArray(gl, depth, options) {
+    const opt = options ?? {};
+    opt.width ??= gl.drawingBufferWidth;
+    opt.height ??= gl.drawingBufferHeight;
+    opt.depth = depth;
+    opt.wrapS ??= gl.CLAMP_TO_EDGE;
+    opt.wrapT ??= gl.CLAMP_TO_EDGE;
+    opt.minFilter ??= gl.LINEAR;
+    opt.magFilter ??= gl.LINEAR;
+    opt.internalFormat ??= gl.RGBA8;
+    opt.dataFormat ??= gl.RGBA;
+    opt.dataType ??= gl.UNSIGNED_BYTE;
+    opt.attachment ??= gl.COLOR_ATTACHMENT0;
+
+    const texArray = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D_ARRAY, texArray);
+    gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MIN_FILTER, opt.minFilter);
+    gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MAG_FILTER, opt.magFilter);
+    gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_S, opt.wrapS);
+    gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_T, opt.wrapT);
+    gl.texImage3D(
+        gl.TEXTURE_2D_ARRAY,
+        0,
+        opt.internalFormat,
+        opt.width,
+        opt.height,
+        depth,
+        0,
+        opt.dataFormat,
+        opt.dataType,
+        null
+    );
+
+    const fbo = gl.createFramebuffer();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+    // will need:
+    // gl.framebufferTextureLayer(gl.FRAMEBUFFER, attachment, texArray, 0, layer);
+
+    // const status = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
+    // warnAboutBadFramebufferStatus(gl, status);
+
+    gl.bindTexture(gl.TEXTURE_2D_ARRAY, null);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+
+    return {
+        fbo,
+        texArray,
+        attachments: [opt.attachment],
+        width: opt.width,
+        height: opt.height,
+        depth: opt.depth,
+        texelSize: [1 / opt.width, 1 / opt.height, 1 / opt.depth],
+        opt,
+    };
+}
+
 export function halfFloatOptions(gl, resolution, internalFormat, filter) {
     const dataFormatFor = {
         [gl.R16F]: gl.RED,
@@ -73,6 +129,8 @@ export function halfFloatOptions(gl, resolution, internalFormat, filter) {
         [gl.RGB16F]: gl.RG,
         [gl.RGBA16F]: gl.RGBA,
     };
+    internalFormat ??= gl.RGBA16F;
+    filter ??= gl.LINEAR;
     const result = {
         ...resolution,
         minFilter: filter,
@@ -95,8 +153,8 @@ export function createPingPongFramebuffersWithTexture(gl, options) {
         ping: 0,
     };
     pp.pong = () => 1 - pp.ping;
-    pp.currentWriteReadOrder = () => [
-        // TODO: better name: currentRoles()
+    pp.currentRoles = () => [
+        /** usage e.g. const [write, read] = pp.currentRoles(); */
         pp.fb[pp.ping],
         pp.fb[pp.pong()]
     ];
@@ -179,73 +237,12 @@ export function takePingPongFramebuffers(state) {
     }
 }
 
-export function clearFramebuffers(gl, state) {
-    state.framebuffer.fb.forEach(fb => {
+export function clearFramebuffers(gl, framebuffers) {
+    framebuffers.forEach(fb => {
         gl.bindFramebuffer(gl.FRAMEBUFFER, fb.fbo);
         gl.viewport(0, 0, fb.width, fb.height);
         gl.clearColor(0, 0, 0, 0);
         gl.clear(gl.COLOR_BUFFER_BIT);
     });
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-}
-
-export async function evaluateReadData(buffer, mapFunc = undefined) {
-    const isUnsignedByte = buffer instanceof Uint8Array;
-    const asFloat = buffer instanceof Float32Array
-        ? buffer
-        : Float32Array.from(buffer, mapFunc);
-    const data = {
-        pixels: buffer.length / 4,
-        min: rgba(Infinity),
-        max: rgba(-Infinity),
-        avg: rgba(0),
-        span: rgba(0),
-        buffer: {
-            raw: buffer,
-            asFloat,
-        },
-    };
-    for (let i = 0; i < buffer.length; i += 4) {
-        for (let c = 0; c < 4; c++) {
-            let value = asFloat[i + c];
-            if (value < data.min[c]) {
-                data.min[c] = value;
-            }
-            if (value > data.max[c]) {
-                data.max[c] = value;
-            }
-            data.avg[c] += value;
-        }
-    }
-    for (let c = 0; c < 4; c++) {
-        data.avg[c] /= data.pixels;
-        data.span[c] = data.max[c] - data.min[c];
-    }
-    data.formatted = {
-        avg: toStr(data.avg),
-        min: toStr(data.min),
-        max: toStr(data.max),
-    };
-    return data;
-
-    function rgba(value) {
-        return [value, value, value, value];
-    }
-
-    function toStr(rgba) {
-        const list = rgba.map(format).join(", ");
-        return `[${list}]`;
-    }
-
-    function format(value) {
-        if (isUnsignedByte) {
-            if (value < 0.001) {
-                return " <= 0";
-            }
-            if (value > 0.999) {
-                return " >= 1"
-            }
-        }
-        return value.toFixed(3);
-    }
 }

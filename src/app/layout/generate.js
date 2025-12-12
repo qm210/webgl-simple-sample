@@ -8,7 +8,7 @@ import {addCanvasMouseInteraction} from "../mouse.js";
 import {createPresetSelector, refreshPresets} from "../exchange.js";
 import {initializePresetStore} from "../database.js";
 import {createMainControlBar} from "./controls/bar.js";
-import {takeMilliSeconds} from "../measuring.js";
+import {takeMilliSeconds} from "../jsHelpers.js";
 import {updateResolutionInState} from "../../webgl/helpers/resolution.js";
 import {promptForSecondToJump} from "./controls/time.js";
 

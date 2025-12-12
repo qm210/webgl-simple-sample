@@ -6,6 +6,7 @@ export default defineConfig({
         minify: false,
         keepAllComments: true,
     })],
+    assetsInclude: ['src/textures/**/*.png'],
     test: {
         globals: true,
         environment: "happy-dom"

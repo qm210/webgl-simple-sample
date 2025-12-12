@@ -1,5 +1,9 @@
 import {createGlyphDef, createUbo, initBasicState, startRenderLoop} from "./common.js";
-import {createTextureFromImage} from "../webgl/helpers/textures.js";
+import {
+    createTextureFromImage,
+    createTextureFromLoadedImage,
+    loadImagesByVite
+} from "../webgl/helpers/textures.js";
 
 import vertexShaderSource from "../shaders/specific/dream210.vertex.glsl";
 import fragmentShaderSource from "../shaders/specific/dream210.fragment.glsl";
@@ -7,15 +11,19 @@ import spiceSaleMsdfPng from "../textures/dream210/SpicySale.msdf.png";
 import spiceSaleMsdfJson from "../textures/dream210/SpicySale.msdf.json";
 import {resolutionScaled, updateResolutionInState} from "../webgl/helpers/resolution.js";
 import {
-    clearFramebuffers, createFramebufferWithTexture,
-    createPingPongFramebuffersWithTexture,
-    halfFloatOptions
+    clearFramebuffers, createFramebufferWithTexture, createFramebufferWithTextureArray,
+    createPingPongFramebuffersWithTexture, halfFloatOptions
 } from "../webgl/helpers/framebuffers.js";
 import ditherImage from "../textures/dither.png";
 
+// This secret move is presented to you by... vite :)
+const monaImages =
+    import.meta.glob('/src/textures/dream210/mona/*.png', {eager: true});
+
+
 export default {
     title: "DREAM210 Merged",
-    init: (gl, sources = {}) => {
+    init: async (gl, sources = {}) => {
         sources.vertex ??= vertexShaderSource;
         sources.fragment ??= fragmentShaderSource;
         const state = initBasicState(gl, sources);
@@ -24,33 +32,52 @@ export default {
             return state;
         }
 
+        state.monaTextures = await loadImagesByVite(
+            monaImages,
+            img => createTextureFromLoadedImage(gl, img)
+        );
+        console.log("Mona-Textures", state.monaTextures);
+
         state.passIndex = 0;
 
-        //////////////  --> CLOUDS
         const {width, height} = updateResolutionInState(state, gl);
-        state.framebuffer = {
-            clouds: createPingPongFramebuffersWithTexture(gl, {
-                width,
-                height,
-                attachment: gl.COLOR_ATTACHMENT0,
+        state.opt = {
+            image: {
+                width, height,
+            },
+            floatImage: {
+                width, height,
                 internalFormat: gl.RGBA32F,
                 dataFormat: gl.RGBA,
                 dataType: gl.FLOAT,
-            })
+            },
+            fluid: resolutionScaled(128, width, height),
+            sunrays: halfFloatOptions(gl,
+                resolutionScaled(196, width, height),
+                gl.R16F,
+                gl.LINEAR
+            ),
+            bloom: halfFloatOptions(gl,
+                resolutionScaled(256, width, height),
+                gl.RGBA16F,
+                gl.LINEAR
+            )
         };
 
-        state.debugOption = +(sessionStorage.getItem("qm.clouds.debug") ?? 0);
+        state.framebuffer = {
+            clouds: createPingPongFramebuffersWithTexture(gl, state.opt.floatImage),
+            noiseBase: createFramebufferWithTexture(gl, state.opt.image),
+            texts: createFramebufferWithTextureArray(gl, 4, state.opt.image),
+        };
+
+        state.debugOption = +(sessionStorage.getItem("qm.dream210.debug") ?? 0);
         state.toggleDebugOption = (index) => {
             state.debugOption ^= 1 << index;
-            sessionStorage.setItem("qm.clouds.debug", state.debugOption);
+            sessionStorage.setItem("qm.drean210.debug", state.debugOption);
         }
         state.hasDebugOption = (index) =>
             (state.debugOption & (1 << index)) !== 0;
         state.accumulate = false;
-
-        ////////////// <-- CLOUDS
-
-        /////////////  ---> GLYPHS
 
         const {glyphDef, glyphDebug} = createGlyphDef(spiceSaleMsdfJson);
         const ubo = createUbo(gl, state.program, glyphDef, "Glyphs");
@@ -70,31 +97,18 @@ export default {
             debug: glyphDebug,
         }
 
-        /////////// <------------ GLYPHS, now FLUID
-
-        state.framebuffer = {
-            ...state.framebuffer,
-            image: createPingPongFramebuffersWithTexture(gl, {
-                width,
-                height,
-                attachment: gl.COLOR_ATTACHMENT0,
-            }),
-            fluid: {},
-            post: {},
-        };
-        state.fluid = resolutionScaled(128, width, height);
-        state.fluid.scalarField = {
-            width: state.fluid.width,
-            height: state.fluid.height,
+        state.opt.fluidScalar = {
+            width: state.opt.fluid.width,
+            height: state.opt.fluid.height,
             internalFormat: gl.R16F,
             dataFormat: gl.RED,
             dataType: gl.HALF_FLOAT,
             minFilter: gl.NEAREST,
             magFilter: gl.NEAREST,
         };
-        state.fluid.vec2Field = {
-            width: state.fluid.width,
-            height: state.fluid.height,
+        state.opt.fluidVec2 = {
+            width: state.opt.fluid.width,
+            height: state.opt.fluid.height,
             internalFormat: gl.RG16F,
             dataFormat: gl.RG,
             dataType: gl.HALF_FLOAT,
@@ -102,38 +116,20 @@ export default {
             magFilter: gl.LINEAR,
         };
         state.framebuffer.fluid = {
-            velocity: createPingPongFramebuffersWithTexture(gl, state.fluid.vec2Field),
-            divergence: createFramebufferWithTexture(gl, state.fluid.scalarField),
-            curl: createFramebufferWithTexture(gl, state.fluid.scalarField),
-            pressure: createPingPongFramebuffersWithTexture(gl, state.fluid.scalarField),
+            color: createPingPongFramebuffersWithTexture(gl, state.opt.image),
+            velocity: createPingPongFramebuffersWithTexture(gl, state.opt.fluidVec2),
+            divergence: createFramebufferWithTexture(gl, state.opt.fluidScalar),
+            curl: createFramebufferWithTexture(gl, state.opt.fluidScalar),
+            pressure: createPingPongFramebuffersWithTexture(gl, state.opt.fluidScalar),
         };
 
-        // analog zum scalarField oben -> Helper definiert :)
+        state.framebuffer.post = {};
         state.framebuffer.post.sunrays = {
-            options: halfFloatOptions(
-                gl,
-                resolutionScaled(196, width, height),
-                gl.R16F,
-                gl.LINEAR
-            ),
-            effect: undefined,
-        }
-        state.framebuffer.post.sunrays.effect =
-            createFramebufferWithTexture(gl,
-                state.framebuffer.post.sunrays.options
-            );
-        state.framebuffer.post.sunrays.tempForBlur =
-            createFramebufferWithTexture(gl,
-                state.framebuffer.post.sunrays.options
-            );
-
+            effect: createFramebufferWithTexture(gl, state.opt.sunrays),
+            tempForBlur: createFramebufferWithTexture(gl, state.opt.sunrays),
+        };
         state.framebuffer.post.bloom = {
-            options: halfFloatOptions(
-                gl,
-                resolutionScaled(256, width, height),
-                gl.RGBA16F,
-                gl.LINEAR
-            ),
+            options: state.opt.bloom,
             effect: undefined,
             iterations: [],
             dither: createTextureFromImage(gl, ditherImage, {
@@ -147,17 +143,14 @@ export default {
             })
         };
         state.framebuffer.post.bloom.effect =
-            createFramebufferWithTexture(gl,
-                state.framebuffer.post.bloom.options
-            );
-        const bloomIterations = Math.log2(
-            state.framebuffer.post.bloom.options.height
-        );
+            createFramebufferWithTexture(gl, state.opt.bloom);
+        const bloomIterations =
+            Math.log2(state.opt.bloom.height);
         for (let i = 0; i < bloomIterations; i++) {
             const options = {
-                ...state.framebuffer.post.bloom.options,
-                width: state.framebuffer.post.bloom.options.width >> (i + 1),
-                height: state.framebuffer.post.bloom.options.height >> (i + 1),
+                ...state.opt.bloom,
+                width: state.opt.bloom.width >> (i + 1),
+                height: state.opt.bloom.height >> (i + 1),
             };
             if (options.width < 2 || options.height < 2) {
                 break;
@@ -171,7 +164,7 @@ export default {
 
         // initialize the velocity framebuffer texture ([1] = pong = first read) to constant values
         // rg == vec2(0,0) should be default anyway, but why not make sure.
-        const [, initialVelocity] = state.framebuffer.fluid.velocity.currentWriteReadOrder();
+        const [, initialVelocity] = state.framebuffer.fluid.velocity.currentRoles();
         gl.bindFramebuffer(gl.FRAMEBUFFER, initialVelocity.fbo);
         gl.clearColor(0,0,0,0);
         gl.clear(gl.COLOR_BUFFER_BIT);
@@ -181,14 +174,12 @@ export default {
         gl.clear(gl.COLOR_BUFFER_BIT);
         gl.bindFramebuffer(gl.FRAMEBUFFER, null);
 
-
         // Relic from the Fluid -- random input -- is not what we want!
         state.spawn = {
             seed: 0.,
             last: Number.NEGATIVE_INFINITY,
             age: 0.,
         };
-
 
         return state;
     },
@@ -216,7 +207,7 @@ export default {
                 label: () =>
                     "Accumulate: " + (state.accumulate ? "On" : "Off"),
                 onClick: () => {
-                    clearFramebuffers(gl, state);
+                    clearFramebuffers(gl, state.framebuffer.fb);
                     state.iFrame = 0;
                     state.toggleDebugOption(0);
                     state.accumulate = state.hasDebugOption(0);
@@ -246,13 +237,593 @@ export default {
                 style: { flex: 0 }
             }
         ],
-        uniforms: [
-            // type: "button",
-            // name: "executeQueries",
-            // label: "Query Rendering",
-            // onClick: () => {
-            //     state.query.doExecute = true;
-            // }
+        uniforms: createUniforms(),
+    })
+};
+
+const PASS = {
+    INIT_VELOCITY: 0,
+    INIT_COLOR_DENSITY: 1,
+    INIT_PRESSURE: 2,
+    INIT_CURL_FROM_VELOCITY: 3,
+    PROCESS_VELOCITY_VORTICITY: 10,
+    PROCESS_DIVERGENCE_FROM_VELOCITY: 11,
+    PROCESS_PRESSURE: 12,
+    PROCESS_GRADIENT_SUBTRACTION: 13,
+    PROCESS_ADVECTION: 14,
+    PROCESS_FLUID_COLOR: 19,
+    POST_PREFILTER_BLOOM: 20,
+    POST_BLOOM_BLUR: 21,
+    POST_PREPARE_SUNRAYS_MASK: 30,
+    POST_APPLY_SUNRAYS: 31,
+    POST_BLUR_SUNRAYS: 32,
+    RENDER_COLORS: 40,
+
+    ACCUMULATE_CLOUDS: 60,
+    RENDER_CLOUDS: 61,
+
+    // PLACEHOLDERS
+    INIT_TEXT0: 80,
+    INIT_TEXT1: 81,
+    INIT_TEXT2: 82,
+    INIT_TEXT3: 83,
+
+    RENDER_NOISE_BASE: 90,
+    RENDER_FINALLY_TO_SCREEN: 100
+};
+
+
+// ist nur Auflistung, sollte man beim portieren vllt richtig machen.
+// btw -> scheiß-nummerierung -> aber egal -> frag nicht
+const TEXTURE_UNITS = {
+    // die fürs Fluid KÖNNTE man komprimieren, aber schaumermal
+    COLOR_DENSITY: 0, // <-- ist das sichtbare Bild
+    VELOCITY: 1,
+    CURL: 2, // wird nie zeitgleich 0 verwendet
+    POST_SUNRAYS: 3,
+    POST_BLOOM: 4,
+    PRESSURE: 5,  // wird nie zeitgleich COLOR_DENSITY verwendet
+    DIVERGENCE: 6,  // wird nie zeitgleich COLOR_DENSITY verwendet
+    POST_BLOOM_DITHER: 7,
+    // glyphs
+    OHLI_FONT: 8,
+    // cloud render result
+    PREVIOUS_CLOUD: 9,
+    // ... and some mona-graphics please?
+}
+
+// sind halt einfach Platzhalter.
+// zwar global, aber werden halt einfach nicht scheiße behandelt. yespls?
+// -> else hausverbot
+let write, read, readPrevious, readVelocity;
+
+function render(gl, state) {
+    gl.uniform1f(state.location.iTime, state.time);
+    gl.uniform1f(state.location.deltaTime, state.play.dt);
+    gl.uniform2fv(state.location.iResolution, state.resolution);
+    gl.uniform1i(state.location.iFrame, state.iFrame);
+
+    gl.uniform1f(state.location.iVignetteInner, state.iVignetteInner);
+    gl.uniform1f(state.location.iVignetteOuter, state.iVignetteOuter);
+    gl.uniform1f(state.location.iVignetteScale, state.iVignetteScale);
+    gl.uniform1f(state.location.iGamma, state.iGamma);
+
+    gl.uniform1f(state.location.iFree0, state.iFree0);
+    gl.uniform1f(state.location.iFree1, state.iFree1);
+    gl.uniform1f(state.location.iFree2, state.iFree2);
+    gl.uniform1f(state.location.iFree3, state.iFree3);
+    gl.uniform1f(state.location.iFree4, state.iFree4);
+    gl.uniform1f(state.location.iFree5, state.iFree5);
+
+    // SOURCE: NOISE BASE -
+
+    gl.uniform1f(state.location.iGridOpacity, state.iGridOpacity);
+    gl.uniform2fv(state.location.iOverallNoiseShift, state.iOverallNoiseShift);
+    gl.uniform1f(state.location.iOverallScale, state.iOverallScale);
+    gl.uniform1f(state.location.iOverallHashOffset, state.iOverallHashOffset);
+    gl.uniform1f(state.location.iNoiseLevelA, state.iNoiseLevelA);
+    gl.uniform1f(state.location.iNoiseLevelB, state.iNoiseLevelB);
+    gl.uniform1f(state.location.iNoiseLevelC, state.iNoiseLevelC);
+    gl.uniform1f(state.location.iNoiseScaleA, state.iNoiseScaleA);
+    gl.uniform1f(state.location.iNoiseScaleB, state.iNoiseScaleB);
+    gl.uniform1f(state.location.iNoiseScaleC, state.iNoiseScaleC);
+    gl.uniform1f(state.location.iNoiseMorphingA, state.iNoiseMorphingA);
+    gl.uniform1f(state.location.iNoiseMorphingB, state.iNoiseMorphingB);
+    gl.uniform1f(state.location.iNoiseMorphingC, state.iNoiseMorphingC);
+    gl.uniform1i(state.location.iFractionalOctaves, state.iFractionalOctaves);
+    gl.uniform1f(state.location.iFractionalScale, state.iFractionalScale);
+    gl.uniform1f(state.location.iFractionalDecay, state.iFractionalDecay);
+    gl.uniform1f(state.location.iTurbulenceNormFactor, state.iTurbulenceNormFactor);
+    gl.uniform1f(state.location.iTurbulenceMeanOffset, state.iTurbulenceMeanOffset);
+    gl.uniform2fv(state.location.iMarbleSqueeze, state.iMarbleSqueeze);
+    gl.uniform1f(state.location.iMarbleGranularity, state.iMarbleGranularity);
+    gl.uniform1f(state.location.iMarbleGradingExponent, state.iMarbleGradingExponent);
+    gl.uniform1f(state.location.iMarbleRange, state.iMarbleRange);
+    gl.uniform1f(state.location.iColorStrength, state.iColorStrength);
+    gl.uniform3fv(state.location.iColorCosineFreq, state.iColorCosineFreq);
+    gl.uniform3fv(state.location.iColorCosinePhase, state.iColorCosinePhase);
+
+    // SOURCE: FONTS -- TEXTURE8 für MSDF-Png
+
+    gl.uniform3fv(state.location.iTextColor, state.iTextColor);
+
+    gl.activeTexture(gl.TEXTURE8);
+    gl.bindTexture(gl.TEXTURE_2D, state.msdf.tex);
+    gl.uniform1i(state.location.glyphTex, 8);
+    gl.uniform4fv(state.location.glyphDefM, state.msdf.glyphDef.slice(4 * 44, 4*45));
+
+    // SOURCE: CLOUDS -- TEXTURE9 für Feedback / Akkumulation
+
+    gl.uniform1f(state.location.iCloudYDisplacement, state.iCloudYDisplacement);
+    gl.uniform1f(state.location.iCloudLayerDistance, state.iCloudLayerDistance);
+    gl.uniform1f(state.location.iLightLayerDistance, state.iLightLayerDistance);
+    gl.uniform1f(state.location.iCloudSeed, state.iCloudSeed);
+    gl.uniform1f(state.location.iSkyQuetschung, state.iSkyQuetschung);
+    gl.uniform1i(state.location.iSampleCount, state.iSampleCount);
+    gl.uniform1i(state.location.iCloudLayerCount, state.iCloudLayerCount);
+    gl.uniform1i(state.location.iLightLayerCount, state.iLightLayerCount);
+    gl.uniform1i(state.location.iCloudNoiseCount, state.iCloudNoiseCount);
+    gl.uniform1i(state.location.iLightNoiseCount, state.iLightNoiseCount);
+    gl.uniform3fv(state.location.iNoiseScale, state.iNoiseScale);
+    gl.uniform1f(state.location.iCloudAbsorptionCoeff, state.iCloudAbsorptionCoeff);
+    gl.uniform1f(state.location.iCloudAnisoScattering, state.iCloudAnisoScattering);
+    gl.uniform3fv(state.location.vecSunPosition, state.vecSunPosition);
+    gl.uniform3fv(state.location.vecSunColorYCH, state.vecSunColorYCH);
+    gl.uniform1f(state.location.iSunExponent, state.iSunExponent);
+    gl.uniform3fv(state.location.vecTone1, state.vecTone1);
+    gl.uniform3fv(state.location.vecTone2, state.vecTone2);
+    gl.uniform1f(state.location.iAccumulateMix, state.iAccumulateMix);
+
+    gl.uniform1f(state.location.iNoiseLevel, state.iNoiseLevel);
+    gl.uniform1f(state.location.iNoiseFreq, state.iNoiseFreq);
+    gl.uniform1f(state.location.iNoiseOffset, state.iNoiseOffset);
+    gl.uniform1i(state.location.iFractionalOctaves, Math.floor(state.iFractionalOctaves));
+    gl.uniform1f(state.location.iFractionalScale, state.iFractionalScale);
+    gl.uniform1f(state.location.iFractionalDecay, state.iFractionalDecay);
+    gl.uniform1f(state.location.iCloudMorph, state.iCloudMorph);
+
+    gl.uniform1i(state.location.debugOption, state.debugOption);
+
+    gl.activeTexture(gl.TEXTURE9);
+    gl.uniform1i(state.location.prevImage, 9);
+
+    ///// INIT_TEXTi...
+
+    gl.bindFramebuffer(gl.FRAMEBUFFER, state.framebuffer.texts.fbo);
+    gl.uniform1i(state.location.texTexts, 15);
+    gl.activeTexture(gl.TEXTURE15);
+    gl.bindTexture(gl.TEXTURE_2D_ARRAY, null);
+
+    for (let layer = 0; layer < 2; layer++) {
+        gl.uniform1i(state.location.passIndex, PASS.INIT_TEXT0 + layer);
+        gl.framebufferTextureLayer(
+            gl.FRAMEBUFFER,
+            state.framebuffer.texts.opt.attachment,
+            state.framebuffer.texts.texArray,
+            0,
+            layer
+        );
+        gl.drawArrays(gl.TRIANGLES, 0, 6);
+    }
+    gl.bindTexture(gl.TEXTURE_2D_ARRAY, state.framebuffer.texts.texArray);
+
+    /////
+
+    gl.uniform1i(state.location.passIndex, PASS.RENDER_NOISE_BASE);
+
+    gl.bindFramebuffer(gl.FRAMEBUFFER, state.framebuffer.noiseBase.fbo);
+    gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+    /////
+
+    [write, read] = state.framebuffer.clouds.currentRoles();
+    gl.uniform1i(state.location.passIndex, PASS.RENDER_CLOUDS);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo);
+    gl.bindTexture(gl.TEXTURE_2D, read.texture);
+    gl.drawArrays(gl.TRIANGLES, 0, 6);
+    state.framebuffer.clouds.doPingPong();
+
+    gl.uniform1i(state.location.passIndex, PASS.ACCUMULATE_CLOUDS);
+    [, read] = state.framebuffer.clouds.currentRoles();
+
+    // ganz offenbar sind wir noch nicht fertig.
+    /*
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.bindTexture(gl.TEXTURE_2D, read.texture);
+    gl.drawArrays(gl.TRIANGLES, 0, 6);
+     */
+
+    // SOURCE: FLUID-ESCALATION
+
+    gl.uniform3fv(state.location.iSpawnColorHSV, state.iSpawnColorHSV);
+    gl.uniform1f(state.location.iSpawnHueGradient, state.iSpawnHueGradient);
+    gl.uniform1f(state.location.iSpawnRandomizeHue, state.iSpawnRandomizeHue);
+    gl.uniform1f(state.location.iColorDissipation, state.iColorDissipation);
+    gl.uniform1f(state.location.iVelocityDissipation, state.iVelocityDissipation);
+    gl.uniform1f(state.location.iMaxInitialVelocity, state.iMaxInitialVelocity);
+    gl.uniform1f(state.location.iCurlStrength, state.iCurlStrength);
+    gl.uniform1f(state.location.iPressure, state.iPressure);
+    gl.uniform1f(state.location.iSunraysWeight, state.iSunraysWeight);
+    gl.uniform1f(state.location.iSunraysDensity, state.iSunraysDensity);
+    gl.uniform1f(state.location.iSunraysDecay, state.iSunraysDecay);
+    gl.uniform1f(state.location.iSunraysExposure, state.iSunraysExposure);
+    gl.uniform1f(state.location.iSunraysIterations, state.iSunraysIterations);
+
+    // das ist massiv. erstmal auslagern
+    renderFluidPasses(gl, state);
+
+    // !! Finale Komposition auf Back Buffer !!
+
+    gl.uniform1i(state.location.passIndex, PASS.RENDER_FINALLY_TO_SCREEN);
+
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    let unit = 9;
+    gl.activeTexture(gl.TEXTURE0 + unit);
+    gl.bindTexture(gl.TEXTURE_2D, state.framebuffer.noiseBase.texture);
+    gl.uniform1i(state.location.texNoiseBase, unit++);
+    gl.activeTexture(gl.TEXTURE0 + unit);
+    gl.bindTexture(gl.TEXTURE_2D, state.monaTextures["210_schnoerkel"]);
+    gl.uniform1i(state.location.texMonaSchnoergel, unit++);
+    gl.activeTexture(gl.TEXTURE0 + unit);
+    gl.bindTexture(gl.TEXTURE_2D, state.monaTextures["regenbogen"]);
+    gl.uniform1i(state.location.texMonaRainbow, unit++);
+    gl.activeTexture(gl.TEXTURE0 + unit);
+    gl.bindTexture(gl.TEXTURE_2D, state.monaTextures["dream210_visual_quadratisch_transparent"]);
+    gl.uniform1i(state.location.texMonaCity, unit++);
+    gl.activeTexture(gl.TEXTURE0 + unit);
+    gl.bindTexture(gl.TEXTURE_2D, state.monaTextures["schnoerkelsterne"]);
+    gl.uniform1i(state.location.texMonaStars, unit++);
+
+    gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+    for (; unit >= 9; unit--) {
+        gl.activeTexture(gl.TEXTURE0 + unit);
+        gl.bindTexture(gl.TEXTURE_2D, null);
+    }
+}
+
+const SPAWN_EVERY_SECONDS = 2;
+
+function renderFluidPasses(gl, state) {
+
+    // TODO: NICHT ZUFÄLLIG SPAWNEN!! -->
+    state.spawn.seed = -1.;
+    if (state.time - state.spawn.last > SPAWN_EVERY_SECONDS) {
+        state.spawn.seed = Math.floor(state.time / SPAWN_EVERY_SECONDS);
+        state.spawn.last = state.time;
+    }
+    state.spawn.age = Math.max(state.time - state.spawn.last, 0.);
+    gl.uniform1f(state.location.iSpawnSeed, state.spawn.seed);
+    gl.uniform1f(state.location.iSpawnAge, state.spawn.age);
+    // <-- TODO: NICHT ZUFÄLLIG SPAWNEN! RELIKT.
+
+    // NOTE: man KÖNNTE die komprimieren, aber vllt muss man gar nicht
+    gl.uniform1i(state.location.texColor, 0);
+    gl.uniform1i(state.location.texVelocity, 1);
+    gl.uniform1i(state.location.texCurl, 2); // could also use 0 here because we will not conflict, but this is needless.
+    gl.uniform1i(state.location.texPressure, 5); // could also use 0 here because we will not conflict, but this is needless.
+    gl.uniform1i(state.location.texDivergence, 6); // could also use 0 here because we will not conflict, but this is needless.
+    gl.uniform1i(state.location.texPostSunrays, 3);
+    gl.uniform1i(state.location.texPostBloom, 4);
+    gl.uniform1i(state.location.texPostBloomDither, 7);
+
+    /////////////
+
+    gl.uniform1i(state.location.passIndex, PASS.INIT_VELOCITY);
+
+    [write, readPrevious] = state.framebuffer.fluid.velocity.currentRoles();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, readPrevious.texture);
+
+    gl.viewport(0, 0, write.width, write.height);
+    gl.uniform2fv(state.location.texelSize, state.opt.fluid.texelSize);
+    gl.drawArrays(gl.TRIANGLES, 0, 6);
+    state.framebuffer.fluid.velocity.doPingPong();
+
+    /////////////
+
+    gl.uniform1i(state.location.passIndex, PASS.INIT_COLOR_DENSITY);
+
+    [write, readPrevious] = state.framebuffer.fluid.color.currentRoles();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, readPrevious.texture);
+
+    gl.viewport(0, 0, write.width, write.height);
+    gl.uniform2fv(state.location.texelSize, state.texelSize);
+    gl.drawArrays(gl.TRIANGLES, 0, 6);
+    state.framebuffer.fluid.color.doPingPong();
+
+    /////////////
+
+    // Use Velocity to calculate a fresh Scalar: Curl
+
+    gl.uniform1i(state.location.passIndex, PASS.INIT_CURL_FROM_VELOCITY);
+
+        // Note: need to unbind the curl texture itself when we want to write to its framebuffer.
+        //       we _could_ clean this up right after the next step (or avoid a third texture unit altogether)
+        //       but it _is_ convenient that we can just render the texture for debugging in the last pass.
+
+    write = state.framebuffer.fluid.curl;
+    [, readVelocity] = state.framebuffer.fluid.velocity.currentRoles();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo);
+    gl.activeTexture(gl.TEXTURE2);
+    gl.bindTexture(gl.TEXTURE_2D, null);
+    gl.activeTexture(gl.TEXTURE1);
+    gl.bindTexture(gl.TEXTURE_2D, readVelocity.texture);
+
+    gl.viewport(0, 0, write.width, write.height);
+    gl.uniform2fv(state.location.texelSize, state.opt.fluid.texelSize);
+    gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+    /////////////
+
+    // Use Curl and Velocity to calculate new Velocity
+    gl.uniform1i(state.location.passIndex, PASS.PROCESS_VELOCITY_VORTICITY);
+
+    [write, readVelocity] = state.framebuffer.fluid.velocity.currentRoles();
+    const readCurl = state.framebuffer.fluid.curl;
+    gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo);
+    gl.viewport(0, 0, write.width, write.height);
+    gl.activeTexture(gl.TEXTURE1);
+    gl.bindTexture(gl.TEXTURE_2D, readVelocity.texture);
+    gl.activeTexture(gl.TEXTURE2);
+    gl.bindTexture(gl.TEXTURE_2D, readCurl.texture);
+    gl.uniform2fv(state.location.texelSize, state.opt.fluid.texelSize);
+    gl.drawArrays(gl.TRIANGLES, 0, 6);
+    // ! ... we did use Velocity to write Velocity, so do the ping-pong:
+    state.framebuffer.fluid.velocity.doPingPong();
+
+    /////////////
+
+    // Use Velocity to calculate a fresh Scalar: Divergence
+    gl.uniform1i(state.location.passIndex, PASS.PROCESS_DIVERGENCE_FROM_VELOCITY);
+
+    write = state.framebuffer.fluid.divergence;
+    [, readVelocity] = state.framebuffer.fluid.velocity.currentRoles();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo);
+    gl.viewport(0, 0, write.width, write.height);
+    gl.activeTexture(gl.TEXTURE1);
+    gl.bindTexture(gl.TEXTURE_2D, readVelocity.texture);
+    gl.uniform2fv(state.location.texelSize, state.opt.fluid.texelSize);
+    gl.drawArrays(gl.TRIANGLES, 0, 6);
+    // ! ... we did not write to anything we've read from, i.e. no swap here
+
+    /////////////
+
+    gl.uniform1i(state.location.passIndex, PASS.INIT_PRESSURE);
+
+    [write, readPrevious] = state.framebuffer.fluid.pressure.currentRoles();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo);
+    gl.viewport(0, 0, write.width, write.height);
+    gl.activeTexture(gl.TEXTURE5);
+    gl.bindTexture(gl.TEXTURE_2D, readPrevious.texture);
+    gl.uniform2fv(state.location.texelSize, state.opt.fluid.texelSize);
+    gl.drawArrays(gl.TRIANGLES, 0, 6);
+    state.framebuffer.fluid.pressure.doPingPong();
+
+    /////////////
+
+    // Use Divergence and Pressure to Iterate a while on Pressure
+    gl.uniform1i(state.location.passIndex, PASS.PROCESS_PRESSURE);
+
+    gl.uniform2fv(state.location.texelSize, state.opt.fluid.texelSize);
+    for (let p = 0; p < state.pressureIterations; p++) {
+        [write, readPrevious] = state.framebuffer.fluid.pressure.currentRoles();
+        gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo);
+        gl.viewport(0, 0, write.width, write.height);
+        gl.activeTexture(gl.TEXTURE5);
+        gl.bindTexture(gl.TEXTURE_2D, readPrevious.texture);
+        gl.activeTexture(gl.TEXTURE6);
+        gl.bindTexture(gl.TEXTURE_2D, state.framebuffer.fluid.divergence.texture);
+        gl.uniform2fv(state.location.texelSize, state.opt.fluid.texelSize);
+        gl.drawArrays(gl.TRIANGLES, 0, 6);
+        state.framebuffer.fluid.pressure.doPingPong();
+    }
+    gl.activeTexture(gl.TEXTURE6);
+    gl.bindTexture(gl.TEXTURE_2D, null);
+
+    /////////////
+
+    // Use Pressure and Velocity to Subtract Gradients on Velocity - it seems.
+    gl.uniform1i(state.location.passIndex, PASS.PROCESS_GRADIENT_SUBTRACTION);
+
+    const [, readPressure] = state.framebuffer.fluid.pressure.currentRoles();
+    [write, readVelocity] = state.framebuffer.fluid.velocity.currentRoles();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo);
+    gl.viewport(0, 0, write.width, write.height);
+    gl.activeTexture(gl.TEXTURE5);
+    gl.bindTexture(gl.TEXTURE_2D, readPressure.texture);
+    gl.activeTexture(gl.TEXTURE1);
+    gl.bindTexture(gl.TEXTURE_2D, readVelocity.texture);
+    gl.uniform2fv(state.location.texelSize, state.opt.fluid.texelSize);
+    gl.drawArrays(gl.TRIANGLES, 0, 6);
+    state.framebuffer.fluid.velocity.doPingPong();
+
+    /////////////
+
+    // Use Velocity as velocity AND as previous value to advect / dissipate Velocity
+    gl.uniform1i(state.location.passIndex, PASS.PROCESS_ADVECTION);
+
+    [write, readPrevious] = state.framebuffer.fluid.velocity.currentRoles();
+    readVelocity = readPrevious;
+    gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo);
+    gl.viewport(0, 0, write.width, write.height);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, readPrevious.texture);
+    gl.activeTexture(gl.TEXTURE1);
+    gl.bindTexture(gl.TEXTURE_2D, readVelocity.texture);
+    gl.uniform2fv(state.location.texelSize, state.opt.fluid.texelSize);
+    gl.drawArrays(gl.TRIANGLES, 0, 6);
+    state.framebuffer.fluid.velocity.doPingPong();
+
+    /////////////
+
+    // Use Velocity as velocity and last image color as previous value to advect / dissipate Density
+    // (Density, together with the somehow chosen start color, is what we actually see as colored cloud image)
+    gl.uniform1i(state.location.passIndex, PASS.PROCESS_FLUID_COLOR);
+
+    [write, readPrevious] = state.framebuffer.fluid.color.currentRoles();
+    [, readVelocity] = state.framebuffer.fluid.velocity.currentRoles();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo);
+    gl.viewport(0, 0, write.width, write.height);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, readPrevious.texture);
+    gl.activeTexture(gl.TEXTURE1);
+    gl.bindTexture(gl.TEXTURE_2D, readVelocity.texture);
+    gl.uniform2fv(state.location.texelSize, state.texelSize);
+    gl.drawArrays(gl.TRIANGLES, 0, 6);
+    state.framebuffer.fluid.color.doPingPong();
+
+    /// END OF FLUID DYNAMICS ///////////////////
+
+    /// POST: BLOOM /////////////////////////////
+
+    gl.uniform1i(state.location.passIndex, PASS.POST_PREFILTER_BLOOM);
+    gl.disable(gl.BLEND);
+
+    [, readPrevious] = state.framebuffer.fluid.color.currentRoles();
+    write = state.framebuffer.post.bloom.effect;
+    gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, readPrevious.texture);
+    gl.uniform1f(state.location.iBloomSoftKnee, state.iBloomSoftKnee);
+    gl.uniform1f(state.location.iBloomThreshold, state.iBloomThreshold);
+    gl.uniform2fv(state.location.texelSize, write.texelSize);
+    gl.drawArrays(gl.TRIANGLES, 0, 6);
+    let lastWrite = write;
+
+    gl.uniform1i(state.location.passIndex, PASS.POST_BLOOM_BLUR);
+
+    for (const iteration of state.framebuffer.post.bloom.iterations) {
+        gl.bindFramebuffer(gl.FRAMEBUFFER, iteration.fbo);
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, lastWrite.texture);
+        gl.uniform2fv(state.location.texelSize, lastWrite.texelSize);
+        gl.drawArrays(gl.TRIANGLES, 0, 6);
+        lastWrite = iteration;
+    }
+
+    gl.blendFunc(gl.ONE, gl.ONE);
+    gl.enable(gl.BLEND);
+
+    for (let i = state.framebuffer.post.bloom.iterations.length - 2; i >= 0; i--) {
+        const base = state.framebuffer.post.bloom.iterations[i];
+        gl.bindFramebuffer(gl.FRAMEBUFFER, base.fbo);
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, lastWrite.texture);
+        gl.uniform2fv(state.location.texelSize, lastWrite.texelSize);
+        gl.drawArrays(gl.TRIANGLES, 0, 6);
+        lastWrite = base;
+    }
+
+    gl.disable(gl.BLEND);
+
+    gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, lastWrite.texture);
+    gl.uniform1f(state.location.iBloomIntensity, state.iBloomIntensity);
+    gl.uniform2fv(state.location.texelSize, lastWrite.texelSize);
+    gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+    /// POST: SUNRAYS ///////////////////////////
+
+    // the prepare step takes the previous image and writes to the next _image_
+
+    gl.uniform1i(state.location.passIndex, PASS.POST_PREPARE_SUNRAYS_MASK);
+
+    [write, readPrevious] = state.framebuffer.fluid.color.currentRoles();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo);
+    gl.viewport(0, 0, write.width, write.height);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, readPrevious.texture);
+    gl.uniform2fv(state.location.texelSize, state.texelSize);
+    gl.drawArrays(gl.TRIANGLES, 0, 6);
+    // did we write to what we read? hell yes wie did (the image itself)
+    state.framebuffer.fluid.color.doPingPong();
+
+    /////////////
+
+    // with that mask prepared (i.e. now the previous image),
+    // the main step can now write on the sunrays framebuffer itself
+
+    gl.uniform1i(state.location.passIndex, PASS.POST_APPLY_SUNRAYS);
+    [, readPrevious] = state.framebuffer.fluid.color.currentRoles();
+    write = state.framebuffer.post.sunrays.effect;
+    gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo);
+    gl.viewport(0, 0, write.width, write.height);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, readPrevious.texture);
+    gl.uniform2fv(state.location.texelSize, state.opt.sunrays.texelSize);
+    gl.drawArrays(gl.TRIANGLES, 0, 6);
+    /////////////
+
+    // the blurring afterwards writes from sunrays.effect to sunrays.tempForBlur
+    // because it does first x, then y, and needs something to stash inbetween.
+    // (yeah, that _could_also_ be its own pass, but I couldn't say whether that would be advantageous.)
+    const [texelWidth, texelHeight] = state.opt.sunrays.texelSize;
+    gl.uniform1i(state.location.passIndex, PASS.POST_BLUR_SUNRAYS);
+    readPrevious = state.framebuffer.post.sunrays.effect;
+    write = state.framebuffer.post.sunrays.tempForBlur;
+    gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo);
+    gl.viewport(0, 0, write.width, write.height);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, readPrevious.texture);
+    gl.uniform2f(state.location.texelSize, texelWidth, 0.);
+    gl.drawArrays(gl.TRIANGLES, 0, 6);
+    // ... consider this very similar to the other framebuffer ping pongs ...
+    [readPrevious, write] = [write, readPrevious];
+    gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo);
+    gl.viewport(0, 0, write.width, write.height);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, readPrevious.texture);
+    gl.uniform2f(state.location.texelSize, 0., texelHeight);
+    gl.drawArrays(gl.TRIANGLES, 0, 6);
+    // we could iterate this for more blur, but that's fine for now.
+
+    // RENDER COLORS
+
+    gl.uniform1i(state.location.passIndex, PASS.RENDER_COLORS);
+
+    [, readPrevious] = state.framebuffer.fluid.color.currentRoles();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, readPrevious.texture);
+    // <-- gl.uniform1i(displayMaterial.uniforms.uTexture, dye.read.attach(0));
+    // --> bloom
+    gl.activeTexture(gl.TEXTURE4);
+    gl.bindTexture(gl.TEXTURE_2D, state.framebuffer.post.bloom.effect.texture);
+    gl.activeTexture(gl.TEXTURE7);
+    gl.bindTexture(gl.TEXTURE_2D, state.framebuffer.post.bloom.dither.texture);
+    const scale = [
+        gl.drawingBufferWidth / state.framebuffer.post.bloom.dither.width,
+        gl.drawingBufferHeight / state.framebuffer.post.bloom.dither.height,
+    ];
+    gl.uniform2fv(state.location.iBloomDitherScale, scale);
+    // --> sunrays
+    gl.activeTexture(gl.TEXTURE3); // see above, we kept that
+    gl.bindTexture(gl.TEXTURE_2D, state.framebuffer.post.sunrays.effect.texture);
+    gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+    // need to cleanup this one, we got
+    //   "GL_INVALID_OPERATION: glDrawArrays: Feedback loop formed between Framebuffer and active Texture."
+    gl.activeTexture(gl.TEXTURE3);
+    gl.bindTexture(gl.TEXTURE_2D, null);
+    gl.activeTexture(gl.TEXTURE4);
+    gl.bindTexture(gl.TEXTURE_2D, null);
+
+}
+
+function createUniforms() {
+    return [
+        // type: "button",
+        // name: "executeQueries",
+        // label: "Query Rendering",
+        // onClick: () => {
+        //     state.query.doExecute = true;
+        // }
         // }, {
         {
             separator: "Fragment Shader Uniforms"
@@ -542,12 +1113,12 @@ export default {
             defaultValue: 0,
             min: 0,
             max: 2,
-        // }, {
-        //     type: "float",
-        //     name: "iCloudVelX",
-        //     defaultValue: 0,
-        //     min: -2.,
-        //     max: 2,
+            // }, {
+            //     type: "float",
+            //     name: "iCloudVelX",
+            //     defaultValue: 0,
+            //     min: -2.,
+            //     max: 2,
         }, {
             separator: "Noch allgemeiner..."
         }, {
@@ -745,522 +1316,6 @@ export default {
             defaultValue: 0,
             min: -9.99,
             max: +9.99,
-        }]
-    })
-};
-
-const PASS = {
-    INIT_VELOCITY: 0,
-    INIT_COLOR_DENSITY: 1,
-    INIT_PRESSURE: 2,
-    INIT_CURL_FROM_VELOCITY: 3,
-    PROCESS_VELOCITY_VORTICITY: 10,
-    PROCESS_DIVERGENCE_FROM_VELOCITY: 11,
-    PROCESS_PRESSURE: 12,
-    PROCESS_GRADIENT_SUBTRACTION: 13,
-    PROCESS_ADVECTION: 14,
-    PROCESS_FLUID_COLOR: 19,
-    POST_PREFILTER_BLOOM: 20,
-    POST_BLOOM_BLUR: 21,
-    POST_PREPARE_SUNRAYS_MASK: 30,
-    POST_APPLY_SUNRAYS: 31,
-    POST_BLUR_SUNRAYS: 32,
-    RENDER_COLORS: 40,
-
-    ACCUMULATE_CLOUDS: 60,
-    RENDER_CLOUDS: 61,
-
-    // PLACEHOLDERS
-    TEXTURE_STUFF_0: 70,
-    TEXTURE_STUFF_1: 71,
-    TEXTURE_STUFF_2: 72,
-    TEXT_RENDERING_0: 80,
-    TEXT_RENDERING_1: 81,
-    TEXT_RENDERING_2: 82,
-    TEXT_RENDERING_3: 83,
-
-    RENDER_NOISE_BASE: 90,
-    RENDER_FINALLY_TO_SCREEN: 100
-};
-
-
-// ist nur Auflistung, sollte man beim portieren vllt richtig machen.
-// btw -> scheiß-nummerierung -> aber egal -> frag nicht
-const TEXTURE_UNITS = {
-    // die fürs Fluid KÖNNTE man komprimieren, aber schaumermal
-    COLOR_DENSITY: 0, // <-- ist das sichtbare Bild
-    VELOCITY: 1,
-    CURL: 2, // wird nie zeitgleich 0 verwendet
-    POST_SUNRAYS: 3,
-    POST_BLOOM: 4,
-    PRESSURE: 5,  // wird nie zeitgleich COLOR_DENSITY verwendet
-    DIVERGENCE: 6,  // wird nie zeitgleich COLOR_DENSITY verwendet
-    POST_BLOOM_DITHER: 7,
-    // glyphs
-    OHLI_FONT: 8,
-    // cloud render result
-    PREVIOUS_CLOUD: 9,
-    // ... and some mona-graphics please?
-}
-
-// sind halt einfach Platzhalter.
-// zwar global, aber werden halt einfach nicht scheiße behandelt. yespls?
-// -> else hausverbot
-let write, read, readPrevious, readVelocity;
-
-function render(gl, state) {
-    gl.uniform1f(state.location.iTime, state.time);
-    gl.uniform1f(state.location.deltaTime, state.play.dt);
-    gl.uniform2fv(state.location.iResolution, state.resolution);
-    gl.uniform1i(state.location.iFrame, state.iFrame);
-
-    gl.uniform1f(state.location.iFree0, state.iFree0);
-    gl.uniform1f(state.location.iFree1, state.iFree1);
-    gl.uniform1f(state.location.iFree2, state.iFree2);
-    gl.uniform1f(state.location.iFree3, state.iFree3);
-    gl.uniform1f(state.location.iFree4, state.iFree4);
-    gl.uniform1f(state.location.iFree5, state.iFree5);
-
-    // SOURCE: NOISE BASE -
-
-    gl.uniform1f(state.location.iTime, state.time);
-    gl.uniform2fv(state.location.iResolution, state.resolution);
-    gl.uniform1f(state.location.iGridOpacity, state.iGridOpacity);
-    gl.uniform2fv(state.location.iOverallNoiseShift, state.iOverallNoiseShift);
-    gl.uniform1f(state.location.iOverallScale, state.iOverallScale);
-    gl.uniform1f(state.location.iOverallHashOffset, state.iOverallHashOffset);
-    gl.uniform1f(state.location.iNoiseLevelA, state.iNoiseLevelA);
-    gl.uniform1f(state.location.iNoiseLevelB, state.iNoiseLevelB);
-    gl.uniform1f(state.location.iNoiseLevelC, state.iNoiseLevelC);
-    gl.uniform1f(state.location.iNoiseScaleA, state.iNoiseScaleA);
-    gl.uniform1f(state.location.iNoiseScaleB, state.iNoiseScaleB);
-    gl.uniform1f(state.location.iNoiseScaleC, state.iNoiseScaleC);
-    gl.uniform1f(state.location.iNoiseMorphingA, state.iNoiseMorphingA);
-    gl.uniform1f(state.location.iNoiseMorphingB, state.iNoiseMorphingB);
-    gl.uniform1f(state.location.iNoiseMorphingC, state.iNoiseMorphingC);
-    gl.uniform1i(state.location.iFractionalOctaves, state.iFractionalOctaves);
-    gl.uniform1f(state.location.iFractionalScale, state.iFractionalScale);
-    gl.uniform1f(state.location.iFractionalDecay, state.iFractionalDecay);
-    gl.uniform1f(state.location.iTurbulenceNormFactor, state.iTurbulenceNormFactor);
-    gl.uniform1f(state.location.iTurbulenceMeanOffset, state.iTurbulenceMeanOffset);
-    gl.uniform2fv(state.location.iMarbleSqueeze, state.iMarbleSqueeze);
-    gl.uniform1f(state.location.iMarbleGranularity, state.iMarbleGranularity);
-    gl.uniform1f(state.location.iMarbleGradingExponent, state.iMarbleGradingExponent);
-    gl.uniform1f(state.location.iMarbleRange, state.iMarbleRange);
-    gl.uniform1f(state.location.iColorStrength, state.iColorStrength);
-    gl.uniform3fv(state.location.iColorCosineFreq, state.iColorCosineFreq);
-    gl.uniform3fv(state.location.iColorCosinePhase, state.iColorCosinePhase);
-
-    // FOR THE FIRST TEST
-    gl.drawArrays(gl.TRIANGLES, 0, 6);
-
-    // SOURCE: FONTS -- TEXTURE8 für MSDF-Png
-
-    gl.uniform3fv(state.location.iTextColor, state.iTextColor);
-
-    gl.activeTexture(gl.TEXTURE8);
-    gl.bindTexture(gl.TEXTURE_2D, state.msdf.tex);
-    gl.uniform1i(state.location.glyphTex, 8);
-    gl.uniform4fv(state.location.glyphDefM, state.msdf.glyphDef.slice(4 * 44, 4*45));
-
-    // SOURCE: CLOUDS -- TEXTURE9 für Feedback / Akkumulation
-
-    gl.uniform1f(state.location.iCloudYDisplacement, state.iCloudYDisplacement);
-    gl.uniform1f(state.location.iCloudLayerDistance, state.iCloudLayerDistance);
-    gl.uniform1f(state.location.iLightLayerDistance, state.iLightLayerDistance);
-    gl.uniform1f(state.location.iCloudSeed, state.iCloudSeed);
-    gl.uniform1f(state.location.iSkyQuetschung, state.iSkyQuetschung);
-    gl.uniform1i(state.location.iSampleCount, state.iSampleCount);
-    gl.uniform1i(state.location.iCloudLayerCount, state.iCloudLayerCount);
-    gl.uniform1i(state.location.iLightLayerCount, state.iLightLayerCount);
-    gl.uniform1i(state.location.iCloudNoiseCount, state.iCloudNoiseCount);
-    gl.uniform1i(state.location.iLightNoiseCount, state.iLightNoiseCount);
-    gl.uniform3fv(state.location.iNoiseScale, state.iNoiseScale);
-    gl.uniform1f(state.location.iCloudAbsorptionCoeff, state.iCloudAbsorptionCoeff);
-    gl.uniform1f(state.location.iCloudAnisoScattering, state.iCloudAnisoScattering);
-    gl.uniform3fv(state.location.vecSunPosition, state.vecSunPosition);
-    gl.uniform3fv(state.location.vecSunColorYCH, state.vecSunColorYCH);
-    gl.uniform1f(state.location.iSunExponent, state.iSunExponent);
-    gl.uniform3fv(state.location.vecTone1, state.vecTone1);
-    gl.uniform3fv(state.location.vecTone2, state.vecTone2);
-    gl.uniform1f(state.location.iAccumulateMix, state.iAccumulateMix);
-
-    gl.uniform1f(state.location.iNoiseLevel, state.iNoiseLevel);
-    gl.uniform1f(state.location.iNoiseFreq, state.iNoiseFreq);
-    gl.uniform1f(state.location.iNoiseOffset, state.iNoiseOffset);
-    gl.uniform1i(state.location.iFractionalOctaves, Math.floor(state.iFractionalOctaves));
-    gl.uniform1f(state.location.iFractionalScale, state.iFractionalScale);
-    gl.uniform1f(state.location.iFractionalDecay, state.iFractionalDecay);
-    gl.uniform1f(state.location.iCloudMorph, state.iCloudMorph);
-
-    gl.uniform1i(state.location.debugOption, state.debugOption);
-
-    gl.activeTexture(gl.TEXTURE9);
-    gl.uniform1i(state.location.prevImage, 9);
-
-    [write, read] = state.framebuffer.clouds.currentWriteReadOrder();
-    gl.uniform1i(state.location.passIndex, PASS.RENDER_CLOUDS);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo);
-    gl.bindTexture(gl.TEXTURE_2D, read.texture);
-    gl.drawArrays(gl.TRIANGLES, 0, 6);
-    state.framebuffer.clouds.doPingPong();
-
-    gl.uniform1i(state.location.passIndex, PASS.ACCUMULATE_CLOUDS);
-    [, read] = state.framebuffer.clouds.currentWriteReadOrder();
-
-    // ganz offenbar sind wir noch nicht fertig.
-    /*
-    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-    gl.bindTexture(gl.TEXTURE_2D, read.texture);
-    gl.drawArrays(gl.TRIANGLES, 0, 6);
-     */
-
-    // SOURCE: FLUID-ESCALATION
-
-    gl.uniform3fv(state.location.iSpawnColorHSV, state.iSpawnColorHSV);
-    gl.uniform1f(state.location.iSpawnHueGradient, state.iSpawnHueGradient);
-    gl.uniform1f(state.location.iSpawnRandomizeHue, state.iSpawnRandomizeHue);
-    gl.uniform1f(state.location.iColorDissipation, state.iColorDissipation);
-    gl.uniform1f(state.location.iVelocityDissipation, state.iVelocityDissipation);
-    gl.uniform1f(state.location.iMaxInitialVelocity, state.iMaxInitialVelocity);
-    gl.uniform1f(state.location.iCurlStrength, state.iCurlStrength);
-    gl.uniform1f(state.location.iPressure, state.iPressure);
-    gl.uniform1f(state.location.iSunraysWeight, state.iSunraysWeight);
-    gl.uniform1f(state.location.iSunraysDensity, state.iSunraysDensity);
-    gl.uniform1f(state.location.iSunraysDecay, state.iSunraysDecay);
-    gl.uniform1f(state.location.iSunraysExposure, state.iSunraysExposure);
-    gl.uniform1f(state.location.iSunraysIterations, state.iSunraysIterations);
-    gl.uniform1f(state.location.iVignetteInner, state.iVignetteInner);
-    gl.uniform1f(state.location.iVignetteOuter, state.iVignetteOuter);
-    gl.uniform1f(state.location.iVignetteScale, state.iVignetteScale);
-
-    // das ist massiv. erstmal auslagern
-    renderFluidPasses(gl, state);
-
-    gl.uniform1i(state.location.passIndex, PASS.RENDER_COLORS);
-    [, readPrevious] = state.framebuffer.image.currentWriteReadOrder();
-    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-    gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
-    gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, readPrevious.texture);
-    // <-- gl.uniform1i(displayMaterial.uniforms.uTexture, dye.read.attach(0));
-    // --> bloom
-    gl.activeTexture(gl.TEXTURE4);
-    gl.bindTexture(gl.TEXTURE_2D, state.framebuffer.post.bloom.effect.texture);
-    gl.activeTexture(gl.TEXTURE7);
-    gl.bindTexture(gl.TEXTURE_2D, state.framebuffer.post.bloom.dither.texture);
-    const scale = [
-        gl.drawingBufferWidth / state.framebuffer.post.bloom.dither.width,
-        gl.drawingBufferHeight / state.framebuffer.post.bloom.dither.height,
+        }
     ];
-    gl.uniform2fv(state.location.iBloomDitherScale, scale);
-    // --> sunrays
-    gl.activeTexture(gl.TEXTURE3); // see above, we kept that
-    gl.bindTexture(gl.TEXTURE_2D, state.framebuffer.post.sunrays.effect.texture);
-    gl.drawArrays(gl.TRIANGLES, 0, 6);
-
-    // need to cleanup this one, we got
-    //   "GL_INVALID_OPERATION: glDrawArrays: Feedback loop formed between Framebuffer and active Texture."
-    gl.activeTexture(gl.TEXTURE3);
-    gl.bindTexture(gl.TEXTURE_2D, null);
-    gl.activeTexture(gl.TEXTURE4);
-    gl.bindTexture(gl.TEXTURE_2D, null);
-
-}
-
-const SPAWN_EVERY_SECONDS = 2;
-
-function renderFluidPasses(gl, state) {
-
-    // TODO: NICHT ZUFÄLLIG SPAWNEN!! -->
-    state.spawn.seed = -1.;
-    if (state.time - state.spawn.last > SPAWN_EVERY_SECONDS) {
-        state.spawn.seed = Math.floor(state.time / SPAWN_EVERY_SECONDS);
-        state.spawn.last = state.time;
-    }
-    state.spawn.age = Math.max(state.time - state.spawn.last, 0.);
-    gl.uniform1f(state.location.iSpawnSeed, state.spawn.seed);
-    gl.uniform1f(state.location.iSpawnAge, state.spawn.age);
-    // <-- TODO: NICHT ZUFÄLLIG SPAWNEN! RELIKT.
-
-    // NOTE: man KÖNNTE die komprimieren, aber vllt muss man gar nicht
-    gl.uniform1i(state.location.texColor, 0);
-    gl.uniform1i(state.location.texVelocity, 1);
-    gl.uniform1i(state.location.texCurl, 2); // could also use 0 here because we will not conflict, but this is needless.
-    gl.uniform1i(state.location.texPressure, 5); // could also use 0 here because we will not conflict, but this is needless.
-    gl.uniform1i(state.location.texDivergence, 6); // could also use 0 here because we will not conflict, but this is needless.
-    gl.uniform1i(state.location.texPostSunrays, 3);
-    gl.uniform1i(state.location.texPostBloom, 4);
-    gl.uniform1i(state.location.texPostBloomDither, 7);
-
-
-    gl.uniform1i(state.location.passIndex, PASS.INIT_VELOCITY);
-    [write, readPrevious] = state.framebuffer.fluid.velocity.currentWriteReadOrder();
-    gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo);
-    gl.viewport(0, 0, write.width, write.height);
-    gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, readPrevious.texture);
-    gl.uniform2fv(state.location.texelSize, state.fluid.texelSize);
-    gl.drawArrays(gl.TRIANGLES, 0, 6);
-    state.framebuffer.fluid.velocity.doPingPong();
-
-    /////////////
-
-    gl.uniform1i(state.location.passIndex, PASS.INIT_COLOR_DENSITY);
-
-    [write, readPrevious] = state.framebuffer.image.currentWriteReadOrder();
-    gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo);
-    gl.viewport(0, 0, write.width, write.height);
-    gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, readPrevious.texture);
-    gl.uniform2fv(state.location.texelSize, state.texelSize);
-    gl.drawArrays(gl.TRIANGLES, 0, 6);
-    state.framebuffer.image.doPingPong();
-
-    /////////////
-
-    // Use Velocity to calculate a fresh Scalar: Curl
-
-    gl.uniform1i(state.location.passIndex, PASS.INIT_CURL_FROM_VELOCITY),
-
-        // Note: need to unbind the curl texture itself when we want to write to its framebuffer.
-        //       we _could_ clean this up right after the next step (or avoid a third texture unit altogether)
-        //       but it _is_ convenient that we can just render the texture for debugging in the last pass.
-
-        write = state.framebuffer.fluid.curl;
-    [, readVelocity] = state.framebuffer.fluid.velocity.currentWriteReadOrder();
-    gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo);
-    gl.viewport(0, 0, write.width, write.height);
-    gl.activeTexture(gl.TEXTURE2);
-    gl.bindTexture(gl.TEXTURE_2D, null);
-    gl.activeTexture(gl.TEXTURE1);
-    gl.bindTexture(gl.TEXTURE_2D, readVelocity.texture);
-    gl.uniform2fv(state.location.texelSize, state.fluid.texelSize);
-    gl.drawArrays(gl.TRIANGLES, 0, 6);
-
-    /////////////
-
-    // Use Curl and Velocity to calculate new Velocity
-    gl.uniform1i(state.location.passIndex, PASS.PROCESS_VELOCITY_VORTICITY);
-
-    [write, readVelocity] = state.framebuffer.fluid.velocity.currentWriteReadOrder();
-    const readCurl = state.framebuffer.fluid.curl;
-    gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo);
-    gl.viewport(0, 0, write.width, write.height);
-    gl.activeTexture(gl.TEXTURE1);
-    gl.bindTexture(gl.TEXTURE_2D, readVelocity.texture);
-    gl.activeTexture(gl.TEXTURE2);
-    gl.bindTexture(gl.TEXTURE_2D, readCurl.texture);
-    gl.uniform2fv(state.location.texelSize, state.fluid.texelSize);
-    gl.drawArrays(gl.TRIANGLES, 0, 6);
-    // ! ... we did use Velocity to write Velocity, so do the ping-pong:
-    state.framebuffer.fluid.velocity.doPingPong();
-
-    /////////////
-
-    // Use Velocity to calculate a fresh Scalar: Divergence
-    gl.uniform1i(state.location.passIndex, PASS.PROCESS_DIVERGENCE_FROM_VELOCITY);
-
-    write = state.framebuffer.fluid.divergence;
-    [, readVelocity] = state.framebuffer.fluid.velocity.currentWriteReadOrder();
-    gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo);
-    gl.viewport(0, 0, write.width, write.height);
-    gl.activeTexture(gl.TEXTURE1);
-    gl.bindTexture(gl.TEXTURE_2D, readVelocity.texture);
-    gl.uniform2fv(state.location.texelSize, state.fluid.texelSize);
-    gl.drawArrays(gl.TRIANGLES, 0, 6);
-    // ! ... we did not write to anything we've read from, i.e. no swap here
-
-    /////////////
-
-    gl.uniform1i(state.location.passIndex, PASS.INIT_PRESSURE);
-
-    [write, readPrevious] = state.framebuffer.fluid.pressure.currentWriteReadOrder();
-    gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo);
-    gl.viewport(0, 0, write.width, write.height);
-    gl.activeTexture(gl.TEXTURE5);
-    gl.bindTexture(gl.TEXTURE_2D, readPrevious.texture);
-    gl.uniform2fv(state.location.texelSize, state.fluid.texelSize);
-    gl.drawArrays(gl.TRIANGLES, 0, 6);
-    state.framebuffer.fluid.pressure.doPingPong();
-
-    /////////////
-
-    // Use Divergence and Pressure to Iterate a while on Pressure
-    gl.uniform1i(state.location.passIndex, PASS.PROCESS_PRESSURE);
-
-    gl.uniform2fv(state.location.texelSize, state.fluid.texelSize);
-    for (let p = 0; p < state.pressureIterations; p++) {
-        [write, readPrevious] = state.framebuffer.fluid.pressure.currentWriteReadOrder();
-        gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo);
-        gl.viewport(0, 0, write.width, write.height);
-        gl.activeTexture(gl.TEXTURE5);
-        gl.bindTexture(gl.TEXTURE_2D, readPrevious.texture);
-        gl.activeTexture(gl.TEXTURE6);
-        gl.bindTexture(gl.TEXTURE_2D, state.framebuffer.fluid.divergence.texture);
-        gl.uniform2fv(state.location.texelSize, state.fluid.texelSize);
-        gl.drawArrays(gl.TRIANGLES, 0, 6);
-        state.framebuffer.fluid.pressure.doPingPong();
-    }
-    gl.activeTexture(gl.TEXTURE6);
-    gl.bindTexture(gl.TEXTURE_2D, null);
-
-    /////////////
-
-    // Use Pressure and Velocity to Subtract Gradients on Velocity - it seems.
-    gl.uniform1i(state.location.passIndex, PASS.PROCESS_GRADIENT_SUBTRACTION);
-
-    const [, readPressure] = state.framebuffer.fluid.pressure.currentWriteReadOrder();
-    [write, readVelocity] = state.framebuffer.fluid.velocity.currentWriteReadOrder();
-    gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo);
-    gl.viewport(0, 0, write.width, write.height);
-    gl.activeTexture(gl.TEXTURE5);
-    gl.bindTexture(gl.TEXTURE_2D, readPressure.texture);
-    gl.activeTexture(gl.TEXTURE1);
-    gl.bindTexture(gl.TEXTURE_2D, readVelocity.texture);
-    gl.uniform2fv(state.location.texelSize, state.fluid.texelSize);
-    gl.drawArrays(gl.TRIANGLES, 0, 6);
-    state.framebuffer.fluid.velocity.doPingPong();
-
-    /////////////
-
-    // Use Velocity as velocity AND as previous value to advect / dissipate Velocity
-    gl.uniform1i(state.location.passIndex, PASS.PROCESS_ADVECTION);
-
-    [write, readPrevious] = state.framebuffer.fluid.velocity.currentWriteReadOrder();
-    readVelocity = readPrevious;
-    gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo);
-    gl.viewport(0, 0, write.width, write.height);
-    gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, readPrevious.texture);
-    gl.activeTexture(gl.TEXTURE1);
-    gl.bindTexture(gl.TEXTURE_2D, readVelocity.texture);
-    gl.uniform2fv(state.location.texelSize, state.fluid.texelSize);
-    gl.drawArrays(gl.TRIANGLES, 0, 6);
-    state.framebuffer.fluid.velocity.doPingPong();
-
-    /////////////
-
-    // Use Velocity as velocity and last image color as previous value to advect / dissipate Density
-    // (Density, together with the somehow chosen start color, is what we actually see as colored cloud image)
-    gl.uniform1i(state.location.passIndex, PASS.PROCESS_FLUID_COLOR);
-
-    [write, readPrevious] = state.framebuffer.image.currentWriteReadOrder();
-    [, readVelocity] = state.framebuffer.fluid.velocity.currentWriteReadOrder();
-    gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo);
-    gl.viewport(0, 0, write.width, write.height);
-    gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, readPrevious.texture);
-    gl.activeTexture(gl.TEXTURE1);
-    gl.bindTexture(gl.TEXTURE_2D, readVelocity.texture);
-    gl.uniform2fv(state.location.texelSize, state.texelSize);
-    gl.drawArrays(gl.TRIANGLES, 0, 6);
-    state.framebuffer.image.doPingPong();
-
-    /// END OF FLUID DYNAMICS ///////////////////
-
-    /// POST: BLOOM /////////////////////////////
-
-    gl.uniform1i(state.location.passIndex, PASS.POST_PREFILTER_BLOOM);
-    gl.disable(gl.BLEND);
-
-    [, readPrevious] = state.framebuffer.image.currentWriteReadOrder();
-    write = state.framebuffer.post.bloom.effect;
-    gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo);
-    gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, readPrevious.texture);
-    gl.uniform1f(state.location.iBloomSoftKnee, state.iBloomSoftKnee);
-    gl.uniform1f(state.location.iBloomThreshold, state.iBloomThreshold);
-    gl.uniform2fv(state.location.texelSize, write.texelSize);
-    gl.drawArrays(gl.TRIANGLES, 0, 6);
-    let lastWrite = write;
-
-    gl.uniform1i(state.location.passIndex, PASS.POST_BLOOM_BLUR);
-
-    for (const iteration of state.framebuffer.post.bloom.iterations) {
-        gl.bindFramebuffer(gl.FRAMEBUFFER, iteration.fbo);
-        gl.activeTexture(gl.TEXTURE0);
-        gl.bindTexture(gl.TEXTURE_2D, lastWrite.texture);
-        gl.uniform2fv(state.location.texelSize, lastWrite.texelSize);
-        gl.drawArrays(gl.TRIANGLES, 0, 6);
-        lastWrite = iteration;
-    }
-
-    gl.blendFunc(gl.ONE, gl.ONE);
-    gl.enable(gl.BLEND);
-
-    for (let i = state.framebuffer.post.bloom.iterations.length - 2; i >= 0; i--) {
-        const base = state.framebuffer.post.bloom.iterations[i];
-        gl.bindFramebuffer(gl.FRAMEBUFFER, base.fbo);
-        gl.activeTexture(gl.TEXTURE0);
-        gl.bindTexture(gl.TEXTURE_2D, lastWrite.texture);
-        gl.uniform2fv(state.location.texelSize, lastWrite.texelSize);
-        gl.drawArrays(gl.TRIANGLES, 0, 6);
-        lastWrite = base;
-    }
-
-    gl.disable(gl.BLEND);
-
-    gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo);
-    gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, lastWrite.texture);
-    gl.uniform1f(state.location.iBloomIntensity, state.iBloomIntensity);
-    gl.uniform2fv(state.location.texelSize, lastWrite.texelSize);
-    gl.drawArrays(gl.TRIANGLES, 0, 6);
-
-    /// POST: SUNRAYS ///////////////////////////
-
-    // the prepare step takes the previous image and writes to the next _image_
-
-    gl.uniform1i(state.location.passIndex, PASS.POST_PREPARE_SUNRAYS_MASK);
-
-    [write, readPrevious] = state.framebuffer.image.currentWriteReadOrder();
-    gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo);
-    gl.viewport(0, 0, write.width, write.height);
-    gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, readPrevious.texture);
-    gl.uniform2fv(state.location.texelSize, state.texelSize);
-    gl.drawArrays(gl.TRIANGLES, 0, 6);
-    // did we write to what we read? hell yes wie did (the image itself)
-    state.framebuffer.image.doPingPong();
-
-    /////////////
-
-    // with that mask prepared (i.e. now the previous image),
-    // the main step can now write on the sunrays framebuffer itself
-
-    gl.uniform1i(state.location.passIndex, PASS.POST_APPLY_SUNRAYS);
-    [, readPrevious] = state.framebuffer.image.currentWriteReadOrder();
-    write = state.framebuffer.post.sunrays.effect;
-    gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo);
-    gl.viewport(0, 0, write.width, write.height);
-    gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, readPrevious.texture);
-    gl.uniform2fv(state.location.texelSize, state.framebuffer.post.sunrays.options.texelSize);
-    gl.drawArrays(gl.TRIANGLES, 0, 6);
-    /////////////
-
-    // the blurring afterwards writes from sunrays.effect to sunrays.tempForBlur
-    // because it does first x, then y, and needs something to stash inbetween.
-    // (yeah, that _could_also_ be its own pass, but I couldn't say whether that would be advantageous.)
-    const [texelWidth, texelHeight] = state.framebuffer.post.sunrays.options.texelSize;
-    gl.uniform1i(state.location.passIndex, PASS.POST_BLUR_SUNRAYS);
-    readPrevious = state.framebuffer.post.sunrays.effect;
-    write = state.framebuffer.post.sunrays.tempForBlur;
-    gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo);
-    gl.viewport(0, 0, write.width, write.height);
-    gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, readPrevious.texture);
-    gl.uniform2f(state.location.texelSize, texelWidth, 0.);
-    gl.drawArrays(gl.TRIANGLES, 0, 6);
-    // ... consider this very similar to the other framebuffer ping pongs ...
-    [readPrevious, write] = [write, readPrevious];
-    gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo);
-    gl.viewport(0, 0, write.width, write.height);
-    gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, readPrevious.texture);
-    gl.uniform2f(state.location.texelSize, 0., texelHeight);
-    gl.drawArrays(gl.TRIANGLES, 0, 6);
-    // we could iterate this for more blur, but that's fine for now.
-
 }

@@ -3,7 +3,7 @@ import {startRenderLoop} from "../app/playback.js";
 import vertexShaderSource from "../shaders/vertex.basicWithDifferentials.glsl"
 import fragmentShaderSource from "../shaders/moreProcessingPlayground.glsl";
 import {initBasicState} from "./common.js";
-import image from "../textures/dream210/210_schnoerkel.png";
+import image from "../textures/dream210/mona/210_schnoerkel.png";
 import {createTextureFromImage} from "../webgl/helpers/textures.js";
 import {createPingPongFramebuffersWithTexture} from "../webgl/helpers/framebuffers.js";
 import {updateResolutionInState} from "../webgl/helpers/resolution.js";
@@ -198,7 +198,7 @@ function render(gl, state) {
     /////////////
 
     gl.uniform1i(state.location.passIndex, 0);
-    [write, read] = state.framebuffer.image.currentWriteReadOrder();
+    [write, read] = state.framebuffer.image.currentRoles();
     gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo);
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, read.texture);
@@ -206,7 +206,7 @@ function render(gl, state) {
     state.framebuffer.image.doPingPong();
 
     gl.uniform1i(state.location.passIndex, 1);
-    [, read] = state.framebuffer.image.currentWriteReadOrder();
+    [, read] = state.framebuffer.image.currentRoles();
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.bindTexture(gl.TEXTURE_2D, read.texture);
     gl.drawArrays(gl.TRIANGLES, 0, 6);

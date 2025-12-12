@@ -1,5 +1,5 @@
 import {loadExtensions} from "./extensions.js";
-import {takeMilliSeconds} from "../app/measuring.js";
+import {takeMilliSeconds} from "../app/jsHelpers.js";
 import {initialOrStoredResolution, storeResolution} from "./helpers/resolution.js";
 import {collectActiveUniforms, createShader} from "./helpers/setup.js";
 import {createInitialState} from "../app/initialize.js";

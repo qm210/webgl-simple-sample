@@ -1,7 +1,7 @@
 import {compile, initVertices} from "../webgl/setup.js";
 import {createStaticVertexBuffer} from "../webgl/helpers/setup.js";
-import {evaluateReadData} from "../webgl/helpers/framebuffers.js";
 import {REGEX} from "../glslCode/definitions.js";
+import {evaluateReadData} from "../app/math.js";
 
 export {startRenderLoop} from "../app/playback.js";
 

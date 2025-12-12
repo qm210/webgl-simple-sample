@@ -8,7 +8,7 @@ import './app/style/index.css';
 const showcase = selectShowcase();
 const elements = initLayout("app");
 const glContext = setupWebGl(elements.canvas, {aspectRatio: 16 / 9});
-const state = prepareShowcase(showcase, glContext);
+const state = await prepareShowcase(showcase, glContext);
 
 console.info("Shader compiled in", state.compiledMillis, "ms.", state, glContext);
 

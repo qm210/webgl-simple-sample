@@ -3,10 +3,10 @@ import {initBasicState} from "./common.js";
 import fragmentShaderSource from "../shaders/specific/nr4_clouds.glsl";
 import {
     clearFramebuffers,
-    createPingPongFramebuffersWithTexture,
-    evaluateReadData
+    createPingPongFramebuffersWithTexture
 } from "../webgl/helpers/framebuffers.js";
 import {updateResolutionInState} from "../webgl/helpers/resolution.js";
+import {evaluateReadData} from "../app/math.js";
 
 export default {
     title: "NR4's Clouds",
@@ -69,7 +69,7 @@ export default {
                 label: () =>
                     "Accumulate: " + (state.accumulate ? "On" : "Off"),
                 onClick: () => {
-                    clearFramebuffers(gl, state);
+                    clearFramebuffers(gl, state.framebuffer.fb);
                     state.iFrame = 0;
                     state.toggleDebugOption(0);
                     state.accumulate = state.hasDebugOption(0);
@@ -299,7 +299,7 @@ function render(gl, state) {
     gl.activeTexture(gl.TEXTURE0);
     gl.uniform1i(state.location.prevImage, 0);
 
-    [write, read] = state.framebuffer.currentWriteReadOrder();
+    [write, read] = state.framebuffer.currentRoles();
     gl.uniform1i(state.location.passIndex, 0);
     if (state.readNextPixels) {
         state.readNextPixels = false;
@@ -324,7 +324,7 @@ function render(gl, state) {
         state.framebuffer.doPingPong();
     }
     gl.uniform1i(state.location.passIndex, 1);
-    [, read] = state.framebuffer.currentWriteReadOrder();
+    [, read] = state.framebuffer.currentRoles();
 
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.bindTexture(gl.TEXTURE_2D, read.texture);

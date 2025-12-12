@@ -3,9 +3,10 @@ import {REGEX} from "../glslCode/definitions.js";
 
 const storageKey = "qm.showcase.key";
 
-export function prepareShowcase(showcase, glContext) {
+export async function prepareShowcase(showcase, glContext) {
 
-    const state = showcase.init(glContext);
+    const state = await showcase.init(glContext);
+
     state.title = showcase.title;
     state.showcaseId = showcase.path;
 
