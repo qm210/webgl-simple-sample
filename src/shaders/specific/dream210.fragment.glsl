@@ -813,7 +813,6 @@ float calcSunrays() {
     vec2 cursorDir = st - 0.5;
     cursorDir *= 1. / iSunraysIterations * iSunraysDensity;
     float illumination = 1.;
-    // float value = fluidColor.a;
     float value = texture(texPostSunrays, stCursor).a;
     for (float i=0.; i < iSunraysIterations; i+=1.) {
         stCursor -= cursorDir;
@@ -957,9 +956,6 @@ void finalComposition(in vec2 uv) {
 #define _RENDER_FINALLY_TO_SCREEN 100
 
 void main() {
-    fluidColor = texture(texColor, st);
-    fluidVelocity = texture(texVelocity, st).xy;
-
     vec2 spawnRandom = hash22(vec2(1.2, 1.1) * iSpawnSeed);
     vec2 spawnCenter = vec2(spawnRandom.x, spawnRandom.y);
     float spawnSize = clamp(iSpawnAge, 0.18, 1.); // <-- put iSpawnAge in there
@@ -991,6 +987,7 @@ void main() {
 
         // all the fluid stuff below
         case _INIT_FLUID_COLOR: {
+                fluidColor = texture(texColor, st);
                 if (iSpawnSeed < 0.) {
                     fragColor = fluidColor;
                     return;
@@ -1010,6 +1007,7 @@ void main() {
             }
             return;
         case _INIT_VELOCITY: {
+                fluidVelocity = texture(texVelocity, st).xy;
                 if (iSpawnSeed < 0.) {
                     fragColor.xy = fluidVelocity;
                     return;
@@ -1042,19 +1040,18 @@ void main() {
             velR = +texture(texVelocity, stR).y;
             velU = -texture(texVelocity, stU).x;
             velD = -texture(texVelocity, stD).x;
-            float vorticity = (velR - velL) + (velU - velD);
-            fragColor.r = vorticity;
+            fragColor.r = (velR - velL) + (velU - velD);
             return;
         case _PROCESS_VELOCITY_BY_CURL:
-            // the curl from the previous pass is here the "previous.r"
-            float curlHere = texture(texCurl, st).x;
+            fluidVelocity = texture(texVelocity, st).xy;
+            float curl = texture(texCurl, st).x;
             float curlL = texture(texCurl, stL).x;
             float curlR = texture(texCurl, stR).x;
             float curlU = texture(texCurl, stU).x;
             float curlD = texture(texCurl, stD).x;
             vec2 force = vec2(abs(curlU) - abs(curlD), abs(curlR) - abs(curlL));
             force /= length(force) + 0.0001;
-            force *= iCurlStrength * curlHere * c.yz;
+            force *= iCurlStrength * curl * c.yz;
             fluidVelocity += force * deltaTime;
             // velocity = clamp(velocity, -1000., 1000.);
             fragColor.xy = fluidVelocity;
@@ -1071,17 +1068,16 @@ void main() {
             // velL = mix(velL, c, float(a < b));
             // velL = mix(velL, c, step(a, b));
             // and compiler might recognize them as equal; but the last one is the most idiomatic GLSL
-//            velL = mix(velL, -velocity.x, step(stL.x, 0.0));
-//            velR = mix(velR, -velocity.x, step(1.0, stR.x));
-//            velU = mix(velU, -velocity.y, step(1.0, stU.y));
-//            velD = mix(velD, -velocity.y, step(stD.y, 0.0));
-            if (stL.x < 0.0) { velL = -fluidVelocity.x; }
-            if (stR.x > 1.0) { velR = -fluidVelocity.x; }
-            if (stU.y > 1.0) { velU = -fluidVelocity.y; }
-            if (stD.y < 0.0) { velD = -fluidVelocity.y; }
-            // the divergence texture is scalar / one-dimensional / a single "red" value,
-            div = 0.5 * (velR - velL + velU - velD);
-            fragColor.r = div;
+//            if (stL.x < 0.0) { velL = -fluidVelocity.x; }
+//            if (stR.x > 1.0) { velR = -fluidVelocity.x; }
+//            if (stU.y > 1.0) { velU = -fluidVelocity.y; }
+//            if (stD.y < 0.0) { velD = -fluidVelocity.y; }
+            fluidVelocity = texture(texVelocity, st).xy;
+            velL = mix(velL, -fluidVelocity.x, step(stL.x, 0.0));
+            velR = mix(velR, -fluidVelocity.x, step(1.0, stR.x));
+            velU = mix(velU, -fluidVelocity.y, step(1.0, stU.y));
+            velD = mix(velD, -fluidVelocity.y, step(stD.y, 0.0));
+            fragColor.r = 0.5 * (velR - velL + velU - velD);
             return;
         case _PROCESS_PRESSURE:
             pL = texture(texPressure, stL).x;
@@ -1093,6 +1089,7 @@ void main() {
             fragColor.r = pressure;
             return;
         case _PROCESS_GRADIENT_SUBTRACTION:
+            fluidVelocity = texture(texVelocity, st).xy;
             pL = texture(texPressure, stL).x;
             pR = texture(texPressure, stR).x;
             pU = texture(texPressure, stU).x;
@@ -1101,11 +1098,11 @@ void main() {
             fragColor.rg = fluidVelocity;
             return;
         case _PROCESS_ADVECTION:
-            fragColor.xy = fluidVelocity;
+            fluidVelocity = texture(texVelocity, st).xy;
             fragColor = simulateAdvection(texVelocity, iVelocityDissipation);
             return;
         case _PROCESS_FLUID_COLOR:
-            fragColor = fluidColor;
+            fluidVelocity = texture(texVelocity, st).xy;
             fragColor = simulateAdvection(texColor, iColorDissipation);
             return;
         case _POST_BLOOM_PREFILTER:
@@ -1127,6 +1124,7 @@ void main() {
             );
             return;
         case _POST_SUNRAYS_CALC_MASK:
+            fluidColor = texture(texColor, st);
             br = max3(fluidColor.rgb);
             fragColor.a = 1.0 - clamp(br * 20., 0., 0.8);
             fragColor.rgb = fluidColor.rgb;
@@ -1135,10 +1133,11 @@ void main() {
             fragColor = vec4(calcSunrays(), 0., 0., 1.);
             return;
         case _POST_SUNRAYS_BLUR:
-            vec4 sum = fluidColor * 0.29411764;
-            sum += texture(texPostSunrays, st - 1.333 * texelSize) * 0.35294117;
-            sum += texture(texPostSunrays, st + 1.333 * texelSize) * 0.35294117;
-            fragColor = sum;
+            const float centerWeight = 0.294117;
+            float weight = (1. - centerWeight) * 0.5;
+            fragColor = centerWeight * texture(texPostSunrays, st)
+                + weight * texture(texPostSunrays, st - 1.333 * texelSize)
+                + weight * texture(texPostSunrays, st + 1.333 * texelSize);
             return;
         case _RENDER_FLUID:
             if (debugOption == 1) {
@@ -1153,11 +1152,11 @@ void main() {
                 // fragColor.rgb = 0.5 + 0.5*cos(iTime+uv.xyx+vec3(0,2,4));
                 break;
             }
-            // 1. first, mimic the gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+            fluidColor = texture(texColor, st);
             const vec3 bg = c.yyy;
             fragColor.rgb = makeSurplusWhite(fluidColor.rgb);
             fragColor.rgb = fluidColor.rgb + (1. - fluidColor.a) * bg;
-            // 2. mix post-processing (bloom & sunrays) in
+
             float sunrays = texture(texPostSunrays, st).r;
             fragColor.rgb *= sunrays;
             vec3 bloom = texture(texPostBloom, st).rgb;
@@ -1165,8 +1164,7 @@ void main() {
             bloom *= sunrays;
 
             if (iBloomDithering > 0.) {
-                // vec2 ditherTexSize = vec2(textureSize(texPostDither, 0));
-                const vec2 ditherTexSize = vec2(64.);
+                const vec2 ditherTexSize = vec2(64.); // textureSize(texPostDither, 0)
                 vec2 scale = iResolution / ditherTexSize;
                 float dither = texture(texPostDither, st * scale).r;
                 dither = dither * 2. - 1.;
@@ -1179,10 +1177,9 @@ void main() {
             fragColor.rgb += bloom;
             fragColor.a = max3(fragColor.rgb);
             // postprocessing(fragColor.rgb, uv);
-
             // DEBUGGING: BLEND ON BLACK
-            fragColor.rgb = fragColor.rgb + (1. - fragColor.a) * c.yyy;
-            fragColor.a = 1.;
+//            fragColor.rgb = fragColor.rgb + (1. - fragColor.a) * c.yyy;
+//            fragColor.a = 1.;
             return;
     }
     fragColor.a = 1.;

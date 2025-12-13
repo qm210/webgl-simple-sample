@@ -269,7 +269,7 @@ export default {
                     if (!state.lastQueryNanos) {
                         return "Query";
                     }
-                    const millis = (1e-6 * state.lastQueryNanos).toFixed(2);
+                    const millis = (1e-6 * state.lastQueryNanos).toFixed(3);
                     return `${millis} ms`;
                 },
                 onClick: async () => {
@@ -278,7 +278,7 @@ export default {
                     );
                     const comparison = !state.lastQueryNanos ? [] :
                         ["- Ratio to last query:", nanos / state.lastQueryNanos];
-                    console.log("Query took", nanos, "ns", ...comparison);
+                    console.log("Query took", nanos / 1e3, "µs", ...comparison);
                     state.lastQueryNanos = nanos;
                 },
                 style: { flex: 0.5 }
@@ -773,7 +773,6 @@ function postProcessFluid(gl, state) {
     /// POST: BLOOM /////////////////////////////
 
     gl.uniform1i(state.location.passIndex, PASS.POST_BLOOM_PREFILTER);
-    gl.disable(gl.BLEND);
 
     write = state.framebuffer.post.bloom.effect;
     gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo);
@@ -794,6 +793,7 @@ function postProcessFluid(gl, state) {
         gl.viewport(0, 0, iteration.width, iteration.height);
         // Obacht, hier lastWrite:
         gl.uniform2fv(state.location.iResolution, lastWrite.resolution);
+
         gl.activeTexture(gl.TEXTURE0 + TEXTURE_UNITS.POST_BLOOM);
         gl.bindTexture(gl.TEXTURE_2D, lastWrite.texture);
 
@@ -810,6 +810,7 @@ function postProcessFluid(gl, state) {
         gl.viewport(0, 0, iteration.width, iteration.height);
         // Obacht, hier auch wieder lastWrite:
         gl.uniform2fv(state.location.iResolution, lastWrite.resolution);
+
         gl.activeTexture(gl.TEXTURE0 + TEXTURE_UNITS.POST_BLOOM);
         gl.bindTexture(gl.TEXTURE_2D, lastWrite.texture);
 
