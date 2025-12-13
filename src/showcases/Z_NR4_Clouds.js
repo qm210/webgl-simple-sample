@@ -299,7 +299,7 @@ function render(gl, state) {
     gl.activeTexture(gl.TEXTURE0);
     gl.uniform1i(state.location.prevImage, 0);
 
-    [write, read] = state.framebuffer.currentRoles();
+    [write, read] = state.framebuffer.currentWriteRead();
     gl.uniform1i(state.location.passIndex, 0);
     if (state.readNextPixels) {
         state.readNextPixels = false;
@@ -324,7 +324,7 @@ function render(gl, state) {
         state.framebuffer.doPingPong();
     }
     gl.uniform1i(state.location.passIndex, 1);
-    [, read] = state.framebuffer.currentRoles();
+    [, read] = state.framebuffer.currentWriteRead();
 
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.bindTexture(gl.TEXTURE_2D, read.texture);

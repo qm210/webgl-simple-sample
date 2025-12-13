@@ -3,6 +3,7 @@ precision mediump float;
 out vec4 fragColor;
 in vec2 uv;
 in vec2 st;
+in vec2 stL, stR, stU, stD;
 in vec2 texSt;
 in float aspRatio;
 in vec2 texelSize;
@@ -15,9 +16,9 @@ uniform float iTime;
 uniform int iFrame;
 uniform int passIndex;
 uniform int debugOption;
+// now all the fun
 uniform sampler2D texAccumulusClouds;
 uniform sampler2D texNoiseBase;
-// MAYBE NEED..?
 uniform sampler2D texText0;
 uniform sampler2D texText1;
 uniform mediump sampler2DArray texTexts;
@@ -82,6 +83,7 @@ uniform float iSkyQuetschung;
 uniform float iSampleCount;
 uniform int iCloudLayerCount;
 uniform int iLightLayerCount;
+uniform float iCloudTransmittanceThreshold;
 uniform float iCloudAbsorptionCoeff;
 uniform float iCloudBaseLuminance;
 uniform float iCloudAnisoScattering;
@@ -168,6 +170,10 @@ vec3 cmap_dream210(float t) {
 vec3 colorPalette(float t) {
     // noch eine flexible zur cmap_dream210() dazu
     return vec3(0.5) + 0.5 * cos(iColorCosineFreq * t + iColorCosinePhase);
+}
+
+float max3(vec3 vec) {
+    return max(vec.x, max(vec.y, vec.z));
 }
 
 /////////////////////////
@@ -407,6 +413,13 @@ vec3 cmap_pastel(float t) {
     ))))));
 }
 
+vec3 hsv2rgb(vec3 hsvColor) {
+    hsvColor.x /= 360.;
+    const vec4 K = vec4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
+    vec3 p = abs(fract(hsvColor.xxx + K.xyz) * 6.0 - K.www);
+    return hsvColor.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), hsvColor.y);
+}
+
 const mat3 rgb2yiq = mat3(
 0.299,  0.5959,  0.2215,
 0.587, -0.2746, -0.5227,
@@ -517,10 +530,10 @@ vec3 raymarch(vec3 rayOrigin, vec3 rayDirection, float offset) {
     vec3 sunDirection = normalize(vecSunPosition);
     float phase = HenyeyGreenstein(iCloudAnisoScattering, dot(rayDirection, sunDirection));
 
-    float totalTransmittance = 1.;
+    float transmittance = 1.;
     vec3 lightEnergy = c.yyy;
 
-    for (int i = 0; i < iCloudLayerCount && totalTransmittance > 0.1; i++) {
+    for (int i = 0; i < iCloudLayerCount && transmittance > iCloudTransmittanceThreshold; i++) {
         p = rayOrigin + depth * rayDirection;
         float density = scene(p, false);
 
@@ -533,8 +546,8 @@ vec3 raymarch(vec3 rayOrigin, vec3 rayDirection, float offset) {
         float logoDensity = smoothstep(0.1 * iFree2, 0., d) * (colFree0.a - 1.);
         vec4 tex = c.yyyy;
         if (logoDensity > 0.) {
-            tex = textureCenteredAt(texMonaSchnoergel, uv * 1.3 + vec2(iFree7 * 0.01 * offset, 0.4));
-            logoDensity *= pow(iFree9 * tex.a, 2.01 + iFree8);
+            tex = textureCenteredAt(texMonaSchnoergel, uv * 1.3 + vec2(iVariateCloudMarchFree * 0.1 * offset, 0.4));
+            logoDensity *= tex.a;
             // sphereDensity *= (1. - 0.9 * logoDensity);
             density = max(density, logoDensity);
         }
@@ -550,13 +563,8 @@ vec3 raymarch(vec3 rayOrigin, vec3 rayDirection, float offset) {
             vec3 color = c.xxx; // colFree0.rgb;
             // color = mix(c.xxx, color, (sphereDensity) / density);
 
-            totalTransmittance *= lightTransmittance;
-            lightEnergy += totalTransmittance * luminance * color;
-
-            if (logoDensity > iFree5) {
-                totalTransmittance = 0.;
-                // lightEnergy = tex.rgb;
-            }
+            transmittance *= lightTransmittance;
+            lightEnergy += transmittance * luminance * color;
         }
 
         depth += marchSize;
@@ -765,6 +773,34 @@ void printYay(in vec2 uv, inout vec4 col) {
     col = mix(col, textColor2, d);
     cursor.x -= dims.x;
 }
+/////
+
+vec4 fluidColor;
+vec2 fluidVelocity;
+
+vec4 simulateAdvection(sampler2D fieldTexture, float dissipationFactor) {
+    vec2 hasMovedTo = st - deltaTime * fluidVelocity * texelSize;
+    vec4 advectedValue = texture(fieldTexture, hasMovedTo);
+    float decay = 1.0 + dissipationFactor * deltaTime;
+    return advectedValue / decay;
+}
+
+float calcSunrays() {
+    vec2 stCursor = st;
+    vec2 cursorDir = st - 0.5;
+    cursorDir *= 1. / iSunraysIterations * iSunraysDensity;
+    float illumination = 1.;
+    // now this is a "red only" texture, i.e. let's call it "value" instead of "color":
+    float value = fluidColor.a;
+    for (float i=0.; i < iSunraysIterations; i+=1.) {
+        stCursor -= cursorDir;
+        float cursorVal = texture(texColor, stCursor).a;
+        value += cursorVal * illumination * iSunraysWeight;
+        illumination *= iSunraysDecay;
+    }
+    value *= iSunraysExposure;
+    return value;
+}
 
 /////
 
@@ -776,9 +812,9 @@ float mask(vec2 st, vec4 limits) {
 vec4 maskedTexture(sampler2D sampler, vec2 stTex, vec4 stLimits) {
     // fix y and then force transparency outside the [stLimits.st, stLimits.pq] range
     stTex.y = 1. - stTex.y;
-    vec4 texColor = texture(sampler, stTex);
-    texColor.a *= mask(stTex, stLimits);
-    return texColor;
+    vec4 color = texture(sampler, stTex);
+    color.a *= mask(stTex, stLimits);
+    return color;
 }
 
 vec4 textureCenteredAt(sampler2D sampler, vec2 uv) {
@@ -879,7 +915,7 @@ void finalComposition(in vec2 uv) {
 #define _POST_SUNRAYS_CALC_MASK 30
 #define _POST_SUNRAYS_ACTUAL 31
 #define _POST_SUNRAYS_BLUR 32
-#define _RENDER_COLORS_PASS 40
+#define _RENDER_FLUID 40
 #define _RENDER_CLOUDS 60
 #define _INIT_TEXT0 80
 #define _INIT_TEXT1 81
@@ -889,6 +925,14 @@ void finalComposition(in vec2 uv) {
 #define _RENDER_FINALLY_TO_SCREEN 100
 
 void main() {
+    fluidColor = texture(texColor, st);
+    fluidVelocity = texture(texVelocity, st).xy;
+
+    vec2 spawnRandom = hash22(vec2(1.2, 1.1) * iSpawnSeed);
+    vec2 spawnCenter = vec2(spawnRandom.x, spawnRandom.y);
+    float spawnSize = clamp(iSpawnAge, 0.18, 1.); // <-- put iSpawnAge in there
+    float d, velL, velR, velU, velD, pL, pR, pU, pD, div;
+
     switch (passIndex) {
         case _RENDER_CLOUDS:
             mainCloudImage(fragColor);
@@ -899,6 +943,7 @@ void main() {
             return;
         case _RENDER_NOISE_BASE:
             noiseBase(uv, fragColor.rgb);
+            fragColor.a = max3(fragColor.rgb);
             return;
         case _INIT_TEXT0:
             fragColor = c.yyyy;
@@ -909,9 +954,161 @@ void main() {
             printYay(uv, fragColor);
             return;
         case _RENDER_FINALLY_TO_SCREEN:
+            finalComposition(uv);
+            break;
+
+        // all the fluid stuff below
+        case _INIT_COLOR_DENSITY: {
+                if (iSpawnSeed < 0.) {
+                    break;
+                }
+                vec2 p = uv - spawnCenter;
+                d = length(p) - spawnSize;
+                float a = smoothstep(0.02, 0., d) * exp(-dot(p, p) / spawnSize);
+                vec3 spawnColor = iSpawnColorHSV;
+                spawnColor.x += (360. * hash(iSpawnSeed + 0.12) - 180.) * iSpawnRandomizeHue;
+                spawnColor.x += pow(-min(0., d), 0.5) * iSpawnHueGradient;
+                vec3 spawn = a * hsv2rgb(spawnColor);
+                // spawn.r += pow(-min(0., d), 0.5) * 1.6;
+                // mix old stuff in:
+                fragColor = vec4(fluidColor.rgb + spawn, 1.);
+                // just new stuff:
+                // fragColor = vec4(spawn.rgb, 1.);
+            }
+            return;
+        case _INIT_VELOCITY: {
+                if (iSpawnSeed < 0.) {
+                    break;
+                }
+                vec2 randomVelocity = hash22(vec2(iSpawnSeed, iSpawnSeed + 0.1))
+                * iMaxInitialVelocity * vec2(aspRatio, 1.);
+                // <-- hash22(x) is _pseudo_random_, i.e. same x results in same "random" value
+                // we want randomVelocity.x != randomVelocity.y, thus the 0.1 offset
+                // but the overall randomVelocity will only differ when sampleSeed differs.
+                //vec2 initialVelocity = randomVelocity;
+                // <-- would be random, but can also direct towards / away from center
+                // vec2 initialVelocity = uv * iMaxInitialVelocity;
+                vec2 initialVelocity = randomVelocity + uv * iMaxInitialVelocity;
+                vec2 p = uv - spawnCenter;
+                d = length(p) - spawnSize;
+                d = smoothstep(0.02, 0., d);
+                d   = exp(-dot(p, p) / spawnSize);
+                vec2 newValue = d * initialVelocity;
+                fragColor.xy = fluidColor.xy + newValue;
+                // can ignore fragColor.zw because these will never be read
+            }
+            return;
+        case _INIT_PRESSURE_PASS:
+            fragColor = iPressure * texture(texPressure, st);
+            return;
+        case _CALC_CURL_FROM_VELOCITY:
+            // this just calculates the "curl" (scalar => only red) for the next pass
+            // understand the curl as kind of "orthogonal to the gradient": (x, y) -> (-y, x)
+            velL = +texture(texVelocity, stL).y;
+            velR = +texture(texVelocity, stR).y;
+            velU = -texture(texVelocity, stU).x;
+            velD = -texture(texVelocity, stD).x;
+            float vorticity = (velR - velL) + (velU - velD);
+            fragColor.r = vorticity;
+            return;
+        case _PROCESS_VELOCITY_BY_CURL:
+            // the curl from the previous pass is here the "previous.r"
+            float curlHere = texture(texCurl, st).x;
+            float curlL = texture(texCurl, stL).x;
+            float curlR = texture(texCurl, stR).x;
+            float curlU = texture(texCurl, stU).x;
+            float curlD = texture(texCurl, stD).x;
+            vec2 force = vec2(abs(curlU) - abs(curlD), abs(curlR) - abs(curlL));
+            force /= length(force) + 0.0001;
+            force *= iCurlStrength * curlHere * c.yz;
+            fluidVelocity += force * deltaTime;
+            // velocity = clamp(velocity, -1000., 1000.);
+            fragColor.xy = fluidVelocity;
+            return;
+        case _CALC_DIVERGENCE_FROM_VELOCITY:
+            // this handles divergence at the borders
+            velL = texture(texVelocity, stL).x;
+            velR = texture(texVelocity, stR).x;
+            velU = texture(texVelocity, stU).y;
+            velD = texture(texVelocity, stD).y;
+            // these are equivalent mathematically:
+            // if (a < b) { velL = c; }
+            // velL = a < b ? c : L;
+            // velL = mix(velL, c, float(a < b));
+            // velL = mix(velL, c, step(a, b));
+            // and compiler might recognize them as equal; but the last one is the most idiomatic GLSL
+//            velL = mix(velL, -velocity.x, step(stL.x, 0.0));
+//            velR = mix(velR, -velocity.x, step(1.0, stR.x));
+//            velU = mix(velU, -velocity.y, step(1.0, stU.y));
+//            velD = mix(velD, -velocity.y, step(stD.y, 0.0));
+            if (stL.x < 0.0) { velL = -fluidVelocity.x; }
+            if (stR.x > 1.0) { velR = -fluidVelocity.x; }
+            if (stU.y > 1.0) { velU = -fluidVelocity.y; }
+            if (stD.y < 0.0) { velD = -fluidVelocity.y; }
+            // the divergence texture is scalar / one-dimensional / a single "red" value,
+            div = 0.5 * (velR - velL + velU - velD);
+            fragColor.r = div;
+            return;
+        case _PROCESS_PRESSURE:
+            pL = texture(texPressure, stL).x;
+            pR = texture(texPressure, stR).x;
+            pU = texture(texPressure, stU).x;
+            pD = texture(texPressure, stD).x;
+            div = texture(texDivergence, st).x;
+            float pressure = 0.25 * (pL + pR + pU + pD - div);
+            fragColor.r = pressure;
+            return;
+        case _PROCESS_GRADIENT_SUBTRACTION:
+            pL = texture(texPressure, stL).x;
+            pR = texture(texPressure, stR).x;
+            pU = texture(texPressure, stU).x;
+            pD = texture(texPressure, stD).x;
+            fluidVelocity.xy -= vec2(pR - pL, pU - pD);
+            fragColor.rg = fluidVelocity;
+            return;
+        case _PROCESS_ADVECTION:
+            fragColor = simulateAdvection(texVelocity, iVelocityDissipation);
+            return;
+        case _PROCESS_COLOR_DENSITY:
+            fragColor = fluidColor;
+            // this does not go through right now
+            fragColor = simulateAdvection(texColor, iColorDissipation);
+            return;
+        case _POST_BLOOM_PREFILTER:
+            float knee = iBloomThreshold * iBloomSoftKnee + 1.e-4;
+            vec3 curve = vec3(iBloomThreshold - knee, knee * 2., 0.25 / knee);
+            vec3 col = texture(texColor, st).rgb;
+            float br = max3(col);
+            float rq = clamp(br - curve.x, 0., curve.y);
+            rq = curve.z * rq * rq;
+            col *= max(rq, br - iBloomThreshold) / max(br, 1.e-4);
+            fragColor = vec4(col, 1.);
+            return;
+        case _POST_BLOOM_BLUR:
+            fragColor = 0.25 * (
+                texture(texColor, stL) +
+                texture(texColor, stR) +
+                texture(texColor, stU) +
+                texture(texColor, stD)
+            );
+            return;
+        case _POST_SUNRAYS_CALC_MASK:
+            br = max3(fluidColor.rgb);
+            fragColor.a = 1.0 - clamp(br * 20., 0., 0.8);
+            fragColor.rgb = fluidColor.rgb;
+            return;
+        case _POST_SUNRAYS_ACTUAL:
+            fragColor = vec4(calcSunrays(), 0., 0., 1.);
+            return;
+        case _POST_SUNRAYS_BLUR:
+            vec4 sum = fluidColor * 0.29411764;
+            sum += texture(texColor, st - 1.333 * texelSize) * 0.35294117;
+            sum += texture(texColor, st + 1.333 * texelSize) * 0.35294117;
+            fragColor = sum;
+            return;
+        case _RENDER_FLUID:
             // "Hello Shadertoy" for making it obvious you forgot something.
             fragColor.rgb = 0.5 + 0.5*cos(iTime+uv.xyx+vec3(0,2,4));
-            finalComposition(uv);
             break;
     }
     fragColor.a = 1.;

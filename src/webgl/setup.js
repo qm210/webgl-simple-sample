@@ -14,7 +14,10 @@ import {createInitialState} from "../app/initialize.js";
 
 export function setupWebGl(canvas, geometry) {
 
-    const gl = canvas.getContext("webgl2");
+    const gl = canvas.getContext("webgl2", {
+        // Anti-Aliasing is nice, but enables Multisampling which
+        antialias: false,
+    });
     if (!gl) {
         window.alert("We need WebGL2 and your Browser does not support that, sadly.");
         // now the rest will fail badly, but that doesn't matter for me now,

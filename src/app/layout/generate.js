@@ -101,9 +101,19 @@ export const addMainControls = (elements, state, controls) => {
                 title: control.label(),
                 style: control.style,
                 onClick: async (event) => {
+                    if (!control.onClick) {
+                        return;
+                    }
                     await control.onClick(event.target);
                     event.target.textContent = control.label();
-                }
+                },
+                onRightClick: async (event) => {
+                    if (!control.onRightClick) {
+                        return;
+                    }
+                    await control.onRightClick(event.target);
+                    event.target.textContent = control.label();
+                },
             })
         );
     }

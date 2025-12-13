@@ -76,7 +76,10 @@ export function addButton({parent, onClick, onRightClick, title = "", className 
         button.addEventListener("click", onClick);
     }
     if (onRightClick) {
-        button.addEventListener("contextmenu", onRightClick);
+        button.addEventListener("contextmenu", (event) => {
+            event.preventDefault();
+            onRightClick(event);
+        });
     }
     if (parent) {
         parent.appendChild(button);

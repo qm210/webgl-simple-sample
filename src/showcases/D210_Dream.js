@@ -70,15 +70,6 @@ export default {
             texts: createFramebufferWithTextureArray(gl, 2, state.opt.image),
         };
 
-        state.debugOption = +(sessionStorage.getItem("qm.dream210.debug") ?? 0);
-        state.toggleDebugOption = (index) => {
-            state.debugOption ^= 1 << index;
-            sessionStorage.setItem("qm.drean210.debug", state.debugOption);
-        }
-        state.hasDebugOption = (index) =>
-            (state.debugOption & (1 << index)) !== 0;
-        state.accumulate = false;
-
         const {glyphDef, glyphDebug} = createGlyphDef(spiceSaleMsdfJson);
         const ubo = createUbo(gl, state.program, glyphDef, "Glyphs");
         state.msdf = {
@@ -95,9 +86,9 @@ export default {
             ubo,
             glyphDef,
             debug: glyphDebug,
-        }
+        };
 
-        state.opt.fluidScalar = {
+        state.opt.fluid.scalar = {
             width: state.opt.fluid.width,
             height: state.opt.fluid.height,
             internalFormat: gl.R16F,
@@ -106,7 +97,7 @@ export default {
             minFilter: gl.NEAREST,
             magFilter: gl.NEAREST,
         };
-        state.opt.fluidVec2 = {
+        state.opt.fluid.vec2 = {
             width: state.opt.fluid.width,
             height: state.opt.fluid.height,
             internalFormat: gl.RG16F,
@@ -116,11 +107,12 @@ export default {
             magFilter: gl.LINEAR,
         };
         state.framebuffer.fluid = {
+            result: createFramebufferWithTexture(gl, state.opt.image),
             color: createPingPongFramebuffersWithTexture(gl, state.opt.image),
-            velocity: createPingPongFramebuffersWithTexture(gl, state.opt.fluidVec2),
-            divergence: createFramebufferWithTexture(gl, state.opt.fluidScalar),
-            curl: createFramebufferWithTexture(gl, state.opt.fluidScalar),
-            pressure: createPingPongFramebuffersWithTexture(gl, state.opt.fluidScalar),
+            velocity: createPingPongFramebuffersWithTexture(gl, state.opt.fluid.vec2),
+            divergence: createFramebufferWithTexture(gl, state.opt.fluid.scalar),
+            curl: createFramebufferWithTexture(gl, state.opt.fluid.scalar),
+            pressure: createPingPongFramebuffersWithTexture(gl, state.opt.fluid.scalar),
         };
 
         state.framebuffer.post = {};
@@ -160,11 +152,56 @@ export default {
             );
         }
 
+        state.debug = {
+            option: +(sessionStorage.getItem("qm.dream210.debug") ?? 0),
+            fb: {
+                index: +(sessionStorage.getItem("qm.dream210.debug.fb") ?? 0),
+                obj: null,
+                name: ""
+            },
+            toggle: {}
+        };
+        state.debug.toggle.option = (index) => {
+            state.debug.option ^= 1 << index;
+            sessionStorage.setItem("qm.dream210.debug", state.debug.option);
+        }
+        state.debug.hasOption = (index) =>
+            (state.debug.option & (1 << index)) !== 0;
+
+        state.debug.fb.toggle = (index) => {
+            const debugFramebuffer = [
+                [null, "--"],
+                [state.framebuffer.fluid.result, "Fluid Render Image"],
+                [state.framebuffer.fluid.color.currentRead(), "Fluid Color Pong"],
+                [state.framebuffer.fluid.color.currentWrite(), "Fluid Color Ping"],
+                [state.framebuffer.fluid.velocity.currentRead(), "Fluid Velocity"],
+                [state.framebuffer.fluid.curl, "Fluid Curl"],
+                [state.framebuffer.fluid.divergence, "Fluid Divergence"],
+                [state.framebuffer.fluid.pressure.currentRead(), "Fluid Pressure"],
+                [state.framebuffer.noiseBase, "Noise Base"],
+            ];
+            state.debug.fb.index =
+                index === undefined
+                ? (state.debug.fb.index + 1)
+                : index === -1
+                ? (state.debug.fb.index - 1)
+                : index;
+            [state.debug.fb.obj, state.debug.fb.name] =
+                debugFramebuffer[state.debug.fb.index] ?? debugFramebuffer[0];
+            if (!state.debug.fb.obj) {
+                state.debug.fb.index = 0;
+            } else {
+                console.info("[DEBUG FRAMEBUFFER]", state.debug.fb);
+            }
+            sessionStorage.setItem("qm.dream210.debug.fb", state.debug.fb.index);
+        };
+        state.debug.fb.toggle(state.debug.fb.index);
+
         gl.useProgram(state.program);
 
         // initialize the velocity framebuffer texture ([1] = pong = first read) to constant values
         // rg == vec2(0,0) should be default anyway, but why not make sure.
-        const [, initialVelocity] = state.framebuffer.fluid.velocity.currentRoles();
+        const [, initialVelocity] = state.framebuffer.fluid.velocity.currentWriteRead();
         gl.bindFramebuffer(gl.FRAMEBUFFER, initialVelocity.fbo);
         gl.clearColor(0,0,0,0);
         gl.clear(gl.COLOR_BUFFER_BIT);
@@ -209,24 +246,21 @@ export default {
         toggles: [
             {
                 label: () =>
-                    "Using FBM " + (state.hasDebugOption(1) ? "B" : "A"),
+                    "Debug Option 1 = " + state.debug.hasOption(1),
                 onClick: () =>
-                    state.toggleDebugOption(1)
+                    state.debug.toggle.option(1)
             }, {
                 label: () =>
-                    state.hasDebugOption(2) ? "Modded fbm" : "Original fbm",
-                onClick: () => {
-                    state.toggleDebugOption(2)
-                }
+                    "Debug Option 2 = " + state.debug.hasOption(2),
+                onClick: () =>
+                    state.debug.toggle.option(2)
             }, {
                 label: () =>
-                    "Accumulate: " + (state.accumulate ? "On" : "Off"),
-                onClick: () => {
-                    clearFramebuffers(gl, state.framebuffer.fb);
-                    state.iFrame = 0;
-                    state.toggleDebugOption(0);
-                    state.accumulate = state.hasDebugOption(0);
-                }
+                    "Debug FB: " + (state.debug.fb.name || "--"),
+                onClick: () =>
+                    state.debug.fb.toggle(),
+                onRightClick: () =>
+                    state.debug.fb.toggle(-1),
             }, {
                 label: () => {
                     if (!state.lastQueryNanos) {
@@ -243,22 +277,17 @@ export default {
                         ["- Ratio to last query:", nanos / state.lastQueryNanos];
                     console.log("Query took", nanos, "ns", ...comparison);
                     state.lastQueryNanos = nanos;
-                }
-            }, {
-                label: () => "Read",
-                onClick: () => {
-                    state.readNextPixels = true;
                 },
-                style: { flex: 0 }
-            }
+                style: { flex: 0.5 }
+            },
         ],
         uniforms: createUniforms(),
     })
 };
 
 const PASS = {
-    INIT_VELOCITY: 0,
-    INIT_COLOR_DENSITY: 1,
+    INIT_COLOR_DENSITY: 0,
+    INIT_VELOCITY: 1,
     INIT_PRESSURE: 2,
     INIT_CURL_FROM_VELOCITY: 3,
     PROCESS_VELOCITY_VORTICITY: 10,
@@ -272,7 +301,7 @@ const PASS = {
     POST_PREPARE_SUNRAYS_MASK: 30,
     POST_APPLY_SUNRAYS: 31,
     POST_BLUR_SUNRAYS: 32,
-    RENDER_COLORS: 40,
+    RENDER_FLUID: 40,
 
     RENDER_CLOUDS: 60,
 
@@ -322,7 +351,7 @@ function render(gl, state) {
     gl.uniform1f(state.location.deltaTime, state.play.dt);
     gl.uniform2fv(state.location.iResolution, state.resolution);
     gl.uniform1i(state.location.iFrame, state.iFrame);
-    gl.uniform1i(state.location.debugOption, state.debugOption);
+    gl.uniform1i(state.location.debugOption, state.debug.option);
 
     gl.uniform1f(state.location.iVignetteInner, state.iVignetteInner);
     gl.uniform1f(state.location.iVignetteOuter, state.iVignetteOuter);
@@ -419,6 +448,7 @@ function render(gl, state) {
     gl.uniform1i(state.location.iLightLayerCount, state.iLightLayerCount);
     gl.uniform1i(state.location.iCloudNoiseCount, state.iCloudNoiseCount);
     gl.uniform1i(state.location.iLightNoiseCount, state.iLightNoiseCount);
+    gl.uniform1f(state.location.iCloudTransmittanceThreshold, state.iCloudTransmittanceThreshold);
     gl.uniform3fv(state.location.iNoiseScale, state.iNoiseScale);
     gl.uniform1f(state.location.iCloudAbsorptionCoeff, state.iCloudAbsorptionCoeff);
     gl.uniform1f(state.location.iCloudBaseLuminance, state.iCloudBaseLuminance);
@@ -449,13 +479,13 @@ function render(gl, state) {
     gl.activeTexture(gl.TEXTURE0 + TEXTURE_UNITS.PREVIOUS_CLOUDS);
     gl.uniform1i(state.location.texAccumulusClouds, TEXTURE_UNITS.PREVIOUS_CLOUDS);
 
-    [write, read] = state.framebuffer.clouds.currentRoles();
+    [write, read] = state.framebuffer.clouds.currentWriteRead();
     gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo);
     gl.bindTexture(gl.TEXTURE_2D, read.texture);
     gl.drawArrays(gl.TRIANGLES, 0, 6);
     state.framebuffer.clouds.doPingPong();
 
-    [, read] = state.framebuffer.clouds.currentRoles();
+    [, read] = state.framebuffer.clouds.currentWriteRead();
     gl.bindTexture(gl.TEXTURE_2D, read.texture);
 
     // SOURCE: FLUID-ESCALATION
@@ -475,7 +505,7 @@ function render(gl, state) {
     gl.uniform1f(state.location.iSunraysIterations, state.iSunraysIterations);
 
     // das ist massiv. erstmal auslagern
-    // renderFluidPasses(gl, state);
+    renderFluidPasses(gl, state);
 
     // !! Finale Komposition auf Back Buffer !!
 
@@ -486,11 +516,22 @@ function render(gl, state) {
     gl.bindTexture(gl.TEXTURE_2D, state.framebuffer.noiseBase.texture);
     gl.uniform1i(state.location.texNoiseBase, TEXTURE_UNITS.NOISE_BASE);
 
-    // gl.viewport(0, 0, state.opt.image.width, state.opt.image.height);
     gl.drawArrays(gl.TRIANGLES, 0, 6);
 
     gl.activeTexture(gl.TEXTURE0 + TEXTURE_UNITS.NOISE_BASE);
     gl.bindTexture(gl.TEXTURE_2D, null);
+
+    if (state.debug.fb.obj) {
+        gl.bindFramebuffer(gl.READ_FRAMEBUFFER, state.debug.fb.obj.fbo);
+        gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, null);
+        gl.blitFramebuffer(
+            0, 0, state.debug.fb.obj.width, state.debug.fb.obj.height,
+            0, 0, state.opt.image.width, state.opt.image.height,
+            gl.COLOR_BUFFER_BIT,
+            gl.NEAREST
+        );
+        gl.bindFramebuffer(gl.READ_FRAMEBUFFER, null);
+    }
 }
 
 const SPAWN_EVERY_SECONDS = 2;
@@ -509,20 +550,20 @@ function renderFluidPasses(gl, state) {
     // <-- TODO: NICHT ZUFÄLLIG SPAWNEN! RELIKT.
 
     // NOTE: man KÖNNTE die komprimieren, aber vllt muss man gar nicht
-    gl.uniform1i(state.location.texColor, 0);
-    gl.uniform1i(state.location.texVelocity, 1);
-    gl.uniform1i(state.location.texCurl, 2); // could also use 0 here because we will not conflict, but this is needless.
-    gl.uniform1i(state.location.texPressure, 5); // could also use 0 here because we will not conflict, but this is needless.
-    gl.uniform1i(state.location.texDivergence, 6); // could also use 0 here because we will not conflict, but this is needless.
-    gl.uniform1i(state.location.texPostSunrays, 3);
-    gl.uniform1i(state.location.texPostBloom, 4);
-    gl.uniform1i(state.location.texPostBloomDither, 7);
+    gl.uniform1i(state.location.texColor, TEXTURE_UNITS.COLOR_DENSITY);
+    gl.uniform1i(state.location.texVelocity, TEXTURE_UNITS.VELOCITY);
+    gl.uniform1i(state.location.texCurl, TEXTURE_UNITS.CURL); // could also use 0 here because we will not conflict, but this is needless.
+    gl.uniform1i(state.location.texPressure, TEXTURE_UNITS.PRESSURE); // could also use 0 here because we will not conflict, but this is needless.
+    gl.uniform1i(state.location.texDivergence, TEXTURE_UNITS.DIVERGENCE); // could also use 0 here because we will not conflict, but this is needless.
+    gl.uniform1i(state.location.texPostSunrays, TEXTURE_UNITS.POST_SUNRAYS);
+    gl.uniform1i(state.location.texPostBloom, TEXTURE_UNITS.POST_BLOOM);
+    gl.uniform1i(state.location.texPostBloomDither, TEXTURE_UNITS.POST_BLOOM_DITHER);
 
     /////////////
 
     gl.uniform1i(state.location.passIndex, PASS.INIT_VELOCITY);
 
-    [write, readPrevious] = state.framebuffer.fluid.velocity.currentRoles();
+    [write, readPrevious] = state.framebuffer.fluid.velocity.currentWriteRead();
     gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo);
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, readPrevious.texture);
@@ -536,7 +577,7 @@ function renderFluidPasses(gl, state) {
 
     gl.uniform1i(state.location.passIndex, PASS.INIT_COLOR_DENSITY);
 
-    [write, readPrevious] = state.framebuffer.fluid.color.currentRoles();
+    [write, readPrevious] = state.framebuffer.fluid.color.currentWriteRead();
     gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo);
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, readPrevious.texture);
@@ -557,7 +598,7 @@ function renderFluidPasses(gl, state) {
         //       but it _is_ convenient that we can just render the texture for debugging in the last pass.
 
     write = state.framebuffer.fluid.curl;
-    [, readVelocity] = state.framebuffer.fluid.velocity.currentRoles();
+    [, readVelocity] = state.framebuffer.fluid.velocity.currentWriteRead();
     gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo);
     gl.activeTexture(gl.TEXTURE0 + TEXTURE_UNITS.CURL);
     gl.bindTexture(gl.TEXTURE_2D, null);
@@ -573,7 +614,7 @@ function renderFluidPasses(gl, state) {
     // Use Curl and Velocity to calculate new Velocity
     gl.uniform1i(state.location.passIndex, PASS.PROCESS_VELOCITY_VORTICITY);
 
-    [write, readVelocity] = state.framebuffer.fluid.velocity.currentRoles();
+    [write, readVelocity] = state.framebuffer.fluid.velocity.currentWriteRead();
     const readCurl = state.framebuffer.fluid.curl;
     gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo);
     gl.viewport(0, 0, write.width, write.height);
@@ -592,7 +633,7 @@ function renderFluidPasses(gl, state) {
     gl.uniform1i(state.location.passIndex, PASS.PROCESS_DIVERGENCE_FROM_VELOCITY);
 
     write = state.framebuffer.fluid.divergence;
-    [, readVelocity] = state.framebuffer.fluid.velocity.currentRoles();
+    [, readVelocity] = state.framebuffer.fluid.velocity.currentWriteRead();
     gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo);
     gl.viewport(0, 0, write.width, write.height);
     gl.activeTexture(gl.TEXTURE0 + TEXTURE_UNITS.VELOCITY);
@@ -605,7 +646,7 @@ function renderFluidPasses(gl, state) {
 
     gl.uniform1i(state.location.passIndex, PASS.INIT_PRESSURE);
 
-    [write, readPrevious] = state.framebuffer.fluid.pressure.currentRoles();
+    [write, readPrevious] = state.framebuffer.fluid.pressure.currentWriteRead();
     gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo);
     gl.viewport(0, 0, write.width, write.height);
     gl.activeTexture(gl.TEXTURE0 + TEXTURE_UNITS.PRESSURE);
@@ -621,7 +662,7 @@ function renderFluidPasses(gl, state) {
 
     gl.uniform2fv(state.location.texelSize, state.opt.fluid.texelSize);
     for (let p = 0; p < state.pressureIterations; p++) {
-        [write, readPrevious] = state.framebuffer.fluid.pressure.currentRoles();
+        [write, readPrevious] = state.framebuffer.fluid.pressure.currentWriteRead();
         gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo);
         gl.viewport(0, 0, write.width, write.height);
         gl.activeTexture(gl.TEXTURE0 + TEXTURE_UNITS.PRESSURE);
@@ -640,8 +681,8 @@ function renderFluidPasses(gl, state) {
     // Use Pressure and Velocity to Subtract Gradients on Velocity - it seems.
     gl.uniform1i(state.location.passIndex, PASS.PROCESS_GRADIENT_SUBTRACTION);
 
-    const [, readPressure] = state.framebuffer.fluid.pressure.currentRoles();
-    [write, readVelocity] = state.framebuffer.fluid.velocity.currentRoles();
+    const [, readPressure] = state.framebuffer.fluid.pressure.currentWriteRead();
+    [write, readVelocity] = state.framebuffer.fluid.velocity.currentWriteRead();
     gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo);
     gl.viewport(0, 0, write.width, write.height);
     gl.activeTexture(gl.TEXTURE0 + TEXTURE_UNITS.PRESSURE);
@@ -657,7 +698,7 @@ function renderFluidPasses(gl, state) {
     // Use Velocity as velocity AND as previous value to advect / dissipate Velocity
     gl.uniform1i(state.location.passIndex, PASS.PROCESS_ADVECTION);
 
-    [write, readPrevious] = state.framebuffer.fluid.velocity.currentRoles();
+    [write, readPrevious] = state.framebuffer.fluid.velocity.currentWriteRead();
     readVelocity = readPrevious;
     gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo);
     gl.viewport(0, 0, write.width, write.height);
@@ -675,8 +716,8 @@ function renderFluidPasses(gl, state) {
     // (Density, together with the somehow chosen start color, is what we actually see as colored cloud image)
     gl.uniform1i(state.location.passIndex, PASS.PROCESS_FLUID_COLOR);
 
-    [write, readPrevious] = state.framebuffer.fluid.color.currentRoles();
-    [, readVelocity] = state.framebuffer.fluid.velocity.currentRoles();
+    [write, readPrevious] = state.framebuffer.fluid.color.currentWriteRead();
+    [, readVelocity] = state.framebuffer.fluid.velocity.currentWriteRead();
     gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo);
     gl.viewport(0, 0, write.width, write.height);
     gl.activeTexture(gl.TEXTURE0);
@@ -694,7 +735,7 @@ function renderFluidPasses(gl, state) {
     gl.uniform1i(state.location.passIndex, PASS.POST_PREFILTER_BLOOM);
     gl.disable(gl.BLEND);
 
-    [, readPrevious] = state.framebuffer.fluid.color.currentRoles();
+    [, readPrevious] = state.framebuffer.fluid.color.currentWriteRead();
     write = state.framebuffer.post.bloom.effect;
     gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo);
     gl.activeTexture(gl.TEXTURE0);
@@ -744,7 +785,7 @@ function renderFluidPasses(gl, state) {
 
     gl.uniform1i(state.location.passIndex, PASS.POST_PREPARE_SUNRAYS_MASK);
 
-    [write, readPrevious] = state.framebuffer.fluid.color.currentRoles();
+    [write, readPrevious] = state.framebuffer.fluid.color.currentWriteRead();
     gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo);
     gl.viewport(0, 0, write.width, write.height);
     gl.activeTexture(gl.TEXTURE0);
@@ -760,7 +801,7 @@ function renderFluidPasses(gl, state) {
     // the main step can now write on the sunrays framebuffer itself
 
     gl.uniform1i(state.location.passIndex, PASS.POST_APPLY_SUNRAYS);
-    [, readPrevious] = state.framebuffer.fluid.color.currentRoles();
+    [, readPrevious] = state.framebuffer.fluid.color.currentWriteRead();
     write = state.framebuffer.post.sunrays.effect;
     gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo);
     gl.viewport(0, 0, write.width, write.height);
@@ -795,11 +836,12 @@ function renderFluidPasses(gl, state) {
 
     // RENDER COLORS
 
-    gl.uniform1i(state.location.passIndex, PASS.RENDER_COLORS);
+    gl.uniform1i(state.location.passIndex, PASS.RENDER_FLUID);
 
-    [, readPrevious] = state.framebuffer.fluid.color.currentRoles();
-    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-    gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
+    readPrevious = state.framebuffer.fluid.color.currentRead();
+    write = state.framebuffer.fluid.result;
+    gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo);
+    gl.viewport(0, 0, state.opt.image.width, state.opt.image.height);
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, readPrevious.texture);
     // <-- gl.uniform1i(displayMaterial.uniforms.uTexture, dye.read.attach(0));
@@ -829,13 +871,6 @@ function renderFluidPasses(gl, state) {
 
 function createUniforms() {
     return [
-        // type: "button",
-        // name: "executeQueries",
-        // label: "Query Rendering",
-        // onClick: () => {
-        //     state.query.doExecute = true;
-        // }
-        // }, {
         {
             separator: "Fragment Shader Uniforms"
         }, {
@@ -897,6 +932,13 @@ function createUniforms() {
             defaultValue: 6,
             min: 1,
             max: 100,
+        }, {
+            type: "float",
+            name: "iCloudTransmittanceThreshold",
+            defaultValue: 0.1,
+            min: 0,
+            max: 1,
+            step: 0.001
         }, {
             type: "int",
             name: "iCloudNoiseCount",

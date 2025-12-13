@@ -1,9 +1,5 @@
 import {startRenderLoop} from "../app/playback.js";
 import {initBasicState} from "./common.js";
-
-import vertexShaderSource from "../shaders/vertex.basicWithDifferentials.glsl"
-import fragmentShaderSource from "../shaders/fluidPlayground.glsl";
-import ditherImage from "../textures/dither.png";
 import {resolutionScaled, updateResolutionInState} from "../webgl/helpers/resolution.js";
 import {createTextureFromImage} from "../webgl/helpers/textures.js";
 import {
@@ -11,6 +7,10 @@ import {
     createPingPongFramebuffersWithTexture,
     halfFloatOptions
 } from "../webgl/helpers/framebuffers.js";
+
+import vertexShaderSource from "../shaders/vertex.basicWithDifferentials.glsl"
+import fragmentShaderSource from "../shaders/fluidPlayground.glsl";
+import ditherImage from "../textures/dither.png";
 
 export default {
     title: "Fluid Dynamics Playground",
@@ -127,7 +127,7 @@ export default {
 
         // initialize the velocity framebuffer texture ([1] = pong = first read) to constant values
         // rg == vec2(0,0) should be default anyway, but why not make sure.
-        const [, initialVelocity] = state.framebuffer.fluid.velocity.currentRoles();
+        const [, initialVelocity] = state.framebuffer.fluid.velocity.currentWriteRead();
         gl.bindFramebuffer(gl.FRAMEBUFFER, initialVelocity.fbo);
         gl.clearColor(0,0,0,0);
         gl.clear(gl.COLOR_BUFFER_BIT);
@@ -481,7 +481,7 @@ function render(gl, state) {
     /////////////
 
     gl.uniform1i(state.location.iPassIndex, PASS.INIT_VELOCITY);
-    [write, readPrevious] = state.framebuffer.fluid.velocity.currentRoles();
+    [write, readPrevious] = state.framebuffer.fluid.velocity.currentWriteRead();
     gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo);
     gl.viewport(0, 0, write.width, write.height);
     gl.activeTexture(gl.TEXTURE0);
@@ -494,7 +494,7 @@ function render(gl, state) {
 
     gl.uniform1i(state.location.iPassIndex, PASS.INIT_IMAGE);
 
-    [write, readPrevious] = state.framebuffer.image.currentRoles();
+    [write, readPrevious] = state.framebuffer.image.currentWriteRead();
     gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo);
     gl.viewport(0, 0, write.width, write.height);
     gl.activeTexture(gl.TEXTURE0);
@@ -514,7 +514,7 @@ function render(gl, state) {
     //       but it _is_ convenient that we can just render the texture for debugging in the last pass.
 
     write = state.framebuffer.fluid.curl;
-    [, readVelocity] = state.framebuffer.fluid.velocity.currentRoles();
+    [, readVelocity] = state.framebuffer.fluid.velocity.currentWriteRead();
     gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo);
     gl.viewport(0, 0, write.width, write.height);
     gl.activeTexture(gl.TEXTURE2);
@@ -529,7 +529,7 @@ function render(gl, state) {
     // Use Curl and Velocity to calculate new Velocity
     gl.uniform1i(state.location.iPassIndex, PASS.PROCESS_VELOCITY_VORTICITY);
 
-    [write, readVelocity] = state.framebuffer.fluid.velocity.currentRoles();
+    [write, readVelocity] = state.framebuffer.fluid.velocity.currentWriteRead();
     const readCurl = state.framebuffer.fluid.curl;
     gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo);
     gl.viewport(0, 0, write.width, write.height);
@@ -548,7 +548,7 @@ function render(gl, state) {
     gl.uniform1i(state.location.iPassIndex, PASS.PROCESS_DIVERGENCE_FROM_VELOCITY);
 
     write = state.framebuffer.fluid.divergence;
-    [, readVelocity] = state.framebuffer.fluid.velocity.currentRoles();
+    [, readVelocity] = state.framebuffer.fluid.velocity.currentWriteRead();
     gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo);
     gl.viewport(0, 0, write.width, write.height);
     gl.activeTexture(gl.TEXTURE1);
@@ -561,7 +561,7 @@ function render(gl, state) {
 
     gl.uniform1i(state.location.iPassIndex, PASS.INIT_PRESSURE);
 
-    [write, readPrevious] = state.framebuffer.fluid.pressure.currentRoles();
+    [write, readPrevious] = state.framebuffer.fluid.pressure.currentWriteRead();
     gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo);
     gl.viewport(0, 0, write.width, write.height);
     gl.activeTexture(gl.TEXTURE5);
@@ -577,7 +577,7 @@ function render(gl, state) {
 
     gl.uniform2fv(state.location.texelSize, state.fluid.texelSize);
     for (let p = 0; p < state.pressureIterations; p++) {
-        [write, readPrevious] = state.framebuffer.fluid.pressure.currentRoles();
+        [write, readPrevious] = state.framebuffer.fluid.pressure.currentWriteRead();
         gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo);
         gl.viewport(0, 0, write.width, write.height);
         gl.activeTexture(gl.TEXTURE5);
@@ -596,8 +596,8 @@ function render(gl, state) {
     // Use Pressure and Velocity to Subtract Gradients on Velocity - it seems.
     gl.uniform1i(state.location.iPassIndex, PASS.PROCESS_GRADIENT_SUBTRACTION);
 
-    const [, readPressure] = state.framebuffer.fluid.pressure.currentRoles();
-    [write, readVelocity] = state.framebuffer.fluid.velocity.currentRoles();
+    const [, readPressure] = state.framebuffer.fluid.pressure.currentWriteRead();
+    [write, readVelocity] = state.framebuffer.fluid.velocity.currentWriteRead();
     gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo);
     gl.viewport(0, 0, write.width, write.height);
     gl.activeTexture(gl.TEXTURE5);
@@ -613,7 +613,7 @@ function render(gl, state) {
     // Use Velocity as velocity AND as previous value to advect / dissipate Velocity
     gl.uniform1i(state.location.iPassIndex, PASS.PROCESS_ADVECTION);
 
-    [write, readPrevious] = state.framebuffer.fluid.velocity.currentRoles();
+    [write, readPrevious] = state.framebuffer.fluid.velocity.currentWriteRead();
     readVelocity = readPrevious;
     gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo);
     gl.viewport(0, 0, write.width, write.height);
@@ -631,8 +631,8 @@ function render(gl, state) {
     // (Density, together with the somehow chosen start color, is what we actually see as colored cloud image)
     gl.uniform1i(state.location.iPassIndex, PASS.PROCESS_FLUID_COLOR);
 
-    [write, readPrevious] = state.framebuffer.image.currentRoles();
-    [, readVelocity] = state.framebuffer.fluid.velocity.currentRoles();
+    [write, readPrevious] = state.framebuffer.image.currentWriteRead();
+    [, readVelocity] = state.framebuffer.fluid.velocity.currentWriteRead();
     gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo);
     gl.viewport(0, 0, write.width, write.height);
     gl.activeTexture(gl.TEXTURE0);
@@ -650,7 +650,7 @@ function render(gl, state) {
     gl.uniform1i(state.location.iPassIndex, PASS.POST_PREFILTER_BLOOM);
     gl.disable(gl.BLEND);
 
-    [, readPrevious] = state.framebuffer.image.currentRoles();
+    [, readPrevious] = state.framebuffer.image.currentWriteRead();
     write = state.framebuffer.post.bloom.effect;
     gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo);
     gl.activeTexture(gl.TEXTURE0);
@@ -700,7 +700,7 @@ function render(gl, state) {
 
     gl.uniform1i(state.location.iPassIndex, PASS.POST_PREPARE_SUNRAYS_MASK);
 
-    [write, readPrevious] = state.framebuffer.image.currentRoles();
+    [write, readPrevious] = state.framebuffer.image.currentWriteRead();
     gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo);
     gl.viewport(0, 0, write.width, write.height);
     gl.activeTexture(gl.TEXTURE0);
@@ -716,7 +716,7 @@ function render(gl, state) {
     // the main step can now write on the sunrays framebuffer itself
 
     gl.uniform1i(state.location.iPassIndex, PASS.POST_APPLY_SUNRAYS);
-    [, readPrevious] = state.framebuffer.image.currentRoles();
+    [, readPrevious] = state.framebuffer.image.currentWriteRead();
     write = state.framebuffer.post.sunrays.effect;
     gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo);
     gl.viewport(0, 0, write.width, write.height);
@@ -752,7 +752,7 @@ function render(gl, state) {
     /////////////
 
     gl.uniform1i(state.location.iPassIndex, PASS.RENDER_TO_SCREEN);
-    [, readPrevious] = state.framebuffer.image.currentRoles();
+    [, readPrevious] = state.framebuffer.image.currentWriteRead();
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
     gl.activeTexture(gl.TEXTURE0);

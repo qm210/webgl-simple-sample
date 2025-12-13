@@ -153,11 +153,13 @@ export function createPingPongFramebuffersWithTexture(gl, options) {
         ping: 0,
     };
     pp.pong = () => 1 - pp.ping;
-    pp.currentRoles = () => [
-        /** usage e.g. const [write, read] = pp.currentRoles(); */
+    pp.currentWriteRead = () => [
+        /** usage e.g. const [write, read] = pp.currentWriteRead(); */
         pp.fb[pp.ping],
         pp.fb[pp.pong()]
     ];
+    pp.currentWrite = () => pp.fb[pp.ping];
+    pp.currentRead = () => pp.fb[pp.pong()];
     pp.doPingPong = () => {
         pp.ping = pp.pong();
     }
