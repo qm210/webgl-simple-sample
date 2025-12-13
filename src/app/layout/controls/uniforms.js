@@ -60,6 +60,9 @@ export function createInputElements(state, control) {
             state[control.name] = [...control.defaultValue];
         }
     }
+    if (control.dim > 1 && !(state[control.name] instanceof Array)) {
+        state[control.name] = toVec(control.dim, state[control.name]);
+    }
 
     if (control.hidden) {
         return;
@@ -72,7 +75,6 @@ export function createInputElements(state, control) {
         return;
     }
 
-    control.dim = 1;
     const input = createInputControlElements(control);
     switch (control.type) {
         case "int":
@@ -81,13 +83,8 @@ export function createInputElements(state, control) {
         case "float":
             return asFloatInput(input, state, control);
         case "vec2":
-            control.dim = 2;
-            return asVecInput(input, state, control);
         case "vec3":
-            control.dim = 3;
-            return asVecInput(input, state, control);
         case "vec4":
-            control.dim = 4;
             return asVecInput(input, state, control);
         case "cursorInput":
             return asCursorInput(input, state, control);
@@ -273,11 +270,11 @@ export const asVecInput = (elements, state, control) => {
     elements.control = document.createElement("div");
     elements.control.style.gap = "0.25rem";
 
-    let maybeNormFactor = 1;
+    control.normScale = 1;
     if (control.normalize) {
         control.min = control.log ? 1e-6 : -1;
         control.max = 1;
-        maybeNormFactor = 1 / (squareNorm(state[control.name]) || 1);
+        control.normScale = 1 / (squareNorm(state[control.name]) || 1);
     }
 
     control.sameMin = !(control.min instanceof Array);
@@ -294,10 +291,6 @@ export const asVecInput = (elements, state, control) => {
     }
     if (!(control.defaultValue instanceof Array)) {
         control.defaultValue = toVec(control.dim, control.defaultValue);
-    }
-    if (!(state[control.name] instanceof Array)) {
-        // fixes bad data from the Browser Storage
-        state[control.name] = toVec(control.dim, state[control.name]);
     }
 
     const sliders = [];
@@ -316,7 +309,7 @@ export const asVecInput = (elements, state, control) => {
         sliders.push(forComponent.control);
         asSlider(forComponent.control, componentControl);
         control.step[index] ??= componentControl.step;
-        state[control.name][index] *= maybeNormFactor;
+        state[control.name][index] *= control.normScale;
         forComponent.control.value =
             updateSlider(forComponent, state, componentControl, true, state[control.name][index]);
         forComponent.control.addEventListener("input", event => {

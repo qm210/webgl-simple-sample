@@ -5,6 +5,7 @@ in vec2 uv;
 in vec2 st;
 in vec2 texSt;
 in float aspRatio;
+in vec2 texelSize;
 in mat2 uv2texSt;
 
 // SHARED
@@ -14,7 +15,7 @@ uniform float iTime;
 uniform int iFrame;
 uniform int passIndex;
 uniform int debugOption;
-uniform sampler2D texPrevious; // <-- evt. same wie texColor;
+uniform sampler2D texAccumulusClouds;
 uniform sampler2D texNoiseBase;
 // MAYBE NEED..?
 uniform sampler2D texText0;
@@ -78,10 +79,11 @@ uniform float iCloudLayerDistance;
 uniform float iLightLayerDistance;
 uniform float iCloudSeed;
 uniform float iSkyQuetschung;
-uniform int iSampleCount;
+uniform float iSampleCount;
 uniform int iCloudLayerCount;
 uniform int iLightLayerCount;
 uniform float iCloudAbsorptionCoeff;
+uniform float iCloudBaseLuminance;
 uniform float iCloudAnisoScattering;
 uniform int iCloudNoiseCount;
 uniform int iLightNoiseCount;
@@ -89,9 +91,15 @@ uniform vec3 iNoiseScale;
 uniform vec3 vecSunPosition;
 uniform vec3 vecSunColorYCH;
 uniform float iSunExponent;
+uniform float iCloudFieldOfView;
 uniform vec3 vecTone1;
 uniform vec3 vecTone2;
+uniform bool doAccumulate;
 uniform float iAccumulateMix;
+uniform bool useModdedFBM;
+uniform float iVariateCloudMarchSize;
+uniform float iVariateCloudMarchOffset;
+uniform float iVariateCloudMarchFree;
 // und allgemein Noise (vllt duplicates)
 uniform float iNoiseFreq;
 uniform float iNoiseLevel;
@@ -99,10 +107,10 @@ uniform float iNoiseOffset;
 uniform float iCloudMorph;
 // und für die extra noise base
 uniform float iNoiseLevelA;
-uniform float iNoiseLevelB;
 uniform float iNoiseLevelC;
+uniform float iNoiseLevelAC;
 uniform float iNoiseScaleA;
-uniform float iNoiseScaleB;
+uniform float iNoiseScaleXT;
 uniform float iNoiseScaleC;
 uniform vec2 iOverallNoiseShift;
 uniform float iOverallScale;
@@ -129,6 +137,14 @@ uniform float iFree2;
 uniform float iFree3;
 uniform float iFree4;
 uniform float iFree5;
+uniform float iFree6;
+uniform float iFree7;
+uniform float iFree8;
+uniform float iFree9;
+uniform vec4 colFree0;
+uniform vec4 colFree1;
+uniform vec4 colFree2;
+uniform vec4 colFree3;
 
 const vec4 c = vec4(1, 0, -1, 0.5);
 const float pi = 3.141593;
@@ -155,6 +171,13 @@ vec3 colorPalette(float t) {
 }
 
 /////////////////////////
+
+float hash12(vec2 p)
+{
+    vec3 p3  = fract(vec3(p.xyx) * .1031);
+    p3 += dot(p3, p3.yzx + 33.33);
+    return fract((p3.x + p3.y) * p3.z);
+}
 
 vec2 hash22(vec2 p)
 {
@@ -217,7 +240,7 @@ void noiseBase(in vec2 uv, inout vec3 col) {
     float noiseMarble = noiseAbsoluteStackWithFurtherProcessing(uv);
     float totalNoise = (
         iNoiseLevelA * noiseClouds +
-        iNoiseLevelB * (noiseClouds * noiseMarble) +
+        iNoiseLevelAC * (noiseClouds * noiseMarble) +
         iNoiseLevelC * noiseMarble
     );
     // totalNoise = clamp(totalNoise, 0., 1.);
@@ -226,6 +249,380 @@ void noiseBase(in vec2 uv, inout vec3 col) {
         cmap_dream210(totalNoise * iColorStrength),
         iColorStrength
     );
+}
+
+// CLOUDS:
+
+vec3 hash31(float p)
+{
+    vec3 p3 = fract(vec3(p) * vec3(.1031, .1030, .0973));
+    p3 += dot(p3, p3.yzx+33.33);
+    return fract((p3.xxy+p3.yzz)*p3.zyx);
+}
+
+const mat3 rot1 = mat3(-0.37, 0.36, 0.85,-0.14,-0.93, 0.34,0.92, 0.01,0.4);
+const mat3 rot2 = mat3(-0.55,-0.39, 0.74, 0.33,-0.91,-0.24,0.77, 0.12,0.63);
+const mat3 rot3 = mat3(-0.71, 0.52,-0.47,-0.08,-0.72,-0.68,-0.7,-0.45,0.56);
+
+float xt95noise(vec3 m);
+float xt95mfnoise3(vec3 m) {
+    // scaled to produce a range like mfnoise3
+    return (
+    0.5333333 * xt95noise(m * rot1)
+    + 0.2666667 * xt95noise(2. * m * rot2)
+    + 0.1333333 * xt95noise(4. * m * rot3)
+    + 0.0666667 * xt95noise(8. * m)
+    ) * 1.62 - 0.005;
+}
+
+float hash(float n)
+{
+    return fract(sin(n)*43758.5453);
+}
+
+float xt95noise(in vec3 x)
+{
+    // match spatial scale of noise(), this seems like a factor of 2.6 .. 3.0:
+    x *= iNoiseScaleXT;
+
+    vec3 p = floor(x);
+    vec3 f = fract(x);
+    f = f*f*(3.0-2.0*f);
+    float n = p.x + p.y*57.0 + 113.0*p.z;
+
+    float res = mix(mix(mix( hash(n+  0.0), hash(n+  1.0),f.x),
+    mix( hash(n+ 57.0), hash(n+ 58.0),f.x),f.y),
+    mix(mix( hash(n+113.0), hash(n+114.0),f.x),
+    mix( hash(n+170.0), hash(n+171.0),f.x),f.y),f.z);
+
+    // also, match value range of output (I measured these values)
+    return 1.24 * res - 0.673;
+}
+
+const mat3 m = mat3(
+    0.00,  0.80,  0.60,
+    -0.80,  0.36, -0.48,
+    -0.60, -0.48,  0.64
+);
+
+float fbmB( vec3 p, int maxOctave)
+{
+    // fbmB() original: just use xt95noise
+    // fbmB() modded: use noise() for the base octave // <--
+    // fbmB() modded: use xt95mfnoise3() for the base octave //
+    float a = 0.5;
+    float b = 2.02;
+    float f = useModdedFBM ? xt95mfnoise3(p) : a * xt95noise(p);
+    for (int i = 0; i < maxOctave - 1; i++) {
+        p = m*p;
+        p *= b;
+        b += (i == 1 ? -0.02 : 0.01);
+        a *= 0.5;
+        f += a*xt95noise( p );
+    }
+    return 0.78 * f + 0.02;
+}
+
+// https://www.shadertoy.com/view/llGcDm
+int hilbert( ivec2 p, int level )
+{
+    int d = 0;
+    for( int k=0; k<level; k++ )
+    {
+        int n = level-k-1;
+        ivec2 r = (p>>n)&1;
+        d += ((3*r.x)^r.y) << (2*n);
+        if (r.y == 0) { if (r.x == 1) { p = (1<<n)-1-p; } p = p.yx; }
+    }
+    return d;
+}
+
+// https://www.shadertoy.com/view/llGcDm
+ivec2 ihilbert( int i, int level )
+{
+    ivec2 p = ivec2(0,0);
+    for( int k=0; k<level; k++ )
+    {
+        ivec2 r = ivec2( i>>1, i^(i>>1) ) & 1;
+        if (r.y==0) { if(r.x==1) { p = (1<<k) - 1 - p; } p = p.yx; }
+        p += r<<k;
+        i >>= 2;
+    }
+    return p;
+}
+
+// knuth's multiplicative hash function (fixed point R1)
+uint kmhf(uint x) {
+    return 0x80000000u + 2654435789u * x;
+}
+
+uint kmhf_inv(uint x) {
+    return (x - 0x80000000u) * 827988741u;
+}
+
+// mapping each pixel to a hilbert curve index, then taking a value from the Roberts R1 quasirandom sequence for it
+uint hilbert_r1_blue_noise(uvec2 p) {
+    #if 1
+    uint x = uint(hilbert( ivec2(p), 17 )) % (1u << 17u);
+    #else
+    //p = p ^ (p >> 1);
+    uint x = pack_morton2x16( p ) % (1u << 17u);
+    //x = x ^ (x >> 1);
+    x = inverse_gray32(x);
+    #endif
+    x = kmhf(x);
+    return x;
+
+    // based on http://extremelearning.com.au/unreasonable-effectiveness-of-quasirandom-sequences/
+    /*
+    const float phi = 2.0/(sqrt(5.0)+1.0);
+    return fract(0.5+phi*float(x));
+    */
+}
+
+// mapping each pixel to a hilbert curve index, then taking a value from the Roberts R1 quasirandom sequence for it
+float hilbert_r1_blue_noisef(uvec2 p) {
+    uint x = hilbert_r1_blue_noise(p);
+    #if 0
+    return float(x >> 24) / 256.0;
+    #else
+    return float(x) / 4294967296.0;
+    #endif
+}
+
+// inverse
+uvec2 hilbert_r1_blue_noise_inv(uint x) {
+    x = kmhf_inv(x);
+    return uvec2(ihilbert(int(x), 17));
+}
+
+vec3 cmap_pastel(float t) {
+    return vec3(0.92, 0.82, 0.68)
+    +t*(vec3(2.25, 0.95, -0.50)
+    +t*(vec3(-24.81, -10.77, -16.68)
+    +t*(vec3(123.32, 35.33, 88.11)
+    +t*(vec3(-289.81, -73.14, -176.72)
+    +t*(vec3(301.16, 79.71, 159.25)
+    +t*(vec3(-112.18, -32.13, -53.50)
+    ))))));
+}
+
+const mat3 rgb2yiq = mat3(
+0.299,  0.5959,  0.2215,
+0.587, -0.2746, -0.5227,
+0.114, -0.3213,  0.3112
+);
+
+vec3 rgbToYCh(vec3 rgb) {
+    vec3 yiq = rgb2yiq * rgb;
+    float C = length(yiq.yz);
+    float h = atan(yiq.z, yiq.y);
+    return vec3(yiq.x, C, h);
+}
+vec3 ychToRgb(float Y, float C, float h) {
+    float I = C * cos(h);
+    float Q = C * sin(h);
+    float R = Y + 0.9469 * I + 0.6236 * Q;
+    float G = Y - 0.2748 * I - 0.6357 * Q;
+    float B = Y - 1.1000 * I + 1.7000 * Q;
+    return clamp(vec3(R, G, B), 0.0, 1.0);
+}
+
+float fbm(vec3 p, bool forLight) {
+    p += 1.e4*hash31(iCloudSeed);// + iTime * 0.5 * vec3(1.0, -0.2, -1.0);
+    p *= iNoiseScale;
+    int maxOctave = forLight ? iLightNoiseCount : iCloudNoiseCount;
+    return fbmB(p, maxOctave);
+}
+
+float sdSphere(vec3 p, float radius) {
+    return length(p) - radius;
+}
+
+float scene(vec3 p, bool forLight) {
+    float y = p.y - 0.01 * iCloudYDisplacement + (0.08 * sin(iTime));
+    p.x += 0.1 * iTime;
+    p.y += 0.02 * iTime;
+    float f = fbm(p, forLight);
+    return f - y;
+}
+
+float BeersLaw(float dist, float absorption) {
+    return exp(-dist * absorption);
+}
+
+float lightmarch(vec3 position, vec3 rayDirection) {
+    vec3 lightDirection = normalize(vecSunPosition);
+    float totalDensity = 0.0;
+    // float marchSize = 0.03;
+    float marchSize = 0.01 * iLightLayerDistance;
+
+    for (int step = 0; step < iLightLayerCount; step++) {
+        position += lightDirection * marchSize * float(step);
+
+        float lightSample = scene(position, true);
+        totalDensity += lightSample;
+    }
+
+    float transmittance = BeersLaw(totalDensity, iCloudAbsorptionCoeff);
+    return transmittance;
+}
+
+float HenyeyGreenstein(float g, float mu) {
+    float gg = g * g;
+    return (1.0 / (4.0 * pi))  * ((1.0 - gg) / pow(1.0 + gg - 2.0 * g * mu, 1.5));
+}
+
+//float udQuad( vec3 p, vec3 a, vec3 b, vec3 c, vec3 d )
+//{
+//    vec3 ba = b - a; vec3 pa = p - a;
+//    vec3 cb = c - b; vec3 pb = p - b;
+//    vec3 dc = d - c; vec3 pc = p - c;
+//    vec3 ad = a - d; vec3 pd = p - d;
+//    vec3 nor = cross( ba, ad );
+//
+//    return sqrt(
+//    (sign(dot(cross(ba,nor),pa)) +
+//    sign(dot(cross(cb,nor),pb)) +
+//    sign(dot(cross(dc,nor),pc)) +
+//    sign(dot(cross(ad,nor),pd))<3.0)
+//    ?
+//    min( min( min(
+//    dot2(ba*clamp(dot(ba,pa)/dot2(ba),0.0,1.0)-pa),
+//    dot2(cb*clamp(dot(cb,pb)/dot2(cb),0.0,1.0)-pb) ),
+//    dot2(dc*clamp(dot(dc,pc)/dot2(dc),0.0,1.0)-pc) ),
+//    dot2(ad*clamp(dot(ad,pd)/dot2(ad),0.0,1.0)-pd) )
+//    :
+//    dot(nor,pa)*dot(nor,pa)/dot2(nor) );
+//}
+
+float opExtrusion( in vec3 p, in float sdf, in float h )
+{
+    vec2 w = vec2( sdf, abs(p.z) - h );
+    return min(max(w.x,w.y),0.0) + length(max(w,0.0));
+}
+
+float sdPlane( vec3 p, vec3 n, float h )
+{
+    // n must be normalized
+    return dot(p,n) + h;
+}
+vec4 textureCenteredAt(sampler2D sampler, vec2 coord);
+
+vec3 raymarch(vec3 rayOrigin, vec3 rayDirection, float offset) {
+    float depth = 0.0;
+    float marchSize = .01 * iCloudLayerDistance; // * (-rayDirection.z);
+    depth += marchSize + 0.01 * iVariateCloudMarchOffset * offset;
+    vec3 p, pd;
+    vec3 sunDirection = normalize(vecSunPosition);
+    float phase = HenyeyGreenstein(iCloudAnisoScattering, dot(rayDirection, sunDirection));
+
+    float totalTransmittance = 1.;
+    vec3 lightEnergy = c.yyy;
+
+    for (int i = 0; i < iCloudLayerCount && totalTransmittance > 0.1; i++) {
+        p = rayOrigin + depth * rayDirection;
+        float density = scene(p, false);
+
+        ///////
+        pd = p - rayOrigin;
+        float d = length(pd - vec3(2.5 * (fract(0.33 * iTime) - 0.5), 0, -3.)) - 2.;
+        float sphereDensity = max(-d * 0.1, 0.);
+
+        d = sdPlane(pd, c.yyx, iFree1);
+        float logoDensity = smoothstep(0.1 * iFree2, 0., d) * (colFree0.a - 1.);
+        vec4 tex = c.yyyy;
+        if (logoDensity > 0.) {
+            tex = textureCenteredAt(texMonaSchnoergel, uv * 1.3 + vec2(iFree7 * 0.01 * offset, 0.4));
+            logoDensity *= pow(iFree9 * tex.a, 2.01 + iFree8);
+            // sphereDensity *= (1. - 0.9 * logoDensity);
+            density = max(density, logoDensity);
+        }
+
+        //////
+
+        // We only draw the density if it's greater than 0
+        if (density > 0.0) {
+            float lightTransmittance = lightmarch(p, rayDirection);
+            float luminance = iCloudBaseLuminance + density * phase;
+
+            // vec3 color = mix(c.xyx, colFree0.rgb, planeDensity / (planeDensity + sphereDensity + 0.01));
+            vec3 color = c.xxx; // colFree0.rgb;
+            // color = mix(c.xxx, color, (sphereDensity) / density);
+
+            totalTransmittance *= lightTransmittance;
+            lightEnergy += totalTransmittance * luminance * color;
+
+            if (logoDensity > iFree5) {
+                totalTransmittance = 0.;
+                // lightEnergy = tex.rgb;
+            }
+        }
+
+        depth += marchSize;
+        marchSize += 0.01 * iVariateCloudMarchSize * offset;
+    }
+
+    return lightEnergy;
+}
+
+void cloudImage(out vec4 color, vec2 uvShift, int sampleIndex) {
+    vec3 ro = vec3(0.0, 0.0, 5.0);
+    vec3 rd = normalize(vec3(uv - uvShift, -iCloudFieldOfView));
+
+    // Sun and Sky
+    vec3 sunColor = ychToRgb(vecSunColorYCH.x, vecSunColorYCH.y, vecSunColorYCH.z);
+    vec3 sunDirection = normalize(vecSunPosition);
+    float sun = clamp(dot(sunDirection, rd), 0.0, 1.0);
+    color.rgb = cmap_pastel(fract(1. - .9 * pow(st.y, iSkyQuetschung)));
+    color.rgb += 0.5 * sunColor * pow(sun, iSunExponent);
+
+    float blueNoise = hilbert_r1_blue_noisef(uvec2(uvShift.xy));
+    //texture2D(uBlueNoise, fragCoord.xy / 1024.0).r;
+     float offset = blueNoise + float(sampleIndex % 32) / sqrt(0.5);
+//    float offset = hash12(uvShift) + float(sampleIndex%32) / sqrt(0.5);
+    //    float offset = 0.;
+    // bring to [-0.5, 0.5]
+    offset = fract(offset + 0.5) - 0.5;
+
+    // Cloud
+    vec3 res = raymarch(ro, rd, offset);
+    color.rgb = color.rgb + sunColor * res;
+}
+
+void mainCloudImage(out vec4 fragColor) {
+    vec4 col = c.yyyy;
+    const float gold = 2.4;
+    for (float i = .75; i < iSampleCount; i += 1.) {
+        float x = i / iSampleCount;
+        float p = gold * i;
+        vec2 z =
+            // Pixel size.
+            .5 * texelSize.y
+            // Vogel order.
+            * sqrt(x) * vec2(cos(p), sin(p))
+            // Adjust width for DOF effect.
+            * 1.
+            ;
+        x *= pi * pi;
+        int sampleIndex = int(i);
+        if (doAccumulate) {
+            sampleIndex += iFrame;
+        }
+        vec4 c1;
+        cloudImage(c1, z, sampleIndex);
+        col += c1;
+    }
+    fragColor = col / iSampleCount;
+    /*
+    // Grain.
+    vec2 uvn = fragCoord.xy/iResolution.xy;
+    fragColor += .01*iGrain * (2. * hash12(1.e4 * uvn) - 1.);
+
+    // Vignette.
+    uvn *=  1. - uvn.yx;
+    fragColor *= pow(uvn.x*uvn.y * 15., iVignette);
+    fragColor = clamp(fragColor, 0., 1.);*/
 }
 
 // GLYPHS:
@@ -269,16 +666,16 @@ float sdRect(in vec2 uv, in vec2 size)
 void printQmSaysHi(in vec2 uv, inout vec4 col) {
     vec2 dims;
     vec4 textColor = vec4(iTextColor, 1.);
-    vec2 cursor = uv - vec2(-1.44, 0.);
+    vec2 cursor = uv - vec2(-1.44, -0.7);
     cursor *= 0.8;
     float d = 100., dR = 100.;
-
-    vec2 pos = cursor + c.yx * 0.2 * sin(iTime * 1.4);
+    const float qmVibe = 0.08;
+    vec2 pos = cursor + c.yx * qmVibe * sin(iTime * 1.4);
     d = min(d, sdGlyph(pos, 81, dims));
     dR = min(dR, sdRect(pos, 0.5 * dims));
     cursor.x -= dims.x;
 
-    pos = cursor - c.yx * 0.15 * cos(iTime);
+    pos = cursor - c.yx * qmVibe * cos(iTime);
     d = min(d, sdGlyph(pos, 77, dims));
     dR = min(dR, sdRect(pos, 0.5 * dims));
     cursor.x -= dims.x;
@@ -406,25 +803,40 @@ vec4 textureToArea(sampler2D sampler, vec2 uv, vec4 uvLBRT, vec4 stLBRT) {
 }
 
 void finalComposition(in vec2 uv) {
-    vec4 previous = texture(texPrevious, st);
+    vec4 accumulus = texture(texAccumulusClouds, st);
     vec4 noiseBase = texture(texNoiseBase, st);
 
+    fragColor.rgb = accumulus.rgb * (1. + iNoiseLevel * noiseBase.rgb);
+    fragColor.rgb = clamp(fragColor.rgb, 0., 1.);
+    // fragColor.rgb = mix(fragColor.rgb, noiseBase.rgb, noiseBase.a + 0.2);
+
+    // \o/
     vec4 tex = texture(texTexts, vec3(st, 1));
-    fragColor.rgb = mix(noiseBase.rgb, c.xyw * tex.rgb, tex.a);
+    // fragColor.rgb = mix(fragColor.rgb, c.xyw * tex.rgb, tex.a);
 
     vec3 col = fragColor.rgb;
 
-    vec2 uvCenter = 0.15 * vec2(sin(3. * iTime), cos(3. * iTime));
-    tex = textureCenteredAt(texMonaRainbow, (uv - uvCenter) * 0.5);
+    vec2 rainbowCenter = 0.15 * vec2(sin(3. * iTime), cos(3. * iTime));
+    rainbowCenter = vec2(0., 0.35);
+    tex = textureCenteredAt(texMonaRainbow, (uv - rainbowCenter) * 0.35);
+    tex.a *= noiseBase.r;
+    vec3 rainbowColor = cmap_dream210(-0.14 + 0.5 * (tex.r + tex.g + tex.b));
+    fragColor.rgb = mix(fragColor.rgb, rainbowColor, tex.a);
+    /*
     float pos210 = floor(mod(2. * iTime, 3.)) * 0.333;
     vec4 tex2 = textureToArea(texMonaSchnoergel, uv, vec4(.7, -.5, 1.7, .5), vec4(pos210, 0., pos210 + 0.333, 1.));
     tex.a *= 1. - tex2.a;
-    fragColor.rgb = mix(fragColor.rgb, tex.rgb, tex.a);
     fragColor.rgb *= 1. - 0.3 * tex2.a;
     fragColor.rgb -= mix(c.yyy, col.brg, tex2.a);
+    */
 
+    /*
+    // QM SAYS HI
     tex = texture(texTexts, vec3(st, 0));
     fragColor.rgb = mix(fragColor.rgb, tex.rgb, tex.a);
+    */
+
+    // fragColor.rgb += tex.a * tex.rgb;
 
     // col = noiseBase.rgb;
     col = fragColor.rgb;
@@ -468,8 +880,7 @@ void finalComposition(in vec2 uv) {
 #define _POST_SUNRAYS_ACTUAL 31
 #define _POST_SUNRAYS_BLUR 32
 #define _RENDER_COLORS_PASS 40
-#define _ACCUMULATE_CLOUDS 60
-#define _RENDER_CLOUDS 61
+#define _RENDER_CLOUDS 60
 #define _INIT_TEXT0 80
 #define _INIT_TEXT1 81
 #define _INIT_TEXT2 82
@@ -479,6 +890,13 @@ void finalComposition(in vec2 uv) {
 
 void main() {
     switch (passIndex) {
+        case _RENDER_CLOUDS:
+            mainCloudImage(fragColor);
+            if (doAccumulate && iFrame > 0) {
+                vec4 accumulus = texture(texAccumulusClouds, st);
+                fragColor.rgb = mix(fragColor.rgb, accumulus.rgb, iAccumulateMix);
+            }
+            return;
         case _RENDER_NOISE_BASE:
             noiseBase(uv, fragColor.rgb);
             return;

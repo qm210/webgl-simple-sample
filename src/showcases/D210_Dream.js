@@ -67,7 +67,7 @@ export default {
         state.framebuffer = {
             clouds: createPingPongFramebuffersWithTexture(gl, state.opt.floatImage),
             noiseBase: createFramebufferWithTexture(gl, state.opt.image),
-            texts: createFramebufferWithTextureArray(gl, 4, state.opt.image),
+            texts: createFramebufferWithTextureArray(gl, 2, state.opt.image),
         };
 
         state.debugOption = +(sessionStorage.getItem("qm.dream210.debug") ?? 0);
@@ -181,6 +181,21 @@ export default {
             age: 0.,
         };
 
+        // ALWAYS BOUND FOR NOW
+        let unit = TEXTURE_UNITS.MONA_1;
+        gl.activeTexture(gl.TEXTURE0 + unit);
+        gl.bindTexture(gl.TEXTURE_2D, state.monaTextures["210_schnoerkel"]);
+        gl.uniform1i(state.location.texMonaSchnoergel, unit++);
+        gl.activeTexture(gl.TEXTURE0 + unit);
+        gl.bindTexture(gl.TEXTURE_2D, state.monaTextures["regenbogen"]);
+        gl.uniform1i(state.location.texMonaRainbow, unit++);
+        gl.activeTexture(gl.TEXTURE0 + unit);
+        gl.bindTexture(gl.TEXTURE_2D, state.monaTextures["dream210_visual_quadratisch_transparent"]);
+        gl.uniform1i(state.location.texMonaCity, unit++);
+        gl.activeTexture(gl.TEXTURE0 + unit);
+        gl.bindTexture(gl.TEXTURE_2D, state.monaTextures["schnoerkelsterne"]);
+        gl.uniform1i(state.location.texMonaStars, unit++);
+
         return state;
     },
     generateControls: (gl, state, elements) => ({
@@ -259,8 +274,7 @@ const PASS = {
     POST_BLUR_SUNRAYS: 32,
     RENDER_COLORS: 40,
 
-    ACCUMULATE_CLOUDS: 60,
-    RENDER_CLOUDS: 61,
+    RENDER_CLOUDS: 60,
 
     // PLACEHOLDERS
     INIT_TEXT0: 80,
@@ -273,8 +287,7 @@ const PASS = {
 };
 
 
-// ist nur Auflistung, sollte man beim portieren vllt richtig machen.
-// btw -> scheiß-nummerierung -> aber egal -> frag nicht
+// scheiß-nummerierung -> aber egal -> frag nicht
 const TEXTURE_UNITS = {
     // die fürs Fluid KÖNNTE man komprimieren, aber schaumermal
     COLOR_DENSITY: 0, // <-- ist das sichtbare Bild
@@ -284,12 +297,19 @@ const TEXTURE_UNITS = {
     POST_BLOOM: 4,
     PRESSURE: 5,  // wird nie zeitgleich COLOR_DENSITY verwendet
     DIVERGENCE: 6,  // wird nie zeitgleich COLOR_DENSITY verwendet
-    POST_BLOOM_DITHER: 7,
-    // glyphs
-    OHLI_FONT: 8,
+    POST_BLOOM_DITHER: 2, //
+    // glyphs:
+    OHLI_FONT: 7,
     // cloud render result
-    PREVIOUS_CLOUD: 9,
+    PREVIOUS_CLOUDS: 8,
+    NOISE_BASE: 9,
     // ... and some mona-graphics please?
+    MONA_1: 10,
+    MONA_2: 12,
+    MONA_3: 13,
+    MONA_4: 14,
+    // GLYPH-WRITTEN TEXTURE ARRAY
+    FONT_ARRAY: 15,
 }
 
 // sind halt einfach Platzhalter.
@@ -302,6 +322,7 @@ function render(gl, state) {
     gl.uniform1f(state.location.deltaTime, state.play.dt);
     gl.uniform2fv(state.location.iResolution, state.resolution);
     gl.uniform1i(state.location.iFrame, state.iFrame);
+    gl.uniform1i(state.location.debugOption, state.debugOption);
 
     gl.uniform1f(state.location.iVignetteInner, state.iVignetteInner);
     gl.uniform1f(state.location.iVignetteOuter, state.iVignetteOuter);
@@ -314,6 +335,14 @@ function render(gl, state) {
     gl.uniform1f(state.location.iFree3, state.iFree3);
     gl.uniform1f(state.location.iFree4, state.iFree4);
     gl.uniform1f(state.location.iFree5, state.iFree5);
+    gl.uniform1f(state.location.iFree6, state.iFree6);
+    gl.uniform1f(state.location.iFree7, state.iFree7);
+    gl.uniform1f(state.location.iFree8, state.iFree8);
+    gl.uniform1f(state.location.iFree9, state.iFree9);
+    gl.uniform4fv(state.location.colFree0, state.colFree0);
+    gl.uniform4fv(state.location.colFree1, state.colFree1);
+    gl.uniform4fv(state.location.colFree2, state.colFree2);
+    gl.uniform4fv(state.location.colFree3, state.colFree3);
 
     // SOURCE: NOISE BASE -
 
@@ -322,10 +351,10 @@ function render(gl, state) {
     gl.uniform1f(state.location.iOverallScale, state.iOverallScale);
     gl.uniform1f(state.location.iOverallHashOffset, state.iOverallHashOffset);
     gl.uniform1f(state.location.iNoiseLevelA, state.iNoiseLevelA);
-    gl.uniform1f(state.location.iNoiseLevelB, state.iNoiseLevelB);
+    gl.uniform1f(state.location.iNoiseLevelAC, state.iNoiseLevelAC);
     gl.uniform1f(state.location.iNoiseLevelC, state.iNoiseLevelC);
     gl.uniform1f(state.location.iNoiseScaleA, state.iNoiseScaleA);
-    gl.uniform1f(state.location.iNoiseScaleB, state.iNoiseScaleB);
+    gl.uniform1f(state.location.iNoiseScaleXT, state.iNoiseScaleXT);
     gl.uniform1f(state.location.iNoiseScaleC, state.iNoiseScaleC);
     gl.uniform1f(state.location.iNoiseMorphingA, state.iNoiseMorphingA);
     gl.uniform1f(state.location.iNoiseMorphingB, state.iNoiseMorphingB);
@@ -347,54 +376,18 @@ function render(gl, state) {
 
     gl.uniform3fv(state.location.iTextColor, state.iTextColor);
 
-    gl.activeTexture(gl.TEXTURE8);
+    gl.activeTexture(gl.TEXTURE0 + TEXTURE_UNITS.OHLI_FONT);
     gl.bindTexture(gl.TEXTURE_2D, state.msdf.tex);
-    gl.uniform1i(state.location.glyphTex, 8);
-    gl.uniform4fv(state.location.glyphDefM, state.msdf.glyphDef.slice(4 * 44, 4*45));
-
-    // SOURCE: CLOUDS -- TEXTURE9 für Feedback / Akkumulation
-
-    gl.uniform1f(state.location.iCloudYDisplacement, state.iCloudYDisplacement);
-    gl.uniform1f(state.location.iCloudLayerDistance, state.iCloudLayerDistance);
-    gl.uniform1f(state.location.iLightLayerDistance, state.iLightLayerDistance);
-    gl.uniform1f(state.location.iCloudSeed, state.iCloudSeed);
-    gl.uniform1f(state.location.iSkyQuetschung, state.iSkyQuetschung);
-    gl.uniform1i(state.location.iSampleCount, state.iSampleCount);
-    gl.uniform1i(state.location.iCloudLayerCount, state.iCloudLayerCount);
-    gl.uniform1i(state.location.iLightLayerCount, state.iLightLayerCount);
-    gl.uniform1i(state.location.iCloudNoiseCount, state.iCloudNoiseCount);
-    gl.uniform1i(state.location.iLightNoiseCount, state.iLightNoiseCount);
-    gl.uniform3fv(state.location.iNoiseScale, state.iNoiseScale);
-    gl.uniform1f(state.location.iCloudAbsorptionCoeff, state.iCloudAbsorptionCoeff);
-    gl.uniform1f(state.location.iCloudAnisoScattering, state.iCloudAnisoScattering);
-    gl.uniform3fv(state.location.vecSunPosition, state.vecSunPosition);
-    gl.uniform3fv(state.location.vecSunColorYCH, state.vecSunColorYCH);
-    gl.uniform1f(state.location.iSunExponent, state.iSunExponent);
-    gl.uniform3fv(state.location.vecTone1, state.vecTone1);
-    gl.uniform3fv(state.location.vecTone2, state.vecTone2);
-    gl.uniform1f(state.location.iAccumulateMix, state.iAccumulateMix);
-
-    gl.uniform1f(state.location.iNoiseLevel, state.iNoiseLevel);
-    gl.uniform1f(state.location.iNoiseFreq, state.iNoiseFreq);
-    gl.uniform1f(state.location.iNoiseOffset, state.iNoiseOffset);
-    gl.uniform1i(state.location.iFractionalOctaves, Math.floor(state.iFractionalOctaves));
-    gl.uniform1f(state.location.iFractionalScale, state.iFractionalScale);
-    gl.uniform1f(state.location.iFractionalDecay, state.iFractionalDecay);
-    gl.uniform1f(state.location.iCloudMorph, state.iCloudMorph);
-
-    gl.uniform1i(state.location.debugOption, state.debugOption);
-
-    gl.activeTexture(gl.TEXTURE9);
-    gl.uniform1i(state.location.prevImage, 9);
+    gl.uniform1i(state.location.glyphTex, TEXTURE_UNITS.OHLI_FONT);
 
     ///// INIT_TEXTi...
 
     gl.bindFramebuffer(gl.FRAMEBUFFER, state.framebuffer.texts.fbo);
-    gl.uniform1i(state.location.texTexts, 15);
-    gl.activeTexture(gl.TEXTURE15);
+    gl.uniform1i(state.location.texTexts, TEXTURE_UNITS.FONT_ARRAY);
+    gl.activeTexture(gl.TEXTURE0 + TEXTURE_UNITS.FONT_ARRAY);
     gl.bindTexture(gl.TEXTURE_2D_ARRAY, null);
 
-    for (let layer = 0; layer < 2; layer++) {
+    for (let layer = 0; layer < state.framebuffer.texts.layers; layer++) {
         gl.uniform1i(state.location.passIndex, PASS.INIT_TEXT0 + layer);
         gl.framebufferTextureLayer(
             gl.FRAMEBUFFER,
@@ -414,24 +407,56 @@ function render(gl, state) {
     gl.bindFramebuffer(gl.FRAMEBUFFER, state.framebuffer.noiseBase.fbo);
     gl.drawArrays(gl.TRIANGLES, 0, 6);
 
-    /////
+    // SOURCE: CLOUDS -- TEXTURE9 für Feedback / Akkumulation
+
+    gl.uniform1f(state.location.iCloudYDisplacement, state.iCloudYDisplacement);
+    gl.uniform1f(state.location.iCloudLayerDistance, state.iCloudLayerDistance);
+    gl.uniform1f(state.location.iLightLayerDistance, state.iLightLayerDistance);
+    gl.uniform1f(state.location.iCloudSeed, state.iCloudSeed);
+    gl.uniform1f(state.location.iSkyQuetschung, state.iSkyQuetschung);
+    gl.uniform1f(state.location.iSampleCount, state.iSampleCount);
+    gl.uniform1i(state.location.iCloudLayerCount, state.iCloudLayerCount);
+    gl.uniform1i(state.location.iLightLayerCount, state.iLightLayerCount);
+    gl.uniform1i(state.location.iCloudNoiseCount, state.iCloudNoiseCount);
+    gl.uniform1i(state.location.iLightNoiseCount, state.iLightNoiseCount);
+    gl.uniform3fv(state.location.iNoiseScale, state.iNoiseScale);
+    gl.uniform1f(state.location.iCloudAbsorptionCoeff, state.iCloudAbsorptionCoeff);
+    gl.uniform1f(state.location.iCloudBaseLuminance, state.iCloudBaseLuminance);
+    gl.uniform1f(state.location.iCloudAnisoScattering, state.iCloudAnisoScattering);
+    gl.uniform3fv(state.location.vecSunPosition, state.vecSunPosition);
+    gl.uniform3fv(state.location.vecSunColorYCH, state.vecSunColorYCH);
+    gl.uniform1f(state.location.iSunExponent, state.iSunExponent);
+    gl.uniform1f(state.location.iCloudFieldOfView, state.iCloudFieldOfView)
+    gl.uniform3fv(state.location.vecTone1, state.vecTone1);
+    gl.uniform3fv(state.location.vecTone2, state.vecTone2);
+    gl.uniform1f(state.location.iAccumulateMix, state.iAccumulateMix);
+    gl.uniform1i(state.location.doAccumulate, state.doAccumulate);
+    gl.uniform1i(state.location.useModdedFBM, state.useModdedFBM);
+    gl.uniform1f(state.location.iVariateCloudMarchSize, state.iVariateCloudMarchSize);
+    gl.uniform1f(state.location.iVariateCloudMarchOffset, state.iVariateCloudMarchOffset);
+    gl.uniform1f(state.location.iVariateCloudMarchFree, state.iVariateCloudMarchFree);
+
+    gl.uniform1f(state.location.iNoiseLevel, state.iNoiseLevel);
+    gl.uniform1f(state.location.iNoiseFreq, state.iNoiseFreq);
+    gl.uniform1f(state.location.iNoiseOffset, state.iNoiseOffset);
+    gl.uniform1i(state.location.iFractionalOctaves, state.iFractionalOctaves);
+    gl.uniform1f(state.location.iFractionalScale, state.iFractionalScale);
+    gl.uniform1f(state.location.iFractionalDecay, state.iFractionalDecay);
+    gl.uniform1f(state.location.iCloudMorph, state.iCloudMorph);
+
+    gl.uniform1i(state.location.passIndex, PASS.RENDER_CLOUDS);
+
+    gl.activeTexture(gl.TEXTURE0 + TEXTURE_UNITS.PREVIOUS_CLOUDS);
+    gl.uniform1i(state.location.texAccumulusClouds, TEXTURE_UNITS.PREVIOUS_CLOUDS);
 
     [write, read] = state.framebuffer.clouds.currentRoles();
-    gl.uniform1i(state.location.passIndex, PASS.RENDER_CLOUDS);
     gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo);
     gl.bindTexture(gl.TEXTURE_2D, read.texture);
     gl.drawArrays(gl.TRIANGLES, 0, 6);
     state.framebuffer.clouds.doPingPong();
 
-    gl.uniform1i(state.location.passIndex, PASS.ACCUMULATE_CLOUDS);
     [, read] = state.framebuffer.clouds.currentRoles();
-
-    // ganz offenbar sind wir noch nicht fertig.
-    /*
-    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.bindTexture(gl.TEXTURE_2D, read.texture);
-    gl.drawArrays(gl.TRIANGLES, 0, 6);
-     */
 
     // SOURCE: FLUID-ESCALATION
 
@@ -450,36 +475,22 @@ function render(gl, state) {
     gl.uniform1f(state.location.iSunraysIterations, state.iSunraysIterations);
 
     // das ist massiv. erstmal auslagern
-    renderFluidPasses(gl, state);
+    // renderFluidPasses(gl, state);
 
     // !! Finale Komposition auf Back Buffer !!
 
     gl.uniform1i(state.location.passIndex, PASS.RENDER_FINALLY_TO_SCREEN);
 
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-    let unit = 9;
-    gl.activeTexture(gl.TEXTURE0 + unit);
+    gl.activeTexture(gl.TEXTURE0 + TEXTURE_UNITS.NOISE_BASE);
     gl.bindTexture(gl.TEXTURE_2D, state.framebuffer.noiseBase.texture);
-    gl.uniform1i(state.location.texNoiseBase, unit++);
-    gl.activeTexture(gl.TEXTURE0 + unit);
-    gl.bindTexture(gl.TEXTURE_2D, state.monaTextures["210_schnoerkel"]);
-    gl.uniform1i(state.location.texMonaSchnoergel, unit++);
-    gl.activeTexture(gl.TEXTURE0 + unit);
-    gl.bindTexture(gl.TEXTURE_2D, state.monaTextures["regenbogen"]);
-    gl.uniform1i(state.location.texMonaRainbow, unit++);
-    gl.activeTexture(gl.TEXTURE0 + unit);
-    gl.bindTexture(gl.TEXTURE_2D, state.monaTextures["dream210_visual_quadratisch_transparent"]);
-    gl.uniform1i(state.location.texMonaCity, unit++);
-    gl.activeTexture(gl.TEXTURE0 + unit);
-    gl.bindTexture(gl.TEXTURE_2D, state.monaTextures["schnoerkelsterne"]);
-    gl.uniform1i(state.location.texMonaStars, unit++);
+    gl.uniform1i(state.location.texNoiseBase, TEXTURE_UNITS.NOISE_BASE);
 
+    // gl.viewport(0, 0, state.opt.image.width, state.opt.image.height);
     gl.drawArrays(gl.TRIANGLES, 0, 6);
 
-    for (; unit >= 9; unit--) {
-        gl.activeTexture(gl.TEXTURE0 + unit);
-        gl.bindTexture(gl.TEXTURE_2D, null);
-    }
+    gl.activeTexture(gl.TEXTURE0 + TEXTURE_UNITS.NOISE_BASE);
+    gl.bindTexture(gl.TEXTURE_2D, null);
 }
 
 const SPAWN_EVERY_SECONDS = 2;
@@ -548,9 +559,9 @@ function renderFluidPasses(gl, state) {
     write = state.framebuffer.fluid.curl;
     [, readVelocity] = state.framebuffer.fluid.velocity.currentRoles();
     gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo);
-    gl.activeTexture(gl.TEXTURE2);
+    gl.activeTexture(gl.TEXTURE0 + TEXTURE_UNITS.CURL);
     gl.bindTexture(gl.TEXTURE_2D, null);
-    gl.activeTexture(gl.TEXTURE1);
+    gl.activeTexture(gl.TEXTURE0 + TEXTURE_UNITS.VELOCITY);
     gl.bindTexture(gl.TEXTURE_2D, readVelocity.texture);
 
     gl.viewport(0, 0, write.width, write.height);
@@ -566,9 +577,9 @@ function renderFluidPasses(gl, state) {
     const readCurl = state.framebuffer.fluid.curl;
     gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo);
     gl.viewport(0, 0, write.width, write.height);
-    gl.activeTexture(gl.TEXTURE1);
+    gl.activeTexture(gl.TEXTURE0 + TEXTURE_UNITS.VELOCITY);
     gl.bindTexture(gl.TEXTURE_2D, readVelocity.texture);
-    gl.activeTexture(gl.TEXTURE2);
+    gl.activeTexture(gl.TEXTURE0 + TEXTURE_UNITS.CURL);
     gl.bindTexture(gl.TEXTURE_2D, readCurl.texture);
     gl.uniform2fv(state.location.texelSize, state.opt.fluid.texelSize);
     gl.drawArrays(gl.TRIANGLES, 0, 6);
@@ -584,7 +595,7 @@ function renderFluidPasses(gl, state) {
     [, readVelocity] = state.framebuffer.fluid.velocity.currentRoles();
     gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo);
     gl.viewport(0, 0, write.width, write.height);
-    gl.activeTexture(gl.TEXTURE1);
+    gl.activeTexture(gl.TEXTURE0 + TEXTURE_UNITS.VELOCITY);
     gl.bindTexture(gl.TEXTURE_2D, readVelocity.texture);
     gl.uniform2fv(state.location.texelSize, state.opt.fluid.texelSize);
     gl.drawArrays(gl.TRIANGLES, 0, 6);
@@ -597,7 +608,7 @@ function renderFluidPasses(gl, state) {
     [write, readPrevious] = state.framebuffer.fluid.pressure.currentRoles();
     gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo);
     gl.viewport(0, 0, write.width, write.height);
-    gl.activeTexture(gl.TEXTURE5);
+    gl.activeTexture(gl.TEXTURE0 + TEXTURE_UNITS.PRESSURE);
     gl.bindTexture(gl.TEXTURE_2D, readPrevious.texture);
     gl.uniform2fv(state.location.texelSize, state.opt.fluid.texelSize);
     gl.drawArrays(gl.TRIANGLES, 0, 6);
@@ -613,15 +624,15 @@ function renderFluidPasses(gl, state) {
         [write, readPrevious] = state.framebuffer.fluid.pressure.currentRoles();
         gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo);
         gl.viewport(0, 0, write.width, write.height);
-        gl.activeTexture(gl.TEXTURE5);
+        gl.activeTexture(gl.TEXTURE0 + TEXTURE_UNITS.PRESSURE);
         gl.bindTexture(gl.TEXTURE_2D, readPrevious.texture);
-        gl.activeTexture(gl.TEXTURE6);
+        gl.activeTexture(gl.TEXTURE0 + TEXTURE_UNITS.DIVERGENCE);
         gl.bindTexture(gl.TEXTURE_2D, state.framebuffer.fluid.divergence.texture);
         gl.uniform2fv(state.location.texelSize, state.opt.fluid.texelSize);
         gl.drawArrays(gl.TRIANGLES, 0, 6);
         state.framebuffer.fluid.pressure.doPingPong();
     }
-    gl.activeTexture(gl.TEXTURE6);
+    gl.activeTexture(gl.TEXTURE0 + TEXTURE_UNITS.DIVERGENCE);
     gl.bindTexture(gl.TEXTURE_2D, null);
 
     /////////////
@@ -633,9 +644,9 @@ function renderFluidPasses(gl, state) {
     [write, readVelocity] = state.framebuffer.fluid.velocity.currentRoles();
     gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo);
     gl.viewport(0, 0, write.width, write.height);
-    gl.activeTexture(gl.TEXTURE5);
+    gl.activeTexture(gl.TEXTURE0 + TEXTURE_UNITS.PRESSURE);
     gl.bindTexture(gl.TEXTURE_2D, readPressure.texture);
-    gl.activeTexture(gl.TEXTURE1);
+    gl.activeTexture(gl.TEXTURE0 + TEXTURE_UNITS.VELOCITY);
     gl.bindTexture(gl.TEXTURE_2D, readVelocity.texture);
     gl.uniform2fv(state.location.texelSize, state.opt.fluid.texelSize);
     gl.drawArrays(gl.TRIANGLES, 0, 6);
@@ -652,7 +663,7 @@ function renderFluidPasses(gl, state) {
     gl.viewport(0, 0, write.width, write.height);
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, readPrevious.texture);
-    gl.activeTexture(gl.TEXTURE1);
+    gl.activeTexture(gl.TEXTURE0 + TEXTURE_UNITS.VELOCITY);
     gl.bindTexture(gl.TEXTURE_2D, readVelocity.texture);
     gl.uniform2fv(state.location.texelSize, state.opt.fluid.texelSize);
     gl.drawArrays(gl.TRIANGLES, 0, 6);
@@ -670,7 +681,7 @@ function renderFluidPasses(gl, state) {
     gl.viewport(0, 0, write.width, write.height);
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, readPrevious.texture);
-    gl.activeTexture(gl.TEXTURE1);
+    gl.activeTexture(gl.TEXTURE0 + TEXTURE_UNITS.VELOCITY);
     gl.bindTexture(gl.TEXTURE_2D, readVelocity.texture);
     gl.uniform2fv(state.location.texelSize, state.texelSize);
     gl.drawArrays(gl.TRIANGLES, 0, 6);
@@ -793,9 +804,9 @@ function renderFluidPasses(gl, state) {
     gl.bindTexture(gl.TEXTURE_2D, readPrevious.texture);
     // <-- gl.uniform1i(displayMaterial.uniforms.uTexture, dye.read.attach(0));
     // --> bloom
-    gl.activeTexture(gl.TEXTURE4);
+    gl.activeTexture(gl.TEXTURE0 + TEXTURE_UNITS.POST_BLOOM);
     gl.bindTexture(gl.TEXTURE_2D, state.framebuffer.post.bloom.effect.texture);
-    gl.activeTexture(gl.TEXTURE7);
+    gl.activeTexture(gl.TEXTURE0 + TEXTURE_UNITS.POST_BLOOM_DITHER);
     gl.bindTexture(gl.TEXTURE_2D, state.framebuffer.post.bloom.dither.texture);
     const scale = [
         gl.drawingBufferWidth / state.framebuffer.post.bloom.dither.width,
@@ -803,15 +814,15 @@ function renderFluidPasses(gl, state) {
     ];
     gl.uniform2fv(state.location.iBloomDitherScale, scale);
     // --> sunrays
-    gl.activeTexture(gl.TEXTURE3); // see above, we kept that
+    gl.activeTexture(gl.TEXTURE0 + TEXTURE_UNITS.POST_SUNRAYS); // see above, we kept that
     gl.bindTexture(gl.TEXTURE_2D, state.framebuffer.post.sunrays.effect.texture);
     gl.drawArrays(gl.TRIANGLES, 0, 6);
 
     // need to cleanup this one, we got
     //   "GL_INVALID_OPERATION: glDrawArrays: Feedback loop formed between Framebuffer and active Texture."
-    gl.activeTexture(gl.TEXTURE3);
+    gl.activeTexture(gl.TEXTURE0 + TEXTURE_UNITS.POST_SUNRAYS);
     gl.bindTexture(gl.TEXTURE_2D, null);
-    gl.activeTexture(gl.TEXTURE4);
+    gl.activeTexture(gl.TEXTURE0 + TEXTURE_UNITS.POST_BLOOM);
     gl.bindTexture(gl.TEXTURE_2D, null);
 
 }
@@ -868,7 +879,7 @@ function createUniforms() {
             min: 0,
             max: 10,
         }, {
-            type: "float",
+            type: "int",
             name: "iSampleCount",
             defaultValue: 1,
             min: 1,
@@ -913,6 +924,13 @@ function createUniforms() {
             max: 3,
         }, {
             type: "float",
+            name: "iCloudBaseLuminance",
+            defaultValue: .055,
+            min: 0.001,
+            max: 1.,
+            log: true,
+        }, {
+            type: "float",
             name: "iCloudAnisoScattering",
             defaultValue: 0.3,
             min: 0,
@@ -937,6 +955,13 @@ function createUniforms() {
             min: 0.01,
             max: 100,
         }, {
+            type: "float",
+            name: "iCloudFieldOfView",
+            defaultValue: 1,
+            min: 0.01,
+            max: 10,
+            log: true,
+        }, {
             type: "vec3",
             name: "vecTone1",
             defaultValue: [2.51, 0.03, 2.43],
@@ -949,11 +974,40 @@ function createUniforms() {
             min: 0,
             max: 5,
         }, {
+            type: "bool",
+            name: "useModdedFBM",
+            defaultValue: false,
+        }, {
+            type: "bool",
+            name: "doAccumulate",
+            defaultValue: false,
+        }, {
             type: "float",
             name: "iAccumulateMix",
             defaultValue: 1.,
             min: 0.,
             max: 1,
+        }, {
+            type: "float",
+            name: "iVariateCloudMarchSize",
+            defaultValue: 0.,
+            min: 0.,
+            max: 0.1,
+            step: 0.001,
+        }, {
+            type: "float",
+            name: "iVariateCloudMarchOffset",
+            defaultValue: 0.,
+            min: 0.,
+            max: 0.1,
+            step: 0.001,
+        }, {
+            type: "float",
+            name: "iVariateCloudMarchFree",
+            defaultValue: 0.,
+            min: 0.,
+            max: 1.,
+            step: 0.001,
         }, {
             /////////////////////////////////////
             separator: "Spawn Colors & Velocity"
@@ -1073,9 +1127,9 @@ function createUniforms() {
         }, {
             type: "float",
             name: "iNoiseLevel",
-            defaultValue: 1,
-            min: 0.,
-            max: 2.,
+            defaultValue: 0.,
+            min: -2,
+            max: 2,
         }, {
             type: "float",
             name: "iNoiseFreq",
@@ -1155,16 +1209,16 @@ function createUniforms() {
             max: 2,
         }, {
             type: "float",
-            name: "iNoiseLevelB",
-            defaultValue: 0.0,
+            name: "iNoiseLevelC",
+            defaultValue: 0,
             min: -2,
             max: 2,
         }, {
             type: "float",
-            name: "iNoiseLevelC",
-            defaultValue: 0,
-            min: -1,
-            max: 1,
+            name: "iNoiseLevelAC",
+            defaultValue: 0.0,
+            min: -2,
+            max: 2,
         }, {
             type: "float",
             name: "iNoiseScaleA",
@@ -1173,13 +1227,13 @@ function createUniforms() {
             max: 10,
         }, {
             type: "float",
-            name: "iNoiseScaleB",
+            name: "iNoiseScaleC",
             defaultValue: 1,
             min: 0.01,
             max: 10,
         }, {
             type: "float",
-            name: "iNoiseScaleC",
+            name: "iNoiseScaleXT",
             defaultValue: 1,
             min: 0.01,
             max: 10,
@@ -1316,6 +1370,54 @@ function createUniforms() {
             defaultValue: 0,
             min: -9.99,
             max: +9.99,
+        }, {
+            type: "float",
+            name: "iFree6",
+            defaultValue: 0,
+            min: -2,
+            max: +2,
+        }, {
+            type: "float",
+            name: "iFree7",
+            defaultValue: 0,
+            min: -2,
+            max: +2,
+        }, {
+            type: "float",
+            name: "iFree8",
+            defaultValue: 0,
+            min: -2,
+            max: +2,
+        }, {
+            type: "float",
+            name: "iFree9",
+            defaultValue: 0,
+            min: -2,
+            max: +2,
+        }, {
+            type: "vec4",
+            name: "colFree0",
+            defaultValue: 0,
+            min: 0,
+            max: 2,
+        }, {
+            type: "vec4",
+            name: "colFree1",
+            defaultValue: 0,
+            min: 0,
+            max: 2,
+        }, {
+            type: "vec4",
+            name: "colFree2",
+            defaultValue: 0,
+            min: 0,
+            max: 2,
+        }, {
+            type: "vec4",
+            name: "colFree3",
+            defaultValue: 0,
+            min: 0,
+            max: 2,
         }
     ];
 }

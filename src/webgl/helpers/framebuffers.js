@@ -66,11 +66,11 @@ export function createFramebufferWithTexture(gl, options, fbIndex = undefined) {
     };
 }
 
-export function createFramebufferWithTextureArray(gl, depth, options) {
+export function createFramebufferWithTextureArray(gl, layers, options) {
     const opt = options ?? {};
     opt.width ??= gl.drawingBufferWidth;
     opt.height ??= gl.drawingBufferHeight;
-    opt.depth = depth;
+    opt.layers = layers;
     opt.wrapS ??= gl.CLAMP_TO_EDGE;
     opt.wrapT ??= gl.CLAMP_TO_EDGE;
     opt.minFilter ??= gl.LINEAR;
@@ -92,7 +92,7 @@ export function createFramebufferWithTextureArray(gl, depth, options) {
         opt.internalFormat,
         opt.width,
         opt.height,
-        depth,
+        layers,
         0,
         opt.dataFormat,
         opt.dataType,
@@ -116,8 +116,8 @@ export function createFramebufferWithTextureArray(gl, depth, options) {
         attachments: [opt.attachment],
         width: opt.width,
         height: opt.height,
-        depth: opt.depth,
-        texelSize: [1 / opt.width, 1 / opt.height, 1 / opt.depth],
+        layers: opt.layers,
+        texelSize: [1 / opt.width, 1 / opt.height],
         opt,
     };
 }

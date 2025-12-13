@@ -35,5 +35,4 @@ void main() {
     stR = st + vec2(texelSize.x, 0.);
     stU = st + vec2(0., texelSize.y);
     stD = st - vec2(0., texelSize.y);
-
 }

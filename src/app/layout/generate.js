@@ -230,6 +230,11 @@ export const addUniformControls = (elements, state, controls) => {
             control.groupedControls = groups[control.group];
         }
 
+        control.dim = 1;
+        if (control.type.startsWith("vec")) {
+            control.dim = +(control.type.slice(-1)[0]);
+        }
+
         const input = createInputElements(state, control);
         if (!input) {
             continue;

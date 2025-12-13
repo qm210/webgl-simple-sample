@@ -48,8 +48,8 @@ export default function initLayout(rootId) {
         }
     };
 
-    keepScrollPosition(elements.shaders, "shaders.scroll");
-    keepScrollPosition(elements.uniformControls, "uniforms.scroll");
+    keepScrollPosition(elements.shaders, "qm.shaders.scroll");
+    keepScrollPosition(elements.uniformControls, "qm.uniforms.scroll");
 
     return elements;
 }
@@ -88,9 +88,15 @@ function keepScrollPosition(element, storageKey) {
     });
     document.addEventListener("DOMContentLoaded", () => {
         const scrollPosition = sessionStorage.getItem(storageKey);
-        if (scrollPosition) {
-            element.scrollTop = parseInt(scrollPosition);
-            sessionStorage.removeItem(storageKey);
+        if (!scrollPosition) {
+            return;
         }
+        setTimeout(() =>
+            element.scrollTo({
+                top: parseInt(scrollPosition),
+                behavior: "smooth",
+            }),
+            300
+        );
     });
 }

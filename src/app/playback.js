@@ -16,7 +16,7 @@
 
 export function startRenderLoop(renderFunction, state, elements) {
     if (!state.program) {
-        console.error("Cannot startRenderLoop() with no-shader-program-at-all!");
+        console.error("Cannot startRenderLoop() with errors-instead-of-a-program:", state.error);
         return;
     }
     cancelAnimationFrame(state.play.animationFrame);
