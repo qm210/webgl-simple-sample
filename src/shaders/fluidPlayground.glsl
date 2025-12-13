@@ -931,7 +931,6 @@ void main() {
 
         case PROCESS_FLUID_COLOR_PASS:
             fragColor = previous;
-            // this does not go through right now
             fragColor = simulateAdvection(texPrevious, iColorDissipation);
             return;
 
@@ -998,7 +997,9 @@ void main() {
             vec3 bloom = texture(texPostBloom, st).rgb;
             bloom *= iBloomIntensity;
             bloom *= sunrays;
-            float dither = texture(texPostBloomDither, st * iBloomDitherScale).r;
+            // float dither = texture(texPostBloomDither, st * iBloomDitherScale).r;
+            vec2 ditherTexSize = vec2(textureSize(texPostBloomDither, 0));
+            float dither = texture(texPostBloomDither, st * iResolution / ditherTexSize).r;
             dither = dither * 2. - 1.;
             bloom += dither / 255.;
             bloom = max(

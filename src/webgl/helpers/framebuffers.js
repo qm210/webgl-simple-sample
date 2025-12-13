@@ -31,7 +31,8 @@ export function createFramebufferWithTexture(gl, options, fbIndex = undefined) {
         0,
         opt.internalFormat,
         opt.width,
-        opt.height, 0,
+        opt.height,
+        0,
         opt.dataFormat,
         opt.dataType,
         null
@@ -56,6 +57,7 @@ export function createFramebufferWithTexture(gl, options, fbIndex = undefined) {
         extraDataTexture: null,
         width: opt.width,
         height: opt.height,
+        resolution: [opt.width, opt.height],
         texelSize: [1 / opt.width, 1 / opt.height],
         params: opt,
         // <-- Speichern wir hier, weil wir bei einem Resize reagieren müssen

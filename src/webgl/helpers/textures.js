@@ -53,6 +53,13 @@ export function createTextureFromImage(gl, imageSource, options) {
     opt.internalFormat ??= gl.RGBA;
     // Anmerkung: internalFormat = gl.SRGB8_ALPHA8 kann bei Bildern oft sinnvoll sein
 
+    const result = {
+        texture,
+        opt,
+        width: 1,
+        height: 1,
+    };
+
     loadImage(imageSource, (img) => {
         gl.bindTexture(gl.TEXTURE_2D, texture);
         gl.texImage2D(
@@ -65,8 +72,13 @@ export function createTextureFromImage(gl, imageSource, options) {
         );
         // Notiz: Weil das hier im Browser ist, ist die Auflösung des Bilds im HTMLImageElement "img"
         //        bereits bekannt. Im Allgemeinen würde man die Auflösung hier auch noch spezifizieren.
+        result.width = img.naturalWidth;
+        result.height = img.naturalHeight;
     });
-    return texture;
+
+    return options.returnMetaInformation
+        ? result
+        : result.texture;
 }
 
 export function createTextureFromLoadedImage(gl, image, options) {

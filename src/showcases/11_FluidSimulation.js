@@ -99,7 +99,8 @@ export default {
                 wrapT: gl.REPEAT,
                 internalFormat: gl.RGB,
                 dataFormat: gl.RGB,
-                dataType: gl.UNSIGNED_BYTE
+                dataType: gl.UNSIGNED_BYTE,
+                returnMetaInformation: true,
             })
         };
         state.framebuffer.post.bloom.effect =
@@ -768,6 +769,7 @@ function render(gl, state) {
         gl.drawingBufferHeight / state.framebuffer.post.bloom.dither.height,
     ];
     gl.uniform2fv(state.location.iBloomDitherScale, scale);
+
     // --> sunrays
     gl.activeTexture(gl.TEXTURE3); // see above, we kept that
     gl.bindTexture(gl.TEXTURE_2D, state.framebuffer.post.sunrays.effect.texture);

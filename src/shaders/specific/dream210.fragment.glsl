@@ -3,7 +3,10 @@ precision mediump float;
 out vec4 fragColor;
 in vec2 uv;
 in vec2 st;
-in vec2 stL, stR, stU, stD;
+in vec2 stL;
+in vec2 stR;
+in vec2 stU;
+in vec2 stD;
 in vec2 texSt;
 in float aspRatio;
 in vec2 texelSize;
@@ -35,7 +38,7 @@ uniform sampler2D texPressure;
 uniform sampler2D texDivergence;
 uniform sampler2D texPostSunrays;
 uniform sampler2D texPostBloom;
-uniform sampler2D texPostBloomDither;
+uniform sampler2D texPostDither;
 uniform float iColorDissipation;
 uniform float iVelocityDissipation;
 uniform float iMaxInitialVelocity;
@@ -52,7 +55,8 @@ uniform float iSpawnRandomizeHue;
 uniform float iBloomIntensity;
 uniform float iBloomThreshold;
 uniform float iBloomSoftKnee;
-uniform vec2 iBloomDitherScale;
+uniform float iBloomPreGain;
+uniform float iBloomDithering;
 uniform float iSunraysWeight;
 uniform float iSunraysIterations;
 uniform float iSunraysDensity;
@@ -174,6 +178,16 @@ vec3 colorPalette(float t) {
 
 float max3(vec3 vec) {
     return max(vec.x, max(vec.y, vec.z));
+}
+
+vec4 debugRedChannel(sampler2D tex, float scaling) {
+    float red = texture(tex, st).r * scaling;
+    return vec4(
+        max(0., red),
+        -min(0., red),
+        abs(red) > 1.,
+        1.
+    );
 }
 
 /////////////////////////
@@ -785,21 +799,39 @@ vec4 simulateAdvection(sampler2D fieldTexture, float dissipationFactor) {
     return advectedValue / decay;
 }
 
+vec3 makeSurplusWhite(vec3 color) {
+    vec3 surplus = max(c.yyy, color - 1.);
+    color = min(color, 1.);
+    color.r += surplus.g + surplus.b;
+    color.g += surplus.r + surplus.b;
+    color.b += surplus.r + surplus.g;
+    return clamp(color, 0., 1.);
+}
+
 float calcSunrays() {
     vec2 stCursor = st;
     vec2 cursorDir = st - 0.5;
     cursorDir *= 1. / iSunraysIterations * iSunraysDensity;
     float illumination = 1.;
-    // now this is a "red only" texture, i.e. let's call it "value" instead of "color":
-    float value = fluidColor.a;
+    // float value = fluidColor.a;
+    float value = texture(texPostSunrays, stCursor).a;
     for (float i=0.; i < iSunraysIterations; i+=1.) {
         stCursor -= cursorDir;
-        float cursorVal = texture(texColor, stCursor).a;
+        float cursorVal = texture(texPostSunrays, stCursor).a;
         value += cursorVal * illumination * iSunraysWeight;
         illumination *= iSunraysDecay;
     }
     value *= iSunraysExposure;
     return value;
+}
+
+// ONLY A RELIC FROM THE FLUID PLAYGROUND!
+void postprocessing(inout vec3 col, in vec2 uv) {
+    // col = cmap_dream210(clamp(max3(col), 0., 1.));
+    col = pow(col, vec3(1./iGamma));
+
+    float vignetteShade = dot(st - 0.5, st - 0.5) * iVignetteScale;
+    col *= smoothstep(iVignetteInner, iVignetteOuter, vignetteShade);
 }
 
 /////
@@ -900,20 +932,20 @@ void finalComposition(in vec2 uv) {
 //        or otherwise technologically distinct from the render method.
 //
 // Also, loose grouped, in sections of 10, but just for the fun of it.
-#define _INIT_VELOCITY 0
-#define _INIT_COLOR_DENSITY 1
-#define _INIT_PRESSURE_PASS 2
-#define _CALC_CURL_FROM_VELOCITY 3
+#define _INIT_FLUID_COLOR 1
+#define _INIT_VELOCITY 2
+#define _INIT_PRESSURE_PASS 3
+#define _CALC_CURL_FROM_VELOCITY 4
 #define _PROCESS_VELOCITY_BY_CURL 10
 #define _CALC_DIVERGENCE_FROM_VELOCITY 11
 #define _PROCESS_PRESSURE 12
 #define _PROCESS_GRADIENT_SUBTRACTION 13
 #define _PROCESS_ADVECTION 14
-#define _PROCESS_COLOR_DENSITY 19
+#define _PROCESS_FLUID_COLOR 19
 #define _POST_BLOOM_PREFILTER 20
 #define _POST_BLOOM_BLUR 21
 #define _POST_SUNRAYS_CALC_MASK 30
-#define _POST_SUNRAYS_ACTUAL 31
+#define _POST_SUNRAYS_CALC 31
 #define _POST_SUNRAYS_BLUR 32
 #define _RENDER_FLUID 40
 #define _RENDER_CLOUDS 60
@@ -958,9 +990,10 @@ void main() {
             break;
 
         // all the fluid stuff below
-        case _INIT_COLOR_DENSITY: {
+        case _INIT_FLUID_COLOR: {
                 if (iSpawnSeed < 0.) {
-                    break;
+                    fragColor = fluidColor;
+                    return;
                 }
                 vec2 p = uv - spawnCenter;
                 d = length(p) - spawnSize;
@@ -978,7 +1011,8 @@ void main() {
             return;
         case _INIT_VELOCITY: {
                 if (iSpawnSeed < 0.) {
-                    break;
+                    fragColor.xy = fluidVelocity;
+                    return;
                 }
                 vec2 randomVelocity = hash22(vec2(iSpawnSeed, iSpawnSeed + 0.1))
                 * iMaxInitialVelocity * vec2(aspRatio, 1.);
@@ -994,7 +1028,7 @@ void main() {
                 d = smoothstep(0.02, 0., d);
                 d   = exp(-dot(p, p) / spawnSize);
                 vec2 newValue = d * initialVelocity;
-                fragColor.xy = fluidColor.xy + newValue;
+                fragColor.xy = fluidVelocity.xy + newValue;
                 // can ignore fragColor.zw because these will never be read
             }
             return;
@@ -1067,29 +1101,29 @@ void main() {
             fragColor.rg = fluidVelocity;
             return;
         case _PROCESS_ADVECTION:
+            fragColor.xy = fluidVelocity;
             fragColor = simulateAdvection(texVelocity, iVelocityDissipation);
             return;
-        case _PROCESS_COLOR_DENSITY:
+        case _PROCESS_FLUID_COLOR:
             fragColor = fluidColor;
-            // this does not go through right now
             fragColor = simulateAdvection(texColor, iColorDissipation);
             return;
         case _POST_BLOOM_PREFILTER:
             float knee = iBloomThreshold * iBloomSoftKnee + 1.e-4;
             vec3 curve = vec3(iBloomThreshold - knee, knee * 2., 0.25 / knee);
             vec3 col = texture(texColor, st).rgb;
-            float br = max3(col);
+            float br = iBloomPreGain * max3(col);
             float rq = clamp(br - curve.x, 0., curve.y);
             rq = curve.z * rq * rq;
             col *= max(rq, br - iBloomThreshold) / max(br, 1.e-4);
-            fragColor = vec4(col, 1.);
+            fragColor = vec4(col, 0.);
             return;
         case _POST_BLOOM_BLUR:
             fragColor = 0.25 * (
-                texture(texColor, stL) +
-                texture(texColor, stR) +
-                texture(texColor, stU) +
-                texture(texColor, stD)
+                texture(texPostBloom, stL) +
+                texture(texPostBloom, stR) +
+                texture(texPostBloom, stU) +
+                texture(texPostBloom, stD)
             );
             return;
         case _POST_SUNRAYS_CALC_MASK:
@@ -1097,19 +1131,59 @@ void main() {
             fragColor.a = 1.0 - clamp(br * 20., 0., 0.8);
             fragColor.rgb = fluidColor.rgb;
             return;
-        case _POST_SUNRAYS_ACTUAL:
+        case _POST_SUNRAYS_CALC:
             fragColor = vec4(calcSunrays(), 0., 0., 1.);
             return;
         case _POST_SUNRAYS_BLUR:
             vec4 sum = fluidColor * 0.29411764;
-            sum += texture(texColor, st - 1.333 * texelSize) * 0.35294117;
-            sum += texture(texColor, st + 1.333 * texelSize) * 0.35294117;
+            sum += texture(texPostSunrays, st - 1.333 * texelSize) * 0.35294117;
+            sum += texture(texPostSunrays, st + 1.333 * texelSize) * 0.35294117;
             fragColor = sum;
             return;
         case _RENDER_FLUID:
-            // "Hello Shadertoy" for making it obvious you forgot something.
-            fragColor.rgb = 0.5 + 0.5*cos(iTime+uv.xyx+vec3(0,2,4));
-            break;
+            if (debugOption == 1) {
+                fragColor = 0.5 * texture(texVelocity, st) + 0.5;
+                break;
+            } else if (debugOption == 2) {
+                fragColor = debugRedChannel(texCurl, 0.2);
+                break;
+            } else if (debugOption == 3) {
+                fragColor = fluidColor;
+                // "Hello Shadertoy" for making it obvious you forgot something.
+                // fragColor.rgb = 0.5 + 0.5*cos(iTime+uv.xyx+vec3(0,2,4));
+                break;
+            }
+            // 1. first, mimic the gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+            const vec3 bg = c.yyy;
+            fragColor.rgb = makeSurplusWhite(fluidColor.rgb);
+            fragColor.rgb = fluidColor.rgb + (1. - fluidColor.a) * bg;
+            // 2. mix post-processing (bloom & sunrays) in
+            float sunrays = texture(texPostSunrays, st).r;
+            fragColor.rgb *= sunrays;
+            vec3 bloom = texture(texPostBloom, st).rgb;
+            bloom *= iBloomIntensity;
+            bloom *= sunrays;
+
+            if (iBloomDithering > 0.) {
+                // vec2 ditherTexSize = vec2(textureSize(texPostDither, 0));
+                const vec2 ditherTexSize = vec2(64.);
+                vec2 scale = iResolution / ditherTexSize;
+                float dither = texture(texPostDither, st * scale).r;
+                dither = dither * 2. - 1.;
+                bloom += dither * iBloomDithering / 255.;
+            }
+            bloom = max(
+                1.055 * pow(max(bloom, c.yyy), vec3(0.4167)) - 0.055,
+                c.yyy
+            );
+            fragColor.rgb += bloom;
+            fragColor.a = max3(fragColor.rgb);
+            // postprocessing(fragColor.rgb, uv);
+
+            // DEBUGGING: BLEND ON BLACK
+            fragColor.rgb = fragColor.rgb + (1. - fragColor.a) * c.yyy;
+            fragColor.a = 1.;
+            return;
     }
     fragColor.a = 1.;
 }

@@ -17,13 +17,13 @@ export function asResolution({width, height, aspectRatio}) {
 }
 
 export function resolutionScaled(newHeight, oldWidth, oldHeight) {
-    const resolution = {
+    const res = {
         width: Math.floor(newHeight * oldWidth / oldHeight),
         height: Math.floor(newHeight),
     };
-    resolution.asVec2 = [resolution.width, resolution.height];
-    resolution.texelSize = [1 / resolution.width, 1 / resolution.height];
-    return resolution;
+    res.resolution = [res.width, res.height];
+    res.texelSize = [1 / res.width, 1 / res.height];
+    return res;
 }
 
 export function initialOrStoredResolution(canvas, geometry) {
