@@ -152,6 +152,21 @@ uniform vec4 colFree1;
 uniform vec4 colFree2;
 uniform vec4 colFree3;
 
+struct Event {
+    int type;
+    float t;          // life time / progress parameter
+    float arg;        // use as you wish
+    int subtype;      // not specified anyway
+    vec4 coords;      // 3d position and another (time-ish?) free
+    vec4 moreArgs;    // and yeah, yeah.
+    vec4 moarArgsies; // yeslel. base alignment would pad these anyway.
+};
+layout(std140) uniform Events {
+    Event fluidColorEvent;
+    Event fluidVelocityEvent;
+    Event textEvent;
+};
+
 const vec4 c = vec4(1, 0, -1, 0.5);
 const float pi = 3.141593;
 const float twoPi = 2. * pi;
@@ -981,11 +996,8 @@ void main() {
             fragColor = c.yyyy;
             printYay(uv, fragColor);
             return;
-        case _RENDER_FINALLY_TO_SCREEN:
-            finalComposition(uv);
-            break;
 
-        // all the fluid stuff below
+        // all the fluid stuff now
         case _INIT_FLUID_COLOR: {
                 fluidColor = texture(texColor, st);
                 if (iSpawnSeed < 0.) {
@@ -1057,22 +1069,16 @@ void main() {
             fragColor.xy = fluidVelocity;
             return;
         case _CALC_DIVERGENCE_FROM_VELOCITY:
+            fluidVelocity = texture(texVelocity, st).xy;
             // this handles divergence at the borders
             velL = texture(texVelocity, stL).x;
             velR = texture(texVelocity, stR).x;
             velU = texture(texVelocity, stU).y;
             velD = texture(texVelocity, stD).y;
-            // these are equivalent mathematically:
-            // if (a < b) { velL = c; }
-            // velL = a < b ? c : L;
-            // velL = mix(velL, c, float(a < b));
-            // velL = mix(velL, c, step(a, b));
-            // and compiler might recognize them as equal; but the last one is the most idiomatic GLSL
 //            if (stL.x < 0.0) { velL = -fluidVelocity.x; }
 //            if (stR.x > 1.0) { velR = -fluidVelocity.x; }
 //            if (stU.y > 1.0) { velU = -fluidVelocity.y; }
 //            if (stD.y < 0.0) { velD = -fluidVelocity.y; }
-            fluidVelocity = texture(texVelocity, st).xy;
             velL = mix(velL, -fluidVelocity.x, step(stL.x, 0.0));
             velR = mix(velR, -fluidVelocity.x, step(1.0, stR.x));
             velU = mix(velU, -fluidVelocity.y, step(1.0, stU.y));
@@ -1140,19 +1146,16 @@ void main() {
                 + weight * texture(texPostSunrays, st + 1.333 * texelSize);
             return;
         case _RENDER_FLUID:
-            if (debugOption == 1) {
-                fragColor = 0.5 * texture(texVelocity, st) + 0.5;
-                break;
-            } else if (debugOption == 2) {
-                fragColor = debugRedChannel(texCurl, 0.2);
-                break;
-            } else if (debugOption == 3) {
-                fragColor = fluidColor;
-                // "Hello Shadertoy" for making it obvious you forgot something.
-                // fragColor.rgb = 0.5 + 0.5*cos(iTime+uv.xyx+vec3(0,2,4));
-                break;
-            }
             fluidColor = texture(texColor, st);
+            if (debugOption == 3) {
+                fragColor = debugRedChannel(texCurl, 0.2);
+                return;
+            } else if (debugOption == 2) {
+                fragColor = fluidColor;
+                return;
+            }
+            // debugOption == 1 see below
+
             const vec3 bg = c.yyy;
             fragColor.rgb = makeSurplusWhite(fluidColor.rgb);
             fragColor.rgb = fluidColor.rgb + (1. - fluidColor.a) * bg;
@@ -1176,12 +1179,20 @@ void main() {
             );
             fragColor.rgb += bloom;
             fragColor.a = max3(fragColor.rgb);
-            // postprocessing(fragColor.rgb, uv);
-            // DEBUGGING: BLEND ON BLACK
-//            fragColor.rgb = fragColor.rgb + (1. - fragColor.a) * c.yyy;
-//            fragColor.a = 1.;
+
+            if (debugOption == 1) {
+                // DEBUGGING: BLEND ON BLACK
+                fragColor.rgb = fragColor.rgb + (1. - fragColor.a) * c.yyy;
+            } else {
+                postprocessing(fragColor.rgb, uv);
+            }
+            fragColor.a = 1.;
+            return;
+
+        case _RENDER_FINALLY_TO_SCREEN:
+            finalComposition(uv);
+            fragColor.a = 1.;
             return;
     }
-    fragColor.a = 1.;
 }
 

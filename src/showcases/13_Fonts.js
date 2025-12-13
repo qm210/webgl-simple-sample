@@ -1,10 +1,11 @@
-import {createGlyphDef, createUbo, initBasicState, startRenderLoop, toAscii} from "./common.js";
+import {createGlyphDef, initBasicState, startRenderLoop, toAscii} from "./common.js";
 import {createTextureFromImage} from "../webgl/helpers/textures.js";
 
 import vertexShaderSource from "../shaders/vertex.fonts.glsl"
 import fragmentShaderSource from "../shaders/fonts.proofofconcept.glsl";
 import spiceSaleMsdfPng from "../textures/dream210/SpicySale.msdf.png";
 import spiceSaleMsdfJson from "../textures/dream210/SpicySale.msdf.json";
+import {createUboForArray} from "../webgl/helpers/uniformbuffers.js";
 
 export default {
     title: "What about Fonts?",
@@ -21,7 +22,7 @@ export default {
         console.log("MAX_TEXTURE_IMAGE_UNITS", maxFragmentTextureUnits);
 
         const {glyphDef, glyphDebug} = createGlyphDef(spiceSaleMsdfJson);
-        const ubo = createUbo(gl, state.program, glyphDef, "Glyphs");
+        const ubo = createUboForArray(gl, state.program, glyphDef, "Glyphs");
         state.msdf = {
             tex: createTextureFromImage(gl, spiceSaleMsdfPng, {
                 wrapS: gl.CLAMP_TO_EDGE,

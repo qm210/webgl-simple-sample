@@ -1,4 +1,4 @@
-import {createGlyphDef, createUbo, initBasicState, startRenderLoop} from "./common.js";
+import {createGlyphDef, initBasicState, startRenderLoop} from "./common.js";
 import {
     createTextureFromImage,
     createTextureFromLoadedImage,
@@ -15,6 +15,7 @@ import {
     createPingPongFramebuffersWithTexture, halfFloatOptions
 } from "../webgl/helpers/framebuffers.js";
 import ditherImage from "../textures/dither.png";
+import {createUboForArray, createUboForStruct} from "../webgl/helpers/uniformbuffers.js";
 
 // This secret move is presented to you by... vite :)
 const monaImages =
@@ -72,7 +73,10 @@ export default {
         };
 
         const {glyphDef, glyphDebug} = createGlyphDef(spiceSaleMsdfJson);
-        const ubo = createUbo(gl, state.program, glyphDef, "Glyphs");
+        const ubo = createUboForArray(gl, state.program, glyphDef, {
+            blockName: "Glyphs",
+            dataSize: 4,
+        });
         state.msdf = {
             tex: createTextureFromImage(gl, spiceSaleMsdfPng, {
                 wrapS: gl.CLAMP_TO_EDGE,
@@ -87,6 +91,53 @@ export default {
             ubo,
             glyphDef,
             debug: glyphDebug,
+        };
+
+        /*  std140 needs 4-byte alignments overall, and the offsets must be integer multiples of the size (afair);
+            now as the base alignment is 16 anyway and thus the whole struct is gonna take 64 bytes, we use:
+            struct Event {      | offset | size -> aligned to next element's base size
+                int type;       |      0 |    4 -> 1 *  4 tight
+                float t;        |      4 |    4 -> 2 *  4 tight
+                float arg;      |      8 |    4 -> 3 *  4 tight
+                int subtype;    |     12 |    4 -> 1 * 16 tight
+                vec4 coord;     |     16 |   16 -> tight
+                -> base alignment is 16 (largest) -> struct is 4x16 = 64-aligned
+                -> so we could gönn ourselves even another 2x vec4 for "free".
+            };
+         */
+        state.events = createUboForStruct(gl, state.program, {
+            blockName: "Events",
+            memoryUsage: gl.DYNAMIC_DRAW,
+            dataSize: 64,
+            memberMap: {
+                fluidColorEvent: 0,
+                fluidVelocityEvent: 1,
+                textEvent: 2,
+            },
+            structFields: {
+                type: [0, 1],
+                t: [1, 1],
+                arg: [2, 1],
+                subtype: [3, 1],
+                coords: [4, 4],
+                moreArgs: [8, 4],
+                moarArgsies: [12, 4]
+            },
+        });
+        // maps some readable names to the "int type" and/or "int subtype".
+        // must, of course, be understood by the Shader.
+        state.events.types = Object.freeze({
+            IDLE: 0,
+            SHOW_TEXTURE: 1,
+            STIR_FLUID: 2,
+            DISSIPATE: 3,
+            DRAIN: 4,
+            SHIFT_PALETTE: 5,
+        });
+        state.events.queue = [];
+        state.events.manager = {
+            timeouts: [],
+            lastUpdateAt: null,
         };
 
         state.opt.fluid.scalar = {
@@ -265,6 +316,24 @@ export default {
                 onRightClick: () =>
                     state.debug.fb.toggle(-1),
             }, {
+                label: () =>
+                    "Test some Event...",
+                onClick: () => {
+                    state.events.queue.push({
+                        member: state.events.members.fluidVelocityEvent,
+                        lifetime: 0.5,
+                        data: {
+                            type: state.events.types.DRAIN,
+                            t: 2,
+                            arg: 7.,
+                            coords: [10., 0.]
+                        }
+                    });
+                },
+                onRightClick: () => {
+                    console.info("[EVENTS]", state.events, "- Queue:", state.events.queue);
+                },
+            }, {
                 label: () => {
                     if (!state.lastQueryNanos) {
                         return "Query";
@@ -354,6 +423,8 @@ function render(gl, state) {
     gl.uniform2fv(state.location.iResolution, state.resolution);
     gl.uniform1i(state.location.iFrame, state.iFrame);
     gl.uniform1i(state.location.debugOption, state.debug.option);
+
+    handleEventsUniformBuffer(state);
 
     gl.uniform1f(state.location.iVignetteInner, state.iVignetteInner);
     gl.uniform1f(state.location.iVignetteOuter, state.iVignetteOuter);
@@ -1553,4 +1624,43 @@ function createUniforms() {
             max: 2,
         }
     ];
+}
+
+function handleEventsUniformBuffer(state) {
+    // NOT IMPLEMENTED: Schedule for triggering events later.
+    //                  For now, the Queue is emptying whenever it can.
+    const timeoutQueue = state.events.manager.timeouts;
+
+    while (state.events.queue.length > 0) {
+        const event = state.events.queue.shift();
+        event.member.update(event.data);
+        console.info("[EVENT] Handle", event, "Lifetime:", event.lifetime);
+        if (event.lifetime === undefined) {
+            return;
+        }
+        event.endOfLife = state.time + event.lifetime;
+        binarySearchInsert(event);
+    }
+
+    while (timeoutQueue.length > 0 && timeoutQueue[0].endOfLife <= state.time) {
+        const deadEvent = timeoutQueue.shift();
+        deadEvent.member.update({ type: null });
+    }
+
+    // I guess this is now only for debugging
+    state.events.manager.lastUpdateAt = state.time;
+
+
+    function binarySearchInsert(event) {
+        let low = 0, high = timeoutQueue.length;
+        while (low < high) {
+            const mid = (low + high) >> 1;
+            if (timeoutQueue[mid].endOfLife < event.endOfLife) {
+                low = mid + 1;
+            } else {
+                high = mid;
+            }
+        }
+        queue.splice(low, 0, event.endOfLife);
+    }
 }
