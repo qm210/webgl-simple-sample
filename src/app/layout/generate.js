@@ -96,16 +96,13 @@ export const addMainControls = (elements, state, controls) => {
     const {seeker} = createMainControlBar(elements, state, controls);
 
     for (const control of controls.toggles ?? []) {
-        const toggleIndex = elements.controlBar.buttons.length;
         elements.controlBar.buttons.push(
             addButton({
                 title: control.label(),
                 style: control.style,
-                onClick: async (...args) => {
-                    console.log("büttØn?", args);
-                    await control.onClick();
-                    const self = elements.controlBar.buttons[toggleIndex];
-                    self.textContent = control.label();
+                onClick: async (event) => {
+                    await control.onClick(event.target);
+                    event.target.textContent = control.label();
                 }
             })
         );
