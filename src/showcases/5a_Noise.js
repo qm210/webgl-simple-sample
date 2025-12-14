@@ -5,7 +5,7 @@ import fragmentShaderSource from "../shaders/noisePlayground.glsl";
 import vertexShaderSource from "../shaders/vertex.basic.glsl";
 import {initBasicState, readPixelsAndEvaluate} from "./common.js";
 import {createStaticVertexBuffer} from "../webgl/helpers/setup.js";
-import {evaluateReadData} from "../app/math.js";
+import {evaluateReadData} from "../app/algorithms.js";
 
 export default {
     title: "Noise Playground",

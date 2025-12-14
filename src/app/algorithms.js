@@ -2,6 +2,19 @@ export function clamp(x, min, max) {
     return Math.min(Math.max(x, min), max);
 }
 
+export function binarySearchInsert(event, queue, key) {
+    let low = 0, high = queue.length;
+    while (low < high) {
+        const mid = (low + high) >> 1;
+        if (queue[mid][key] < event[key]) {
+            low = mid + 1;
+        } else {
+            high = mid;
+        }
+    }
+    queue.splice(low, 0, event);
+}
+
 export async function evaluateReadData(buffer, mapFunc = undefined) {
     const isUnsignedByte = buffer instanceof Uint8Array;
     const asFloat = buffer instanceof Float32Array

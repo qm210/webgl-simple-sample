@@ -154,14 +154,12 @@ uniform vec4 colFree3;
 
 struct Event {
     int type;
-    float t;          // life time / progress parameter
-    float arg;        // use as you wish
-    int subtype;      // not specified anyway
-    vec4 coords;      // 3d position and another (time-ish?) free
-    vec4 moreArgs;    // and yeah, yeah.
-    vec4 moarArgsies; // yeslel. base alignment would pad these anyway.
+    int subtype;
+    vec4 coords;
+    vec4 args;
 };
 layout(std140) uniform Events {
+    Event genericEvent;
     Event fluidColorEvent;
     Event fluidVelocityEvent;
     Event textEvent;

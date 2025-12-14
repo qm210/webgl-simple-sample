@@ -1,4 +1,4 @@
-import {clamp} from "../../math.js";
+import {clamp} from "../../algorithms.js";
 
 export function createTimeSeeker(parent, state) {
     parent.innerHTML =

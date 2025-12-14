@@ -16,6 +16,7 @@ import {
 } from "../webgl/helpers/framebuffers.js";
 import ditherImage from "../textures/dither.png";
 import {createUboForArray, createUboForStruct} from "../webgl/helpers/uniformbuffers.js";
+import {binarySearchInsert} from "../app/algorithms.js";
 
 // This secret move is presented to you by... vite :)
 const monaImages =
@@ -107,21 +108,20 @@ export default {
          */
         state.events = createUboForStruct(gl, state.program, {
             blockName: "Events",
+            bindingPoint: 1,
             memoryUsage: gl.DYNAMIC_DRAW,
-            dataSize: 64,
+            dataSize: 48,
             memberMap: {
-                fluidColorEvent: 0,
-                fluidVelocityEvent: 1,
-                textEvent: 2,
+                genericEvent: 0,
+                fluidColorEvent: 1,
+                fluidVelocityEvent: 2,
+                textEvent: 3,
             },
             structFields: {
                 type: [0, 1],
-                t: [1, 1],
-                arg: [2, 1],
-                subtype: [3, 1],
+                subtype: [1, 1],
                 coords: [4, 4],
-                moreArgs: [8, 4],
-                moarArgsies: [12, 4]
+                args: [8, 4],
             },
         });
         // maps some readable names to the "int type" and/or "int subtype".
@@ -134,11 +134,7 @@ export default {
             DRAIN: 4,
             SHIFT_PALETTE: 5,
         });
-        state.events.queue = [];
-        state.events.manager = {
-            timeouts: [],
-            lastUpdateAt: null,
-        };
+        state.events.manager = createEventsManager(state, state.events);
 
         state.opt.fluid.scalar = {
             width: state.opt.fluid.width,
@@ -188,7 +184,6 @@ export default {
                 returnMetaInformation: true,
             })
         };
-        console.log(state.framebuffer.post.bloom);
 
         for (let i = 0; i < state.framebuffer.post.bloom.nIterations; i++) {
             const options = {
@@ -319,15 +314,15 @@ export default {
                 label: () =>
                     "Test some Event...",
                 onClick: () => {
-                    state.events.queue.push({
+                    state.events.manager.launch({
                         member: state.events.members.fluidVelocityEvent,
-                        lifetime: 0.5,
                         data: {
                             type: state.events.types.DRAIN,
                             t: 2,
                             arg: 7.,
                             coords: [10., 0.]
-                        }
+                        },
+                        expire: {in: 0.5},
                     });
                 },
                 onRightClick: () => {
@@ -424,7 +419,7 @@ function render(gl, state) {
     gl.uniform1i(state.location.iFrame, state.iFrame);
     gl.uniform1i(state.location.debugOption, state.debug.option);
 
-    handleEventsUniformBuffer(state);
+    state.events.manager.manage(state);
 
     gl.uniform1f(state.location.iVignetteInner, state.iVignetteInner);
     gl.uniform1f(state.location.iVignetteOuter, state.iVignetteOuter);
@@ -1626,41 +1621,90 @@ function createUniforms() {
     ];
 }
 
-function handleEventsUniformBuffer(state) {
-    // NOT IMPLEMENTED: Schedule for triggering events later.
-    //                  For now, the Queue is emptying whenever it can.
-    const timeoutQueue = state.events.manager.timeouts;
+function createEventsManager(state, events) {
+    const scheduled = [];
+    const manager = {
+        queue: {
+            immediate: [],
+            scheduled,
+        },
+        events,
+        launch: void 0,
+        manage: void 0,
+        flag: {
+            debug: false,
+        }
+    };
+    const schedule = (event) =>
+        binarySearchInsert(event, scheduled, "timeSec");
 
-    while (state.events.queue.length > 0) {
-        const event = state.events.queue.shift();
+    manager.launch = (event) => {
+        /** This is the public callee.
+         *  event can contain the fields {type, subtype, coords, args}
+         *  from the actual struct, and for scheduling
+         *  launch: {in? , at?} and expire: {in? , at?} in seconds each
+         *  */
+        event.timeSec = asScheduled(event.launch);
+        if (event.timeSec > 0) {
+            schedule(event);
+        } else {
+            manager.queue.immediate.push(event);
+        }
+        // FOR NOW
+        manager.flag.debug = true;
+    };
+
+    const handle = (event) => {
         event.member.update(event.data);
-        console.info("[EVENT] Handle", event, "Lifetime:", event.lifetime);
-        if (event.lifetime === undefined) {
-            return;
+        if (event.expire) {
+            schedule({
+                ...event,
+                data: { ...event.data, type: null },
+                timeSec: asScheduled(event.expire, state.time),
+                expire: null
+            });
         }
-        event.endOfLife = state.time + event.lifetime;
-        binarySearchInsert(event);
-    }
+    };
 
-    while (timeoutQueue.length > 0 && timeoutQueue[0].endOfLife <= state.time) {
-        const deadEvent = timeoutQueue.shift();
-        deadEvent.member.update({ type: null });
-    }
-
-    // I guess this is now only for debugging
-    state.events.manager.lastUpdateAt = state.time;
-
-
-    function binarySearchInsert(event) {
-        let low = 0, high = timeoutQueue.length;
-        while (low < high) {
-            const mid = (low + high) >> 1;
-            if (timeoutQueue[mid].endOfLife < event.endOfLife) {
-                low = mid + 1;
-            } else {
-                high = mid;
-            }
+    manager.manage = (state) => {
+        /** This is the public method for the render loop.
+         *  The internal queue handling is done so that at this one manage() call,
+         *  we can have somewhat of a synchronization for a short time.
+         *  (other than that, events might get spawned via buttons, mouse, keyboard, etc...)
+         *  */
+        for (const event of manager.queue.immediate) {
+            handle(event);
+            console.info("[EVENT][IMMEDIATE] Handle", event, "Expire?", event.expire);
         }
-        queue.splice(low, 0, event.endOfLife);
+        manager.queue.immediate.length = 0;
+
+        while (scheduled.length > 0 && scheduled[0].timeSec <= state.time) {
+            const event = scheduled.shift();
+            handle(event);
+            console.info("[EVENT][SCHEDULED] Handle", event);
+        }
+
+        if (manager.flag.debug && scheduled.length === 0) {
+            console.info("[EVENT MANAGER] Schedule Empty.", manager.queue, manager.events);
+            manager.flag.debug = false;
+        }
+    };
+
+    return manager;
+}
+
+/**
+ * @param {object=} [given] - Optional scheduling info
+ * @param {number} [given.in] - Delay in seconds from "current" or "at"
+ * @param {number} [given.at] - Absolute launch time (or reference for "in")
+ * @param {object=} [current] - current time as reference for "in" (unless "at")
+ * @returns {number} - absolutely scheduled time in seconds.
+ */
+function asScheduled(given, current) {
+    if (!given) {
+        return undefined;
     }
+    return given.in
+        ? (given.in + (given.at ?? current))
+        : given.at;
 }

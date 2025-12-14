@@ -6,7 +6,7 @@ import {
     createPingPongFramebuffersWithTexture
 } from "../webgl/helpers/framebuffers.js";
 import {updateResolutionInState} from "../webgl/helpers/resolution.js";
-import {evaluateReadData} from "../app/math.js";
+import {evaluateReadData} from "../app/algorithms.js";
 
 export default {
     title: "NR4's Clouds",

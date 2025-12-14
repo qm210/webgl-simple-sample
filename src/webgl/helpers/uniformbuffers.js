@@ -10,9 +10,9 @@ export function createUboForArray(gl, program, array, opt) {
     // but... suffice to say I never compared these..?
 
     const ubo = gl.createBuffer();
-    const blockBytes = array.length * opt.dataSize;
+    const blockSize = array.length * opt.dataSize;
     gl.bindBuffer(gl.UNIFORM_BUFFER, ubo);
-    gl.bufferData(gl.UNIFORM_BUFFER, blockBytes, opt.memoryUsage);
+    gl.bufferData(gl.UNIFORM_BUFFER, blockSize, opt.memoryUsage);
 
     const blockIndex = gl.getUniformBlockIndex(program, opt.blockName);
     if (blockIndex === gl.INVALID_INDEX) {
@@ -34,8 +34,8 @@ export function createUboForArray(gl, program, array, opt) {
         program, blockIndex, gl.UNIFORM_BLOCK_DATA_SIZE
     );
     console.info("[UBO]", opt.blockName, ubo, opt,
-        "Block Sizes equal... ", checkBlockSize, blockBytes,
-        "? Block Name/Index:", blockIndex, "Binding", binding,
+        "Do Block Sizes in Bytes match...", checkBlockSize, blockSize,
+        "? Block Index:", blockIndex, "Binding", binding
     );
 
     /*
@@ -56,14 +56,14 @@ export function createUboForStruct(gl, program, opt) {
     opt.dataLength ??= 1;
     opt.memoryUsage ??= gl.DYNAMIC_DRAW;
     opt.bindingPoint ??= 0;
-    opt.data ??= null;
+    opt.initialData ??= null;
 
     const result = {
         opt,
         ubo: null,
         block: {
             name: opt.blockName,
-            bytes: null,
+            size: null,
             index: null,
             binding: null,
         },
@@ -93,70 +93,50 @@ export function createUboForStruct(gl, program, opt) {
         }
     }
 
-    result.block.bytes = opt.dataLength * opt.dataSize;
+    const block = result.block;
+    block.size = opt.dataLength * opt.dataSize;
 
     result.ubo = gl.createBuffer();
     gl.bindBuffer(gl.UNIFORM_BUFFER, result.ubo);
-    gl.bufferData(gl.UNIFORM_BUFFER, result.block.bytes, opt.memoryUsage);
+    gl.bufferData(gl.UNIFORM_BUFFER, block.size, opt.memoryUsage);
 
-    result.block.index = gl.getUniformBlockIndex(program, result.block.name);
-    if (result.block.index === gl.INVALID_INDEX) {
-        result.error = `Found no layout(std140) uniform "${result.block.name}"`;
+    block.index = gl.getUniformBlockIndex(program, block.name);
+    if (block.index === gl.INVALID_INDEX) {
+        result.error = `Found no layout(std140) uniform "${block.name}"`;
         return result;
     }
 
-    result.block.binding = gl.getActiveUniformBlockParameter(
-        program, result.block.index, gl.UNIFORM_BLOCK_BINDING
+    block.binding = gl.getActiveUniformBlockParameter(
+        program, block.index, gl.UNIFORM_BLOCK_BINDING
     );
-    gl.uniformBlockBinding(program, result.block.index, opt.bindingPoint);
+    gl.uniformBlockBinding(program, block.index, opt.bindingPoint);
     gl.bindBufferBase(gl.UNIFORM_BUFFER, opt.bindingPoint, result.ubo);
 
-    if (opt.data) {
+    if (opt.initialData) {
         gl.bindBuffer(gl.UNIFORM_BUFFER, result.ubo);
         gl.bufferSubData(gl.UNIFORM_BUFFER, 0, opt.data);
     }
-
-    // update like:
-    // gl.bindBuffer(gl.UNIFORM_BUFFER, ubo);
-    // gl.bufferSubData(gl.UNIFORM_BUFFER, 0, data);
-    // (or 0 -> offset in bytes, if you update specific elements)
 
     result.updateMemberAt = (baseIndex, memberData) => {
         /** Helper function that does no checks on it's own!
          * (but probably expects memberData as array of <dataSize> length)
          * */
-        gl.bindBuffer(gl.UNIFORM_BUFFER, ubo);
+        gl.bindBuffer(gl.UNIFORM_BUFFER, result.ubo);
         const offset = baseIndex * opt.dataSize;
         gl.bufferSubData(gl.UNIFORM_BUFFER, offset, memberData);
     }
 
-    /**
-     * More Convenience: If the options define a memberMap, can update via
-     * updateMembers({
-     *     member1: [...],
-     *     member2: [...]
-     *     ... all members optional ...
-     * }
-     * if not defined in the memberMap, it will take their position
-     * but take caution, as JS' maps don't have a reliable order =P
-     */
-    // Works, but maybe unnecessary and/or questionable in performance (??)
-    /*
-    result.updateMembers = (dataByMember) => {
-        gl.bindBuffer(gl.UNIFORM_BUFFER, ubo);
-        let index = 0;
-        for (const key in dataByMember) {
-            const offset = result.members[key]?.offset
-                ?? constructMember(
-                    key, index * opt.dataSize, opt
-                );
-            gl.bufferSubData(gl.UNIFORM_BUFFER, offset, dataByMember[key]);
-            index++;
-        }
+    block.actualSize = gl.getActiveUniformBlockParameter(
+        program, block.index, gl.UNIFORM_BLOCK_DATA_SIZE
+    );
+    if (block.actualSize !== block.size) {
+        console.warn("[UBO][CUSTOM STRUCTS]",
+            "Block Sizes don't match; you said", block.size,
+            "WebGL thinks differently:", block.actualSize, "..?", result
+        );
     }
-     */
 
-    console.log("[UBO FOR CUSTOM STRUCTS]", opt.blockName, result);
+    console.info("[UBO]", opt.blockName, result);
 
     return result;
 
@@ -174,11 +154,12 @@ export function createUboForStruct(gl, program, opt) {
     }
 
     function constructMemberUpdater(key) {
-        const member = result.members[key];
         let changed;
         // the update object can contain all the fields, and
         // as an additional info { reset: false } (true by default)
         return (update) => {
+            const member = result.members[key];
+            console.log(result.members, key, member, update);
             changed = false;
             if (update.reset !== false) {
                 member.workdata.fill(0);
@@ -203,17 +184,25 @@ export function createUboForStruct(gl, program, opt) {
 }
 //
 // /**
-//  * @param structFields as a record {
-//  *     field: [start, size],
-//  *     ...
-//  * } whereas start and size are given in 32bit (i.e. number of floats / ints)
+//  * @param fields {Array<[string, [number, number]]>}
+//  *               whereas start and size are given in 32bit (i.e. number of floats / ints)
 //  */
 // function structSize(fields) {
-//     let baseAlignmentInFours = 1;
-//     for (const [field, [startInFours, sizeInFours]] of fields) {
-//         if (sizeInFours > baseAlignmentInFours) {
-//             baseAlignmentInFours = sizeInFours;
+//     const cursor = {
+//         baseAlignmentInFours: 1,
+//         counter: 0,
+//         subcounter: 0,
+//     };
+//     for (const [, [, sizeInFours]] of fields) {
+//         if (sizeInFours > cursor.baseAlignmentInFours) {
+//             cursor.baseAlignmentInFours = sizeInFours;
 //         }
-//
 //     }
+//     /*
+//     The Rules (GLSL Spec §7.6.2.2)
+//      -- Member alignment: offset = roundUp(offset, member.baseAlign)
+//      -- Struct baseAlign = max(all member baseAligns)
+//      -- Struct size = roundUp(total_offset, baseAlign)
+//      -- Next struct offset = roundUp(prev_end, prev.baseAlign) -> vec4 stride
+//      */
 // }
