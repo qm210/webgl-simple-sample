@@ -1,12 +1,9 @@
 import {startRenderLoop} from "../../webgl/render.js";
-import {
-    createFramebufferWithTexture,
-    updateResolution
-} from "../../webgl/helpers.js";
 
 import vertexShaderSource from "../../shaders/vertex.basicWithDifferentials.glsl"
 import fragmentShaderSource from "../../shaders/multipassPlayground.glsl";
 import {initBasicState} from "../common.js";
+import {updateResolution} from "../index.js";
 
 export default {
     title: "Multi-Pass Playground",

@@ -1,7 +1,7 @@
 import {
     createTextureFromImage,
-} from "../webgl/helpers.js";
-import {initBasicState} from "./common.js";
+    initBasicState,
+} from "./index.js";
 
 import vertexShaderSource from "../shaders/vertex.basic.glsl"
 import fragmentShaderSource from "../shaders/gol__stage1.glsl";

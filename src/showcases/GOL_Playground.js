@@ -2,9 +2,9 @@ import {
     createFramebufferWithTexture,
     createPingPongFramebuffersWithTexture,
     createTextureFromImage,
-    updateResolution
-} from "../webgl/helpers.js";
-import {initBasicState} from "./common.js";
+    updateResolution,
+    initBasicState,
+} from "./index.js";
 
 import vertexShaderSource from "../shaders/vertex.basic.glsl"
 import fragmentShaderSource from "../shaders/gol_playground.glsl";
@@ -142,7 +142,7 @@ function render(gl, state) {
     gl.uniform1i(loc.transitionFrames, state.transitionFrames);
 
     // Framebuffer Ping Pong - in eigene Struktur ausgelagert
-    [write, read] = state.gameBuffers.currentWriteReadOrder();
+    [write, read] = state.gameBuffers.currentWriteRead();
     state.gameBuffers.doPingPong();
 
     gl.uniform1i(state.location.iPassIndex, 0);

@@ -1,12 +1,12 @@
-import {startRenderLoop} from "../../webgl/render.js";
-import {initBasicState} from "../common.js";
 import fragmentShaderSource from "../../shaders/specific/nr4_clouds.glsl";
 import {
     clearFramebuffers,
     createPingPongFramebuffersWithTexture,
     evaluateReadData,
-    updateResolution
-} from "../../webgl/helpers.js";
+    updateResolution,
+    initBasicState,
+    startRenderLoop,
+} from "../index.js";
 
 export default {
     title: "NR4's Clouds",
@@ -299,7 +299,7 @@ function render(gl, state) {
     gl.activeTexture(gl.TEXTURE0);
     gl.uniform1i(state.location.prevImage, 0);
 
-    [write, read] = state.framebuffer.currentWriteReadOrder();
+    [write, read] = state.framebuffer.currentWriteRead();
     gl.uniform1i(state.location.passIndex, 0);
     if (state.readNextPixels) {
         state.readNextPixels = false;
@@ -324,7 +324,7 @@ function render(gl, state) {
         state.framebuffer.doPingPong();
     }
     gl.uniform1i(state.location.passIndex, 1);
-    [, read] = state.framebuffer.currentWriteReadOrder();
+    [, read] = state.framebuffer.currentWriteRead();
 
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.bindTexture(gl.TEXTURE_2D, read.texture);

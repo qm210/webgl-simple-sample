@@ -1,5 +1,9 @@
-import {initBasicState} from "./common.js";
-import {createPingPongFramebuffersWithTexture, createTextureFromImage, updateResolution} from "../webgl/helpers.js";
+import {
+    createPingPongFramebuffersWithTexture,
+    createTextureFromImage,
+    updateResolution,
+    initBasicState
+} from "./index.js";
 import fragmentShaderSource from "../shaders/gol_torus3d.glsl";
 import imageFloof from "../textures/goofy_floofy.png"
 import imageBG from "../textures/hubble_extreme_deep_field.jpg"
@@ -142,7 +146,7 @@ function render(gl, state) {
     state.doInit = false;
 
     // Framebuffer Ping Pong
-    let [write, read] = state.gameBuffers.currentWriteReadOrder();
+    let [write, read] = state.gameBuffers.currentWriteRead();
     state.gameBuffers.doPingPong();
 
     gl.uniform1i(loc.iPassIndex, 0);

@@ -4,11 +4,11 @@ import {createScrollStackOn, scrollToFirstInterestingLine} from "../events.js";
 import {deferExtendedAnalysis} from "../../glslCode/deferredAnalysis.js";
 import {shiftTime, startRenderLoop} from "../../webgl/render.js";
 import {setCanvasResolution} from "../../webgl/setup.js";
-import {updateResolution} from "../../webgl/helpers.js";
 import {addCanvasMouseInteraction} from "../mouse.js";
 import {createClipboardButtons, createPresetSelector, refreshPresets} from "../exchange.js";
 import {initializePresetStore} from "../database.js";
 import {addButton, addFreeRow, createInputElements, createResetAllButton} from "./controls/uniforms.js";
+import {updateResolutionInState} from "../../webgl/helpers/resolution.js";
 
 
 const generatePage = (glContext, elements, state, controls) => {
@@ -385,7 +385,7 @@ function addDisplayControls(elements, state, glContext) {
             width = Math.max(Math.round(width * factor), 1);
             height = Math.max(Math.round(height * factor), 1);
             setCanvasResolution(elements.canvas, glContext, width, height);
-            updateResolution(state, glContext);
+            updateResolutionInState(state, glContext);
             /*
             // TODO: must recreate framebuffers, but for that we need a short break from rendering
             whilePausingRendering(state, () => {

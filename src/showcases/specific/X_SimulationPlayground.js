@@ -1,8 +1,11 @@
-import {startRenderLoop} from "../../webgl/render.js";
-import {createFramebufferWithTexture, createTextureFromImage} from "../../webgl/helpers.js";
+import {
+    createFramebufferWithTexture,
+    createTextureFromImage,
+    startRenderLoop,
+    initBasicState,
+} from "../index.js";
 
 import fragmentShaderSource from "../../shaders/xSimulationPlayground.glsl";
-import {initBasicState} from "../common.js";
 import schnoergl210 from "../../textures/210_schnoerkel.png";
 
 export default {

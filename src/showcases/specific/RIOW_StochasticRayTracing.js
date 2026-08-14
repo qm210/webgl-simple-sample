@@ -1,6 +1,9 @@
+import {
+    startRenderLoop,
+    createFramebufferWithTexture,
+    takePingPongFramebuffers
+} from "../index.js";
 import standardSetup from "../retired/old3_SimpleGeometry.js";
-import {startRenderLoop} from "../../webgl/render.js";
-import {createFramebufferWithTexture, takePingPongFramebuffers} from "../../webgl/helpers.js";
 
 // dieses Beispiel basiert auf dem bekannten "Ray Tracing In One Weekend" von Peter Shirley
 // https://raytracing.github.io/books/RayTracingInOneWeekend.html#wherenext?

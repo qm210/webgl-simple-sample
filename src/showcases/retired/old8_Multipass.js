@@ -1,6 +1,8 @@
+import {
+    startRenderLoop,
+    createTextureFromImage,
+} from "../index.js";
 import standardSetup from "./old3_SimpleGeometry.js";
-import {startRenderLoop} from "../../webgl/render.js";
-import {createTextureFromImage} from "../../webgl/helpers.js";
 
 // multiPassMain.glsl ist fast wie texturesAdvanced.glsl
 // aber was ist anders?

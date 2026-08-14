@@ -145,7 +145,7 @@ function render(gl, state) {
     state.doInit = false;
 
     // Framebuffer Ping Pong
-    let [write, read] = state.gameBuffers.currentWriteReadOrder();
+    let [write, read] = state.gameBuffers.currentWriteRead();
     state.gameBuffers.doPingPong();
 
     gl.uniform1i(loc.iPassIndex, 0);

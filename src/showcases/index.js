@@ -16,7 +16,9 @@ export {
 export {
     createFramebufferWithTexture,
     createPingPongFramebuffersWithTexture,
-    halfFloatOptions
+    takePingPongFramebuffers,
+    halfFloatOptions,
+    clearFramebuffers,
 } from "../webgl/helpers/framebuffers.js";
 export {evaluateReadData} from "../app/algorithms.js";
 export {startRenderLoop} from "../app/playback.js";

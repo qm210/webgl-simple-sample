@@ -1,8 +1,9 @@
-import {startRenderLoop} from "../../webgl/render.js";
-import {createTextureFromImage} from "../../webgl/helpers.js";
+import {
+    createTextureFromImage,
+    compile, createStaticVertexBuffer, initVertices
+} from "../index.js";
 
 import originalFragmentShaderSource from "../../shaders/retired-2025/texturePlayground.glsl";
-import {compile, createStaticVertexBuffer, initVertices} from "../../webgl/setup.js";
 import vertexShaderSource from "../../shaders/vertex.basic.glsl";
 import image0 from "../../textures/frame.png";
 import image1 from "../../textures/hubble_extreme_deep_field.jpg";
