@@ -1,12 +1,10 @@
-import {startRenderLoop} from "../app/playback.js";
-import {initBasicState} from "./common.js";
-import {resolutionScaled, updateResolutionInState} from "../webgl/helpers/resolution.js";
-import {createTextureFromImage} from "../webgl/helpers/textures.js";
+import {startRenderLoop} from "../webgl/render.js";
 import {
     createFramebufferWithTexture,
-    createPingPongFramebuffersWithTexture,
-    halfFloatOptions
-} from "../webgl/helpers/framebuffers.js";
+    createPingPongFramebuffersWithTexture, createTextureFromImage, halfFloatOptions, resolutionScaled,
+    updateResolution
+} from "../webgl/helpers.js";
+import {initBasicState} from "./common.js";
 
 import vertexShaderSource from "../shaders/vertex.basicWithDifferentials.glsl"
 import fragmentShaderSource from "../shaders/fluidPlayground.glsl";
@@ -26,7 +24,7 @@ export default {
         }
 
         // TODO: Resizing the canvas DOES NOT scale the framebuffers / textures yet!! MUST DO
-        const {width, height} = updateResolutionInState(state, gl);
+        const {width, height} = updateResolution(state, gl);
 
         state.framebuffer = {
             image: createPingPongFramebuffersWithTexture(gl, {
@@ -99,8 +97,7 @@ export default {
                 wrapT: gl.REPEAT,
                 internalFormat: gl.RGB,
                 dataFormat: gl.RGB,
-                dataType: gl.UNSIGNED_BYTE,
-                returnMetaInformation: true,
+                dataType: gl.UNSIGNED_BYTE
             })
         };
         state.framebuffer.post.bloom.effect =
@@ -128,7 +125,7 @@ export default {
 
         // initialize the velocity framebuffer texture ([1] = pong = first read) to constant values
         // rg == vec2(0,0) should be default anyway, but why not make sure.
-        const [, initialVelocity] = state.framebuffer.fluid.velocity.currentWriteRead();
+        const [, initialVelocity] = state.framebuffer.fluid.velocity.currentWriteReadOrder();
         gl.bindFramebuffer(gl.FRAMEBUFFER, initialVelocity.fbo);
         gl.clearColor(0,0,0,0);
         gl.clear(gl.COLOR_BUFFER_BIT);
@@ -150,14 +147,8 @@ export default {
 
         return state;
     },
-    generateControls: (gl, state, elements) => ({
-        onRender: () => {
-            startRenderLoop(
-                state => render(gl, state),
-                state,
-                elements
-            );
-        },
+    generateControls: (state) => ({
+        renderLoop: render,
         toggles: [{
             label: () =>
                 state.doDebugRender === 1
@@ -405,6 +396,7 @@ const PASS = {
     PROCESS_FLUID_COLOR: 50,
     POST_PREFILTER_BLOOM: 70,
     POST_BLOOM_BLUR: 71,
+    POST_BLOOM_BLUR_FINISH: 72,
     POST_PREPARE_SUNRAYS_MASK: 80,
     POST_APPLY_SUNRAYS: 81,
     POST_BLUR_SUNRAYS: 82,
@@ -416,7 +408,7 @@ const SPAWN_EVERY_SECONDS = 2.5;
 
 function render(gl, state) {
     gl.uniform1f(state.location.iTime, state.time);
-    gl.uniform1f(state.location.deltaTime, state.play.dt);
+    gl.uniform1f(state.location.deltaTime, state.deltaTime);
     gl.uniform2fv(state.location.iResolution, state.resolution);
     gl.uniform1i(state.location.iFrame, state.iFrame);
     gl.uniform1f(state.location.iGamma, state.iGamma);
@@ -482,7 +474,7 @@ function render(gl, state) {
     /////////////
 
     gl.uniform1i(state.location.iPassIndex, PASS.INIT_VELOCITY);
-    [write, readPrevious] = state.framebuffer.fluid.velocity.currentWriteRead();
+    [write, readPrevious] = state.framebuffer.fluid.velocity.currentWriteReadOrder();
     gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo);
     gl.viewport(0, 0, write.width, write.height);
     gl.activeTexture(gl.TEXTURE0);
@@ -495,7 +487,7 @@ function render(gl, state) {
 
     gl.uniform1i(state.location.iPassIndex, PASS.INIT_IMAGE);
 
-    [write, readPrevious] = state.framebuffer.image.currentWriteRead();
+    [write, readPrevious] = state.framebuffer.image.currentWriteReadOrder();
     gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo);
     gl.viewport(0, 0, write.width, write.height);
     gl.activeTexture(gl.TEXTURE0);
@@ -508,14 +500,14 @@ function render(gl, state) {
 
     // Use Velocity to calculate a fresh Scalar: Curl
 
-    gl.uniform1i(state.location.iPassIndex, PASS.INIT_CURL_FROM_VELOCITY)
+    gl.uniform1i(state.location.iPassIndex, PASS.INIT_CURL_FROM_VELOCITY),
 
     // Note: need to unbind the curl texture itself when we want to write to its framebuffer.
     //       we _could_ clean this up right after the next step (or avoid a third texture unit altogether)
     //       but it _is_ convenient that we can just render the texture for debugging in the last pass.
 
     write = state.framebuffer.fluid.curl;
-    [, readVelocity] = state.framebuffer.fluid.velocity.currentWriteRead();
+    [, readVelocity] = state.framebuffer.fluid.velocity.currentWriteReadOrder();
     gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo);
     gl.viewport(0, 0, write.width, write.height);
     gl.activeTexture(gl.TEXTURE2);
@@ -530,7 +522,7 @@ function render(gl, state) {
     // Use Curl and Velocity to calculate new Velocity
     gl.uniform1i(state.location.iPassIndex, PASS.PROCESS_VELOCITY_VORTICITY);
 
-    [write, readVelocity] = state.framebuffer.fluid.velocity.currentWriteRead();
+    [write, readVelocity] = state.framebuffer.fluid.velocity.currentWriteReadOrder();
     const readCurl = state.framebuffer.fluid.curl;
     gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo);
     gl.viewport(0, 0, write.width, write.height);
@@ -549,7 +541,7 @@ function render(gl, state) {
     gl.uniform1i(state.location.iPassIndex, PASS.PROCESS_DIVERGENCE_FROM_VELOCITY);
 
     write = state.framebuffer.fluid.divergence;
-    [, readVelocity] = state.framebuffer.fluid.velocity.currentWriteRead();
+    [, readVelocity] = state.framebuffer.fluid.velocity.currentWriteReadOrder();
     gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo);
     gl.viewport(0, 0, write.width, write.height);
     gl.activeTexture(gl.TEXTURE1);
@@ -562,7 +554,7 @@ function render(gl, state) {
 
     gl.uniform1i(state.location.iPassIndex, PASS.INIT_PRESSURE);
 
-    [write, readPrevious] = state.framebuffer.fluid.pressure.currentWriteRead();
+    [write, readPrevious] = state.framebuffer.fluid.pressure.currentWriteReadOrder();
     gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo);
     gl.viewport(0, 0, write.width, write.height);
     gl.activeTexture(gl.TEXTURE5);
@@ -578,7 +570,7 @@ function render(gl, state) {
 
     gl.uniform2fv(state.location.texelSize, state.fluid.texelSize);
     for (let p = 0; p < state.pressureIterations; p++) {
-        [write, readPrevious] = state.framebuffer.fluid.pressure.currentWriteRead();
+        [write, readPrevious] = state.framebuffer.fluid.pressure.currentWriteReadOrder();
         gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo);
         gl.viewport(0, 0, write.width, write.height);
         gl.activeTexture(gl.TEXTURE5);
@@ -597,8 +589,8 @@ function render(gl, state) {
     // Use Pressure and Velocity to Subtract Gradients on Velocity - it seems.
     gl.uniform1i(state.location.iPassIndex, PASS.PROCESS_GRADIENT_SUBTRACTION);
 
-    const [, readPressure] = state.framebuffer.fluid.pressure.currentWriteRead();
-    [write, readVelocity] = state.framebuffer.fluid.velocity.currentWriteRead();
+    const [, readPressure] = state.framebuffer.fluid.pressure.currentWriteReadOrder();
+    [write, readVelocity] = state.framebuffer.fluid.velocity.currentWriteReadOrder();
     gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo);
     gl.viewport(0, 0, write.width, write.height);
     gl.activeTexture(gl.TEXTURE5);
@@ -614,7 +606,7 @@ function render(gl, state) {
     // Use Velocity as velocity AND as previous value to advect / dissipate Velocity
     gl.uniform1i(state.location.iPassIndex, PASS.PROCESS_ADVECTION);
 
-    [write, readPrevious] = state.framebuffer.fluid.velocity.currentWriteRead();
+    [write, readPrevious] = state.framebuffer.fluid.velocity.currentWriteReadOrder();
     readVelocity = readPrevious;
     gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo);
     gl.viewport(0, 0, write.width, write.height);
@@ -632,8 +624,8 @@ function render(gl, state) {
     // (Density, together with the somehow chosen start color, is what we actually see as colored cloud image)
     gl.uniform1i(state.location.iPassIndex, PASS.PROCESS_FLUID_COLOR);
 
-    [write, readPrevious] = state.framebuffer.image.currentWriteRead();
-    [, readVelocity] = state.framebuffer.fluid.velocity.currentWriteRead();
+    [write, readPrevious] = state.framebuffer.image.currentWriteReadOrder();
+    [, readVelocity] = state.framebuffer.fluid.velocity.currentWriteReadOrder();
     gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo);
     gl.viewport(0, 0, write.width, write.height);
     gl.activeTexture(gl.TEXTURE0);
@@ -651,7 +643,7 @@ function render(gl, state) {
     gl.uniform1i(state.location.iPassIndex, PASS.POST_PREFILTER_BLOOM);
     gl.disable(gl.BLEND);
 
-    [, readPrevious] = state.framebuffer.image.currentWriteRead();
+    [, readPrevious] = state.framebuffer.image.currentWriteReadOrder();
     write = state.framebuffer.post.bloom.effect;
     gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo);
     gl.activeTexture(gl.TEXTURE0);
@@ -701,7 +693,7 @@ function render(gl, state) {
 
     gl.uniform1i(state.location.iPassIndex, PASS.POST_PREPARE_SUNRAYS_MASK);
 
-    [write, readPrevious] = state.framebuffer.image.currentWriteRead();
+    [write, readPrevious] = state.framebuffer.image.currentWriteReadOrder();
     gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo);
     gl.viewport(0, 0, write.width, write.height);
     gl.activeTexture(gl.TEXTURE0);
@@ -717,7 +709,7 @@ function render(gl, state) {
     // the main step can now write on the sunrays framebuffer itself
 
     gl.uniform1i(state.location.iPassIndex, PASS.POST_APPLY_SUNRAYS);
-    [, readPrevious] = state.framebuffer.image.currentWriteRead();
+    [, readPrevious] = state.framebuffer.image.currentWriteReadOrder();
     write = state.framebuffer.post.sunrays.effect;
     gl.bindFramebuffer(gl.FRAMEBUFFER, write.fbo);
     gl.viewport(0, 0, write.width, write.height);
@@ -753,7 +745,7 @@ function render(gl, state) {
     /////////////
 
     gl.uniform1i(state.location.iPassIndex, PASS.RENDER_TO_SCREEN);
-    [, readPrevious] = state.framebuffer.image.currentWriteRead();
+    [, readPrevious] = state.framebuffer.image.currentWriteReadOrder();
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
     gl.activeTexture(gl.TEXTURE0);
@@ -769,7 +761,6 @@ function render(gl, state) {
         gl.drawingBufferHeight / state.framebuffer.post.bloom.dither.height,
     ];
     gl.uniform2fv(state.location.iBloomDitherScale, scale);
-
     // --> sunrays
     gl.activeTexture(gl.TEXTURE3); // see above, we kept that
     gl.bindTexture(gl.TEXTURE_2D, state.framebuffer.post.sunrays.effect.texture);

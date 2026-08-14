@@ -1,17 +1,30 @@
-import {createDiv, createElement, createSmallButton, createSpan} from "../dom.js";
+import {createDiv, createElement, createSpan} from "./dom.js";
+import {initMouseState} from "../mouse.js";
 
-export function sessionStoreControlState(state, control) {
-    if (state[control.name] === control.defaultValue) {
-        sessionStorage.removeItem(control.storageKey);
-    } else {
-        sessionStorage.setItem(
-            control.storageKey,
-            JSON.stringify(state[control.name])
-        );
+export function addButton({parent, onClick, onRightClick, title = "", className = "", style}) {
+    const button = document.createElement("button");
+    button.textContent = title;
+    if (className) {
+        button.className = className;
     }
+    if (style) {
+        for (const key in style) {
+            button.style[key] = style[key];
+        }
+    }
+    if (onClick) {
+      button.addEventListener("click", onClick);
+    }
+    if (onRightClick) {
+      button.addEventListener("contextmenu", onRightClick);
+    }
+    if (parent) {
+        parent.appendChild(button);
+    }
+    return button;
 }
 
-export function addFreeRow({parent, label, id, content, isSeparator}) {
+export const addFreeRow = ({parent, label, id, content, valuePrefix, isSeparator}) => {
     const name = createElement("label", label);
     const container = createDiv("", "free-row");
     const value = createDiv("", "value-label");
@@ -27,15 +40,25 @@ export function addFreeRow({parent, label, id, content, isSeparator}) {
     if (isSeparator) {
         container.classList.add("separator-row");
     } else {
+        if (valuePrefix) {
+            container.appendChild(
+                createDiv(valuePrefix, "value-label")
+            );
+        }
         container.appendChild(value);
     }
     if (content instanceof Array) {
-        content.forEach(c => container.appendChild(c));
+        content.forEach(child => {
+            if (!child) {
+                return;
+            }
+            container.appendChild(child);
+        });
     } else if (content) {
         container.appendChild(content);
     }
     return {container, name, value, content};
-}
+};
 
 export function createInputElements(state, control) {
 
@@ -60,9 +83,6 @@ export function createInputElements(state, control) {
             state[control.name] = [...control.defaultValue];
         }
     }
-    if (control.dim > 1 && !(state[control.name] instanceof Array)) {
-        state[control.name] = toVec(control.dim, state[control.name]);
-    }
 
     if (control.hidden) {
         return;
@@ -75,6 +95,7 @@ export function createInputElements(state, control) {
         return;
     }
 
+    control.dim = 1;
     const input = createInputControlElements(control);
     switch (control.type) {
         case "int":
@@ -83,8 +104,13 @@ export function createInputElements(state, control) {
         case "float":
             return asFloatInput(input, state, control);
         case "vec2":
+            control.dim = 2;
+            return asVecInput(input, state, control);
         case "vec3":
+            control.dim = 3;
+            return asVecInput(input, state, control);
         case "vec4":
+            control.dim = 4;
             return asVecInput(input, state, control);
         case "cursorInput":
             return asCursorInput(input, state, control);
@@ -96,6 +122,24 @@ export function createInputElements(state, control) {
             console.warn("Control type", control.type, "has no elements definition (yet)", control);
             return undefined;
     }
+}
+
+function sessionStoreControlState(state, control) {
+    if (state[control.name] === control.defaultValue) {
+        sessionStorage.removeItem(control.storageKey);
+    } else {
+        sessionStorage.setItem(
+            control.storageKey,
+            JSON.stringify(state[control.name])
+        );
+    }
+}
+
+export function createSmallButton(title, ...extraClasses) {
+    const button = document.createElement("button");
+    button.classList.add("small-button", ...extraClasses);
+    button.textContent = title;
+    return button;
 }
 
 const createInputControlElements = (control) => {
@@ -134,7 +178,8 @@ const createInputControlElements = (control) => {
 };
 
 export const asFloatInput = (elements, state, control) => {
-    prepareControls(control);
+    control.defaultValue ??= control.log ? 1 : 0;
+    elements.reset.textContent = `reset: ${control.defaultValue}`;
     asSlider(elements.control, control);
     updateSlider(elements, state, control, true);
 
@@ -159,8 +204,6 @@ export const asFloatInput = (elements, state, control) => {
             valueFrom(event, control)
         );
     });
-
-    elements.reset.textContent = `reset: ${control.defaultValue}`;
     elements.reset.addEventListener("click", () => {
         elements.updateValue(
             control.defaultValue
@@ -182,6 +225,15 @@ function valueFrom(event, control) {
 }
 
 function asSlider(inputElement, control) {
+    control.step ??=
+        control.min > 0 && control.min < 0.01
+            ? 0.001 : 0.01;
+    if (control.log && control.min > 0 && control.max > control.min) {
+        control.step = Math.min(control.min, 0.001);
+        control.min = Math.log10(control.min);
+        control.max = Math.log10(control.max);
+    }
+    control.digits = control.integer ? 0 : -Math.log10(control.step);
     if (control.min !== undefined) {
         inputElement.min = control.min;
     }
@@ -193,27 +245,6 @@ function asSlider(inputElement, control) {
     inputElement.style.flex = "1";
 }
 
-function prepareControls(control) {
-    if (!control.step) {
-        control.step = maybeMap(control.min, min =>
-            (min > 0 && min < 0.01) ? 0.001 : 0.01
-        );
-    }
-    if (control.log && control.min > 0 && control.max > control.min) {
-        control.step = maybeMap(control.min, m => Math.max(m, 0.001));
-        control.min = maybeMap(control.min, Math.log10);
-        control.max = maybeMap(control.max, Math.log10);
-    }
-    if (control.defaultValue === undefined) {
-        control.defaultValue = maybeMap(control.log, log => log ? 1 : 0);
-    }
-    control.digits = control.integer
-        ? 0
-        : control.step instanceof Array
-            ? -Math.log10(control.step[0])
-            : -Math.log10(control.step);
-}
-
 function updateSlider(elements, state, control, full = false, givenValue = undefined) {
     let value = givenValue ?? state[control.name];
     value = round(value, control.step);
@@ -221,12 +252,16 @@ function updateSlider(elements, state, control, full = false, givenValue = undef
         value = Math.log10(value);
     }
     if (full) {
-        const variableMin =
-            value === 0 ? -1 : value > 0 ? 0 : 2 * value;
-        const variableMax =
-            value === 0 ? +1 : value < 0 ? 0 : 2 * value;
-        elements.control.min = round(control.min ?? variableMin, control.step);
-        elements.control.max = round(control.max ?? variableMax, control.step);
+        const defaultMin =
+            value === 0 ? -1
+            : value > 0 ? 0
+            : 2 * value;
+        const defaultMax =
+            value === 0 ? +1
+            : value < 0 ? 0
+            : 2 * value;
+        elements.control.min = round(control.min ?? defaultMin, control.step);
+        elements.control.max = round(control.max ?? defaultMax, control.step);
         elements.min.textContent = toDigits(elements.control.min, control);
         elements.max.textContent = toDigits(elements.control.max, control);
     }
@@ -248,12 +283,6 @@ function round(value, step) {
     return Math.round(value / step) * step;
 }
 
-function maybeMap(value, func) {
-    return value instanceof Array
-        ? value.map(func)
-        : func(value);
-}
-
 const toVec = (dim, value) =>
     Array(dim).fill(null).map(_ => value);
 
@@ -261,20 +290,18 @@ const randomVec = (control) =>
     Array(control.dim).fill(null)
         .map((_, i) => {
             const random = (control.max[i] - control.min[i]) * Math.random();
-            const result = round(control.min[i] + random, control.step[i]);;
-            return result;
+            return round(control.min[i] + random, control.step[i]);
         });
 
 export const asVecInput = (elements, state, control) => {
-    prepareControls(control);
     elements.control = document.createElement("div");
     elements.control.style.gap = "0.25rem";
 
-    control.normScale = 1;
+    let maybeNormFactor = 1;
     if (control.normalize) {
         control.min = control.log ? 1e-6 : -1;
         control.max = 1;
-        control.normScale = 1 / (squareNorm(state[control.name]) || 1);
+        maybeNormFactor = 1 / (squareNorm(state[control.name]) || 1);
     }
 
     control.sameMin = !(control.min instanceof Array);
@@ -289,8 +316,9 @@ export const asVecInput = (elements, state, control) => {
     if (control.sameStep) {
         control.step = toVec(control.dim, control.step);
     }
-    if (!(control.defaultValue instanceof Array)) {
-        control.defaultValue = toVec(control.dim, control.defaultValue);
+    if (!(state[control.name] instanceof Array)) {
+        // fixes bad data from the Browser Storage
+        state[control.name] = toVec(control.dim, state[control.name]);
     }
 
     const sliders = [];
@@ -301,15 +329,14 @@ export const asVecInput = (elements, state, control) => {
             min: control.min[index],
             max: control.max[index],
             step: control.step[index],
-            log: control.log,
-            digits: control.digits,
+            debugOriginal: control,
         };
         const forComponent = createInputControlElements(componentControl);
         elementsForComponent.push(forComponent);
         sliders.push(forComponent.control);
         asSlider(forComponent.control, componentControl);
         control.step[index] ??= componentControl.step;
-        state[control.name][index] *= control.normScale;
+        state[control.name][index] *= maybeNormFactor;
         forComponent.control.value =
             updateSlider(forComponent, state, componentControl, true, state[control.name][index]);
         forComponent.control.addEventListener("input", event => {
@@ -444,7 +471,7 @@ const asCursorInput = (elements, state, control) => {
     }
 }
 
-export function updateVecLabel(labelElement, state, control) {
+function updateVecLabel(labelElement, state, control) {
     let value = state[control.name];
     if (value instanceof Array) {
         value = value
@@ -464,10 +491,11 @@ export const asBoolInput = (elements, state, control) => {
     }
     elements.control.id = `check.${control.name}`;
     elements.description =
-        createElement("label", control.description ?? "", "bool-description");
+        createElement("label", control.description, "bool-description");
     elements.description.htmlFor = elements.control.id;
 
     control.defaultValue ??= false;
+    control.onToggle ??= () => {};
     elements.reset.textContent = `reset`;
     if (control.group && !control.defaultValue) {
         elements.description.classList.add("extra-column");
@@ -493,6 +521,7 @@ export const asBoolInput = (elements, state, control) => {
         if (manuallyChanged) {
             state[control.name] = value;
             sessionStoreControlState(state, control);
+            control.onToggle(value);
         } else {
             value = !!state[control.name];
         }
@@ -529,3 +558,31 @@ export const asBoolInput = (elements, state, control) => {
     }
 };
 
+export function createResetAllButton(elements, state, controls) {
+    if (!controls.uniforms) {
+        return undefined;
+    }
+
+    const button = createSmallButton("Reset All", "right-align");
+    button.addEventListener("click", event => {
+        const allResetButtons = elements.controls.querySelectorAll("button.reset");
+        for (const button of allResetButtons) {
+            button.click();
+        }
+        for (const control of controls.uniforms) {
+            if (control.type === "cursorInput") {
+                state[control.name] = control.defaultValue;
+                const label = elements.uniforms[control.name].value;
+                updateVecLabel(label, state, control);
+                sessionStoreControlState(state, control);
+            }
+        }
+        if (controls.onReset) {
+            controls.onReset();
+        }
+        initMouseState(state, true);
+        state.resetSignal = true;
+        event.target.blur();
+    });
+    return button;
+}

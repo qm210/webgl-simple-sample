@@ -1,8 +1,7 @@
-import {startRenderLoop} from "../app/playback.js";
+import {startRenderLoop} from "../webgl/render.js";
 import {initBasicState} from "./common.js";
 import fragmentShaderSource from "../shaders/raytracingWithMultipass.glsl";
-import {createFramebufferWithTexture} from "../webgl/helpers/framebuffers.js";
-import {updateResolutionInState} from "../webgl/helpers/resolution.js";
+import {createFramebufferWithTexture, updateResolution} from "../webgl/helpers.js";
 
 export default {
     title: "Ray Tracing: First Steps",
@@ -18,7 +17,7 @@ export default {
         // innerhalb initBasicState() abgehandelt, war auf Dauer zuviel zu duplizieren.
         // Hier kommt also noch, was wir darüber hinaus initialisieren müssen (Texturen, Framebuffer, Sonstiges)
 
-        const {width, height} = updateResolutionInState(state, gl);
+        const {width, height} = updateResolution(state, gl);
         state.framebuffer = createFramebufferWithTexture(gl, {
             width,
             height,
@@ -35,14 +34,8 @@ export default {
 
         return state;
     },
-    generateControls: (gl, state, elements) => ({
-        onRender: () => {
-            startRenderLoop(
-                state => render(gl, state),
-                state,
-                elements
-            );
-        },
+    generateControls: (state) => ({
+        renderLoop: render,
         uniforms: [{
             type: "float",
             name: "iFieldOfViewDegrees",
@@ -242,7 +235,8 @@ export default {
             name: "useNormalizedFBM",
             defaultValue: false,
         }, {
-            separator: "Post-Processing: Tiefenunschärfe (Depth of Field)"
+            type: "separator",
+            title: "Post-Processing: Tiefenunschärfe (Depth of Field)"
         }, {
             type: "float",
             name: "iDofFocusDistance",
@@ -273,7 +267,8 @@ export default {
             defaultValue: false,
             description: ""
         }, {
-            separator: "Post-Processing: Chromatische Farbabweichung"
+            type: "separator",
+            title: "Post-Processing: Chromatische Farbabweichung"
         }, {
             type: "vec2",
             name: "iChromaticAbberation",
@@ -281,7 +276,8 @@ export default {
             min: -5,
             max: 5,
         }, {
-            separator: "Zur freien Verwendung..."
+            type: "separator",
+            title: "Zur freien Verwendung..."
         }, {
             type: "float",
             name: "iFree0",

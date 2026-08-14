@@ -1,10 +1,6 @@
-import {compile, initVertices} from "../webgl/setup.js";
-import {createStaticVertexBuffer} from "../webgl/helpers/setup.js";
+import {compile, createStaticVertexBuffer, initVertices} from "../webgl/setup.js";
+import {evaluateReadData, updateResolution} from "../webgl/helpers.js";
 import {REGEX} from "../glslCode/definitions.js";
-import {evaluateReadData} from "../app/algorithms.js";
-
-export {startRenderLoop} from "../app/playback.js";
-
 
 const basicVertexShaderSource =
     `#version 300 es
@@ -34,6 +30,8 @@ export function initBasicState(gl, sources) {
     }
 
     initVertices(gl, state, "aPosition");
+
+    updateResolution(state, gl);
 
     gl.clearColor(0.0, 0.0, 0.0, 1.0);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
@@ -99,19 +97,4 @@ export async function readPixelsAndEvaluate(gl, resolution, resultBuffer, target
         "- Reading took", readMillis, "ms,",
         " Total with numerical evaluation", totalMillis, "ms"
     );
-}
-
-export function readSomeLimits(gl) {
-    const limits = {};
-    limits.textureUnits = {
-        total: gl.getParameter(gl.MAX_COMBINED_TEXTURE_IMAGE_UNITS),
-        fragment: gl.getParameter(gl.MAX_TEXTURE_IMAGE_UNITS),
-        vertex: gl.getParameter(gl.MAX_VERTEX_TEXTURE_IMAGE_UNITS)
-    };
-    limits.uniforms = {
-        vectors: gl.getParameter(gl.MAX_FRAGMENT_UNIFORM_VECTORS),
-        components: gl.getParameter(gl.MAX_FRAGMENT_UNIFORM_COMPONENTS)
-    };
-    console.info("[SYSTEM LIMITS", limits);
-    return limits;
 }

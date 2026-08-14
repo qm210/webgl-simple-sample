@@ -1,7 +1,8 @@
-import {compile, initVertices} from "../../webgl/setup.js";
-import vertexShaderSource from "../../shaders/spring-2025/basic.vertex.glsl";
-import defaultFragmentShaderSource from "../../shaders/spring-2025/simpleGeometry.glsl";
-import {createStaticVertexBuffer} from "../../webgl/helpers/setup.js";
+import {compile, createStaticVertexBuffer, initVertices} from "../../webgl/setup.js";
+
+import vertexShaderSource from "../../shaders/retired-2025/basic.vertex.glsl";
+import defaultFragmentShaderSource from "../../shaders/retired-2025/simpleGeometry.glsl";
+import {startRenderLoop} from "../../webgl/render.js";
 
 export default {
     title: "Simple Geometry",

@@ -24,7 +24,7 @@
     height: calc(100vh - 2 * var(--page-pad));
     padding: var(--page-pad);
     gap: calc(0.5 * var(--page-pad));
-    overflow-x: hidden;
+    overflow: hidden;
 
     @media (max-width: 1300px) {
         flex-direction: column-reverse;
@@ -41,30 +41,7 @@
 
 #layout > #working-program {
     flex: 0;
-}
-
-#layout.no-code > #shaders {
-    display: none;
-}
-
-#layout.no-code > #working-program {
-    @media (min-width: 2000px) {
-        flex: 1;
-        display: grid;
-        grid-template:
-            "uniforms canvas"   auto
-            "uniforms controls" 1fr
-            / 2fr 1fr;
-        grid-column-gap: 2rem;
-    }
-}
-
-#layout.no-code canvas {
-    margin: 1rem;
-}
-
-#layout.no-code #control-frame {
-    gap: 2rem;
+    height: 100%;
 }
 
 #console {
@@ -110,7 +87,6 @@
 }
 
 #canvas-frame {
-    grid-area: canvas;
     display: flex;
     place-items: center;
     gap: 0.25rem;
@@ -130,20 +106,7 @@
     }
 }
 
-#control-frame {
-    grid-area: controls;
-    display: flex;
-    flex-direction: column;
-    align-items: stretch;
-    width: 100%;
-    padding-right: 8px;
-    overflow: hidden;
-    font-family: monospace;
-    font-size: var(--font-size-base);
-}
-
-#uniform-controls {
-    grid-area: uniforms;
+#shader-controls {
     flex: 1;
     display: grid;
     grid-template-columns: auto auto auto 1fr auto auto;
@@ -151,12 +114,16 @@
     padding-right: 8px;
     align-items: center;
     align-content: start;
-    overflow-x: hidden;
-    overflow-y: auto;
+    overflow: auto;
 }
 
-#control-frame > div,
-#uniform-controls > div {
+button.render-button {
+    width: 100%;
+    min-height: 3rem;
+    font-size: var(--font-size-large);
+}
+
+#shader-controls > div {
     display: flex;
     flex-direction: row;
     width: 100%;
@@ -164,32 +131,24 @@
     align-items: center;
 }
 
-#uniform-controls > div {
+#shader-controls > div {
     font-family: monospace;
     gap: 0.5rem;
 }
 
-#uniform-controls > div.value-label {
+#shader-controls > div.value-label {
     padding-left: 0.25rem;
     padding-right: 0.5rem;
     white-space: nowrap;
     font-size: var(--font-size-label);
 }
 
-#uniform-controls > div > label {
+#shader-controls > div > label {
     white-space: nowrap;
 }
 
-#uniform-controls .unused {
+#shader-controls .unused {
     opacity: 0.5;
-}
-
-.full-row {
-    display: flex;
-    flex-direction: row;
-    width: 100%;
-    justify-content: space-between;
-    align-items: center;
 }
 
 .free-row {
@@ -209,21 +168,15 @@
 .free-row button {
     padding: 0.25rem 0.5rem;
     flex: 1;
-    font-size: 0.9em;
 }
 
-.full-spacer {
+.free-row .full-spacer {
     flex: 1;
-    min-width: 0.5rem;
 }
 
-.spacer {
+.free-row .spacer {
     flex: 0;
     min-width: 1rem;
-}
-
-.spacer.half {
-    min-width: 0.5rem;
 }
 
 .free-row .right-align {
@@ -233,7 +186,7 @@
 }
 
 .small-button {
-    padding: 0.12em 0.5em 0.25em;
+    padding: 0.12em 0.5em 0.25em !important;
     margin: 0;
     font-size: smaller;
     white-space: nowrap;
@@ -245,8 +198,7 @@
 #display-controls {
     display: flex;
     flex-direction: column;
-    justify-content: space-around;
-    margin-left: auto;
+    justify-content: space-between;
     height: 100%;
 }
 
@@ -254,7 +206,6 @@
     display: flex;
     flex-direction: column;
     justify-content: center;
-    text-align: center;
     gap: 0.25rem;
 }
 
@@ -262,18 +213,6 @@
     padding: 0.2rem 0.5rem;
     font-size: x-large;
     font-family: monospace;
-}
-
-#display-controls button.icon-word {
-    padding: 0.2rem;
-    font-size: revert;
-    text-align: left;
-}
-
-#display-controls button.icon-word::first-letter {
-    padding: 0;
-    font-weight: bold;
-    text-align: left;
 }
 
 #display-controls label {
@@ -312,40 +251,7 @@
     white-space: nowrap;
 }
 
-#uniform-controls > .separator-row:has(+ .separator-row),
-#uniform-controls > .separator-row:last-child {
+#shader-controls > .separator-row:has(+ .separator-row),
+#shader-controls > .separator-row:last-child {
     display: none;
-}
-
-
-svg text.clickable {
-    font-weight: bold;
-    cursor: pointer;
-    text-anchor: middle;
-    user-select: none;
-}
-
-svg text.clickable.icon {
-    font-size: larger;
-    stroke-width: 1px;
-    stroke: currentcolor;
-    stroke-opacity: 0.34;
-}
-
-svg text.clickable:hover {
-    transform: translate(-1px, -1px);
-    stroke: purple;
-    text-shadow: 0 0 1px #ff00bb22;
-}
-
-svg text.clickable.icon:hover {
-    stroke: purple;
-    fill: blueviolet;
-    text-shadow: 0 0 1px #ff00bb44;
-}
-
-svg text.clickable:active {
-    stroke: #747bff;
-    text-shadow: 0 0 1px #747bff55;
-    transform: none;
 }

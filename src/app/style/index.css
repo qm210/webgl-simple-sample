@@ -63,7 +63,7 @@ button {
   padding: 0.6em 1.2em;
   font-size: 1em;
   font-weight: 500;
-  font-family: inherit;
+  font-family: system-ui;
   background-color: #1a1a1a;
   cursor: pointer;
   transition: 0.25s;
@@ -106,4 +106,9 @@ kbd {
   color: white;
   padding: 0.2em 0.4em;
   border-radius: 0.5em;
+}
+
+input[type="range" i] {
+  min-width: 5vw;
+  width: 100% !important;
 }
