@@ -1,5 +1,5 @@
-import {startRenderLoop} from "../app/playback.js";
-import {initBasicState} from "./common.js";
+import {initBasicState} from "./index.js";
+
 import fragmentShaderSource from "../shaders/raytracingFirstSteps.glsl";
 
 export default {

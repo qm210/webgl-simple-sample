@@ -1,5 +1,9 @@
-import {initBasicState} from "./common.js";
-import {createFramebufferWithTexture, createTextureFromImage, updateResolution} from "../webgl/helpers.js";
+import {
+    initBasicState,
+    createFramebufferWithTexture,
+    createTextureFromImage,
+    updateResolution,
+} from "./index.js";
 
 import vertexShaderSource from "../shaders/vertex.basic.glsl"
 import fragmentShaderSource from "../shaders/12_video_TestLab.glsl";

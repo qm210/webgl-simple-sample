@@ -35,7 +35,7 @@ export function asResolution({width, height, aspectRatio}) {
         height: Math.round(height ?? width / aspectRatio),
     };
 }
-
+/*
 export function resolutionScaled(newHeight, oldWidth, oldHeight) {
     const resolution = {
         width: Math.floor(newHeight * oldWidth / oldHeight),
@@ -45,7 +45,7 @@ export function resolutionScaled(newHeight, oldWidth, oldHeight) {
     resolution.texelSize = [1 / resolution.width, 1 / resolution.height];
     return resolution;
 }
-
+*/
 /**
  * @return {{width, height}}
  */
@@ -328,6 +328,7 @@ export function clearFramebuffers(gl, state) {
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
 }
 
+/*
 export async function evaluateReadData(buffer, mapFunc = undefined) {
     const isUnsignedByte = buffer instanceof Uint8Array;
     const asFloat = buffer instanceof Float32Array
@@ -388,3 +389,4 @@ export async function evaluateReadData(buffer, mapFunc = undefined) {
         return value.toFixed(3);
     }
 }
+*/

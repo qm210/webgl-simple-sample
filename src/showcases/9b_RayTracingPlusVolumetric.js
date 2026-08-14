@@ -1,5 +1,4 @@
-import {startRenderLoop} from "../app/playback.js";
-import {initBasicState} from "./common.js";
+import {initBasicState} from "./index.js";
 import fragmentShaderSource from "../shaders/raytracingPlusVolumetricMarching.glsl";
 
 export default {
@@ -20,7 +19,7 @@ export default {
 
         return state;
     },
-    generateControls: () => ({
+    generateControls: (state) => ({
         renderLoop: render,
         uniforms: [{
             type: "float",

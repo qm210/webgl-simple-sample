@@ -1,4 +1,7 @@
-import {createFramebufferWithTexture, updateResolution} from "../webgl/helpers.js";
+import {
+    createFramebufferWithTexture,
+    updateResolution,
+} from "./index.js";
 import {initBasicState} from "./common.js";
 
 import vertexShaderSource from "../shaders/vertex.basic.glsl"

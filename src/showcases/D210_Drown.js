@@ -1,14 +1,17 @@
+import {initBasicState} from "./common.js";
 import {
-    initBasicState,
-    startRenderLoop,
     createTextureFromImage,
     createTextureFromImageAsync,
-    resolutionScaled,
-    updateResolution,
+} from "../webgl/helpers/textures.js";
+import {resolutionScaled, updateResolutionInState} from "../webgl/helpers/resolution.js";
+import {createEventsManager, createGlyphInstanceManager} from "./D210_Drown.management.js";
+import {initAudioState} from "../app/audio.js";
+import {UniformAutomationizer} from "../app/automation.js";
+import {
     createFramebufferWithTexture,
     createPingPongFramebuffersWithTexture,
-    halfFloatOptions,
-} from "./index.js";
+    halfFloatOptions
+} from "../webgl/helpers/framebuffers.js";
 import ditherImage from "../textures/dither.png";
 import {
     createDataTexture,
@@ -16,21 +19,15 @@ import {
     createUboForArraylikeStruct
 } from "../webgl/helpers/advancedBuffers.js";
 import {compactifyGlyphJson, createGlyphDef, toAscii} from "../app/algorithms.js";
-import {createEventsManager, createGlyphInstanceManager} from "./D210_Dream.management.js";
-import {initAudioState} from "../app/audio.js";
-import {UniformAutomationizer} from "../app/automation.js";
 
 import vertexShaderSource from "../shaders/specific/dream210.vertex.glsl";
-import fragmentShaderSource from "../shaders/specific/dream210.fragment.glsl";
-// import fontMsdfPng from "../textures/dream210/SpicySale.msdf.png";
-// import fontMsdfJson from "../textures/dream210/SpicySale.msdf.json";
-import fontMsdfPng from "../textures/dream210/Kalnia-SemiBold.msdf.png";
-import fontMsdfJson from "../textures/dream210/Kalnia-SemiBold.msdf.json";
-// import fontMsdfPng from "../textures/dream210/Kalnia-Medium.msdf.png";
-// import fontMsdfJson from "../textures/dream210/Kalnia-Medium.msdf.json";
-import track from "/DreamySchilfester2024_3_2025-12-11_2128.ogg?url";
+import fragmentShaderSource from "../shaders/specific/drown210.fragment.glsl";
+import fontMsdfPng from "../textures/dream210/SpicySale.msdf.png";
+import fontMsdfJson from "../textures/dream210/SpicySale.msdf.json";
+// import track from "/DreamySchilfester2024_3_2025-12-11_2128.ogg?url";
 
 import monaAtlas from "../textures/dream210/mona/mona_atlas.png";
+import {startRenderLoop} from "../webgl/render.js";
 
 
 export default {
@@ -44,7 +41,7 @@ export default {
             return state;
         }
 
-        initAudioState(state, track);
+        // initAudioState(state, track);
 
         state.play.sync.bpm = 105;
         const syncBookmarks = [{
@@ -79,10 +76,12 @@ export default {
             }])
         ].flat();
         // UGLY HACK BECAUSE THIS FUNCTION GETS INITIALIZED LATER..!!
-        setTimeout(() =>
-            syncBookmarks.forEach(state.play.actions.setBookmark),
-            2000
-        );
+        // setTimeout(() =>
+        //     syncBookmarks.forEach(
+        //         state.play.actions.setBookmark
+        //     ),
+        //     2000
+        // );
 
         state.automationizer = new UniformAutomationizer(state);
 
@@ -92,7 +91,7 @@ export default {
 
         state.passIndex = 0;
 
-        const {width, height} = updateResolution(state, gl);
+        const {width, height} = updateResolutionInState(state, gl);
         state.opt = {
             image: {
                 width, height,
@@ -736,9 +735,9 @@ function render(gl, state) {
     gl.uniform1f(state.location.iFree8, state.iFree8);
     gl.uniform1f(state.location.iFree9, state.iFree9);
     gl.uniform4fv(state.location.colFree0, state.colFree0);
-    gl.uniform4fv(state.location.colFree1, state.colFree1);
-    gl.uniform4fv(state.location.colFree2, state.colFree2);
-    gl.uniform4fv(state.location.colFree3, state.colFree3);
+    // gl.uniform4fv(state.location.colFree1, state.colFree1);
+    // gl.uniform4fv(state.location.colFree2, state.colFree2);
+    // gl.uniform4fv(state.location.colFree3, state.colFree3);
 
     // SOURCE: NOISE BASE -
 

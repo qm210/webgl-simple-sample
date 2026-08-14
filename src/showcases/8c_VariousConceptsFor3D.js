@@ -1,5 +1,6 @@
+import {createTextureFromImage} from "./index.js";
 import {initBasicState} from "./common.js";
-import {createTextureFromImage} from "../webgl/helpers.js";
+
 import fragmentShaderSource from "../shaders/8c_raymarchingPlusVariousConcepts.glsl";
 import imageFrame from "../textures/frame.png";
 import imageSpace from "../textures/hubble_extreme_deep_field.jpg";

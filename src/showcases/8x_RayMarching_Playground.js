@@ -1,5 +1,10 @@
+import {
+    createPingPongFramebuffersWithTexture,
+    createTextureFromImage,
+    updateResolution
+} from "./index.js";
 import {initBasicState} from "./common.js";
-import {createPingPongFramebuffersWithTexture, createTextureFromImage, updateResolution} from "../webgl/helpers.js";
+
 import fragmentShaderSource from "../shaders/8x_raymarchingPlayground.glsl";
 import imageFloof from "../textures/goofy_floofy.png"
 import imageBG from "../textures/hubble_extreme_deep_field.jpg"

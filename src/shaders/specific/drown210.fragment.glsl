@@ -1,0 +1,1692 @@
+#version 300 es
+precision mediump float;
+out vec4 fragColor;
+in vec2 uv;
+in vec2 aspRatio;
+in vec2 texelSize;
+in vec2 texelL;
+in vec2 texelR;
+in vec2 texelU;
+in vec2 texelD;
+in vec2 st;
+in vec2 stL;
+in vec2 stR;
+in vec2 stU;
+in vec2 stD;
+in vec2 texSt;
+in vec2 uv2texSt;
+
+// SHARED
+uniform vec2 iResolution;
+uniform vec4 iMouseDrag;
+uniform float iTime;
+uniform int iFrame;
+uniform int passIndex;
+uniform int debugOption;
+// now all the fun
+uniform sampler2D texAccumulusClouds;
+uniform sampler2D texNoiseBase;
+// FLUID SIMULATION --> also, stimulation
+uniform sampler2D texColor;
+uniform sampler2D texVelocity;
+uniform sampler2D texCurl;
+uniform sampler2D texPressure;
+uniform sampler2D texDivergence;
+uniform sampler2D texPostSunrays;
+uniform sampler2D texPostBloom;
+uniform sampler2D texPostDither;
+uniform float deltaTime;
+uniform float iColorDissipation;
+uniform float iVelocityDissipation;
+uniform float iMaxInitialVelocity;
+uniform float iCurlStrength;
+uniform float iPressure;
+uniform int pressureIterations;
+// for post processing
+uniform float iBloomIntensity;
+uniform float iBloomThreshold;
+uniform float iBloomKnee;
+uniform float iBloomPreGain;
+uniform float iBloomDithering;
+uniform float iBloomOnMaster;
+uniform float iMasterBloomThreshold;
+uniform float iMasterBloomKnee;
+uniform float iMasterBloomPreGain;
+uniform float iSunraysWeight;
+uniform float iSunraysIterations;
+uniform float iSunraysDensity;
+uniform float iSunraysDecay;
+uniform float iSunraysExposure;
+uniform float iSunraysOnMaster;
+uniform float iGamma;
+uniform float iToneMapA;
+uniform float iToneMapB;
+uniform float iToneMapC;
+uniform float iToneMapD;
+uniform float iToneMapE;
+uniform float iToneMapMix;
+uniform float iVignetteInner;
+uniform float iVignetteOuter;
+uniform float iVignetteScale;
+// External Spawn -- outdated!!
+//uniform float iSpawnSeed;
+//uniform float iSpawnAge;
+uniform vec3 iSpawnColorHSV;
+uniform float iSpawnHueGradient;
+uniform float iSpawnRandomizeHue;
+// <--- FLUID
+
+uniform sampler2D texMonaAtlas;
+const vec4 atlasLTRB_210blocksy = vec4(0.567320261437908, 0.433192686357243, 0.605882352941176, 0.447257383966245);
+const vec4 atlasLTRB_city = vec4(0.000522875816993, 0.00056258790436, 0.51843137254902, 0.431645569620253);
+const vec4 atlasLTRB_210sketchy = vec4(0.364967320261438, 0.433192686357243, 0.565098039215686, 0.6028129395218);
+const vec4 atlasLTRB_dream = vec4(0.000522875816993, 0.433192686357243, 0.358169934640523, 0.665541490857947);
+const vec4 atlasLTRB_buildings = vec4(0.527843137254902, 0.00056258790436, 1.00849673202614, 0.372292545710267);
+const vec4 atlasLTRB_rainbow = vec4(0.606013071895425, 0.381153305203938, 0.999869281045752, 0.685372714486639);
+const vec4 atlasLTRB_stars = vec4(0.000522875816993, 0.676511954992968, 0.502875816993464, 1.);
+const vec4 atlasLTRB_bee = vec4(0.000522875816993, 0.7424753867791842, 0.03019607843137255, 0.7682137834036569);
+/*
+atlas: 7650 x 7110
+
+210: 4340, 3080 - 295, 100
+city: 4, 4 - 3962, 3065
+210_bunt_sketchy: 2792, 3080 - 1531, 1206
+dream_sketchy: 4, 3080 - 2736, 1652
+gebäude: 4038, 4 - 3677, 2643
+rainbow: 4636, 2710 - 3013, 2163
+sterne: 4, 4810 - 3843, 2383
+bee (in den sternen, wo sonst): 4, 5279 - 231, 5462
+*/
+
+// --> GLYPHS
+uniform sampler2D glyphTex;
+const int N_GLYPHS = 97;
+const int START_ASCII = 33; // 33 if charset begins with "!"
+
+struct GlyphDef {
+    vec2 center;
+    vec2 halfSize;
+    vec2 offset;
+    float advance;
+    float relAdvance;
+};
+uniform sampler2D glyphDefs;
+
+struct GlyphInstance {
+    int ascii;
+    float scale;
+    vec2 pos;
+    vec4 color;
+    vec4 glowColor;
+    vec4 glowArgs;
+    vec2 randAmp;
+    vec2 randFreq;
+    vec4 freeArgs;
+    // freeArgs.x: noiseBase mixing
+};
+uniform int lettersUsed;
+uniform sampler2D letterInstances;
+
+// --> CLOUDS
+uniform float iCloudYDisplacement;
+uniform float iCloudLayerDistance;
+uniform float iLightLayerDistance;
+uniform float iCloudSeed;
+uniform float iSkyQuetschung;
+uniform float iSampleCount;
+uniform int iCloudLayerCount;
+uniform int iLightLayerCount;
+uniform float iCloudTransmittanceThreshold;
+uniform float iCloudAbsorptionCoeff;
+uniform float iCloudBaseLuminance;
+uniform float iCloudAnisoScattering;
+uniform int iCloudNoiseCount;
+uniform int iLightNoiseCount;
+uniform vec3 iNoiseScale;
+uniform vec3 vecSunPosition;
+uniform vec3 vecSunColorYCH;
+uniform float iSunExponent;
+uniform float iCloudFieldOfView;
+uniform vec3 vecTone1;
+uniform vec3 vecTone2;
+uniform bool doAccumulate;
+uniform float iAccumulateMix;
+uniform bool useModdedFBM;
+uniform float iVariateCloudMarchSize;
+uniform float iVariateCloudMarchOffset;
+uniform float iVariateCloudMarchFree;
+// und allgemein Noise (vllt duplicates)
+uniform float iNoiseFreq;
+uniform float iNoiseLevel;
+uniform float iNoiseOffset;
+uniform float iCloudMorph;
+// und für die extra noise base
+uniform float iNoiseLevelA;
+uniform float iNoiseLevelC;
+uniform float iNoiseLevelAC;
+uniform float iNoiseScaleA;
+uniform float iNoiseScaleXT;
+uniform float iNoiseScaleC;
+uniform vec2 iOverallNoiseShift;
+uniform float iOverallScale;
+uniform float iOverallHashOffset;
+uniform float iNoiseMorphingA;
+uniform float iNoiseMorphingB;
+uniform float iNoiseMorphingC;
+uniform int iFractionalOctaves;
+uniform float iFractionalScale;
+uniform float iFractionalDecay;
+uniform float iTurbulenceNormFactor;
+uniform float iTurbulenceMeanOffset;
+uniform vec2 iMarbleSqueeze;
+uniform float iMarbleGranularity;
+uniform float iMarbleGradingExponent;
+uniform float iMarbleRange;
+uniform float iColorStrength;
+uniform vec3 iColorCosineFreq;
+uniform vec3 iColorCosinePhase;
+uniform float iBlurBlending;
+uniform int iBlurBlendMode;
+uniform float iHazeStrength;
+uniform float iHazeScale;
+uniform float iCaleidoscopeCurvature;
+uniform float iCaleidoscopeDivisions;
+uniform float iCaleidoscopeOpacity;
+uniform float iCaleidoscopeAberration;
+uniform float iCaleidoscopeAberration2;
+uniform vec2 iForceRingCenter;
+uniform float iForceRingRadius;
+uniform float iForceRingBorder;
+uniform float iForceRingStrength;
+uniform float iHappyWorld;
+
+uniform float iFree0;
+uniform float iFree1;
+uniform float iFree2;
+uniform float iFree3;
+uniform float iFree4;
+uniform float iFree5;
+uniform float iFree6;
+uniform float iFree7;
+uniform float iFree8;
+uniform float iFree9;
+uniform vec4 colFree0;
+uniform vec4 colFree1;
+uniform vec4 colFree2;
+uniform vec4 colFree3;
+
+struct Event {
+    // all floats because it makes WebGL state consistency... handlebar.
+    float type;
+    float subtype;
+    float timeStart;
+    float timeShift;
+    vec4 coords;
+    vec4 args;
+};
+layout(std140) uniform Events {
+    Event genericEvent;
+    Event fluidColorEvent;
+    Event fluidVelocityEvent;
+    Event fluidOtherEvent;
+};
+
+// global, because... probably some reason.
+vec4 fluidColor;
+vec2 fluidVelocity;
+vec3 sunColor;
+
+vec4 textureCenteredAt(sampler2D sampler, vec2 coord);
+vec4 monaAtlasCenteredAt(vec4 stLTRB, vec2 uv);
+
+const vec4 c = vec4(1, 0, -1, 0.5);
+const float pi = 3.141593;
+const float twoPi = 2. * pi;
+const float epsilon = 1.e-4;
+
+const float BPM = 105.;
+const float BPS = 105. / 60.;
+const float BEAT_SEC = 1. / BPS;
+const float BAR_SEC = 4. * BEAT_SEC;
+
+float bar;
+float beat(float time) {
+    return time * BPS;
+}
+float beatPhase(float time, float factor) {
+    return fract(factor * time / BEAT_SEC);
+}
+float beatPhase(float time) {
+    return beatPhase(time, 1.);
+}
+
+vec3 cmap_dream210(float t) {
+    return vec3(0.19, 0.24, 0.40)
+    +t*(vec3(3.42, -1.41, 4.13)
+    +t*(vec3(-21.95, 22.09, -7.62)
+    +t*(vec3(66.28, -51.41, -6.87)
+    +t*(vec3(-80.01, 41.55, 23.40)
+    +t*(vec3(33.21, -11.33, -11.18)
+    +t*(vec3(-0.94, 0.52, -1.86)
+    ))))));
+}
+
+vec3 cmap_dream210_shepard(float t) {
+    // cmap_dream210 is not continuous, but we can just mix in the lower end
+    // like it is done with the always-rising Shepard tone illusion
+    // NOTE: it is not that good. I think 3 phases would be good to try.
+    const float period = 1.; // CHECK: does that hold?
+    vec3 colL = cmap_dream210(mod(t, period));
+    vec3 colH = cmap_dream210(mod(t + 0.5 * period, period));
+    return mix(colL, colH, sin(twoPi * t / period) * 0.5 + 0.5);
+}
+
+vec3 colorPalette(float t) {
+    // noch eine flexible zur cmap_dream210() dazu
+    return vec3(0.5) + 0.5 * cos(iColorCosineFreq * t + iColorCosinePhase);
+}
+
+float max3(vec3 vec) {
+    return max(vec.x, max(vec.y, vec.z));
+}
+
+vec4 debugRedChannel(sampler2D tex, float scaling) {
+    float red = texture(tex, st).r * scaling;
+    return vec4(
+        max(0., red),
+        -min(0., red),
+        abs(red) > 1.,
+        1.
+    );
+}
+
+/////////////////////////
+
+float hash12(vec2 p)
+{
+    vec3 p3  = fract(vec3(p.xyx) * .1031);
+    p3 += dot(p3, p3.yzx + 33.33);
+    return fract((p3.x + p3.y) * p3.z);
+}
+
+vec2 hash22(vec2 p)
+{
+    p = p*mat2(127.1,311.7,269.5,183.3);
+    return -1.0 + 2.0 * fract(sin(p + .01 * iOverallHashOffset)*43758.5453123);
+}
+
+vec2 modulatedHash22(vec2 p, float phase) {
+    return sin(twoPi * hash22(p) + phase);
+}
+
+float modulatedPerlin2D(vec2 p, float phase) {
+    vec2 pi = floor(p);
+    vec2 pf = p - pi;
+    vec2 w = pf * pf * (3.-2.*pf);
+
+    float f00 = dot(modulatedHash22(pi+vec2(.0,.0), phase),pf-vec2(.0,.0));
+    float f01 = dot(modulatedHash22(pi+vec2(.0,1.), phase),pf-vec2(.0,1.));
+    float f10 = dot(modulatedHash22(pi+vec2(1.0,0.), phase),pf-vec2(1.0,0.));
+    float f11 = dot(modulatedHash22(pi+vec2(1.0,1.), phase),pf-vec2(1.0,1.));
+
+    float xm1 = mix(f00,f10,w.x);
+    float xm2 = mix(f01,f11,w.x);
+    float ym = mix(xm1,xm2,w.y);
+    return ym;
+}
+
+vec2 perlin2D(vec2 p) {
+    vec2 i = floor(p);
+    vec2 f = fract(p);
+
+    // Vectorized: 2 calls → 2 vec2 hashes
+    vec2 a = hash22(i + vec2(0.0, 0.0));
+    vec2 b = hash22(i + vec2(1.0, 0.0));
+    vec2 c = hash22(i + vec2(0.0, 1.0));
+    vec2 d = hash22(i + vec2(1.0, 1.0));
+
+    vec2 u = f * f * (3.0 - 2.0 * f);
+
+    return vec2(
+        mix(a.x, b.x, u.x) + (c.x - a.x)*u.y*(1.0-u.x) + (d.x - b.x)*u.x*u.y,
+        mix(a.y, b.y, u.x) + (c.y - a.y)*u.y*(1.0-u.x) + (d.y - b.y)*u.x*u.y
+    );
+}
+
+float noiseAbsoluteStackWithFurtherProcessing(vec2 p){
+    // übersetzt aus https://www.shadertoy.com/view/Md3SzB
+    // nur ein Beispiel für eine Anwendung nach weiteren Berechnungen
+    p *= iNoiseScaleC;
+    float s = modulatedPerlin2D(p, iNoiseMorphingC * iTime);
+    s = sin(s * iMarbleGranularity + p.x * iMarbleSqueeze.x + p.y * iMarbleSqueeze.y);
+    s = pow(0.5 + 0.5 * s, iMarbleGradingExponent);
+    return 1. + iMarbleRange * (s - 1.24);
+}
+
+float noiseStack(vec2 p){
+    float a = 1., s = 0., noise;
+    float sum = 0.;
+    for (int i=0; i < iFractionalOctaves; i++) {
+        noise = modulatedPerlin2D(iNoiseScaleA * p, iNoiseMorphingA * iTime);
+        sum += a * noise;
+
+        s += a;
+        p *= iFractionalScale;
+        a *= iFractionalDecay;
+    }
+    // Skalierung empirisch
+    return 0.5 + 0.5 * (sum / s * 1.5);
+}
+
+void noiseBase(in vec2 uv, inout vec3 col) {
+    uv *= iOverallScale;
+    uv += iOverallNoiseShift;
+    float noiseClouds = noiseStack(uv);
+    float noiseMarble = noiseAbsoluteStackWithFurtherProcessing(uv);
+    float totalNoise = (
+        iNoiseLevelA * noiseClouds +
+        iNoiseLevelAC * (noiseClouds * noiseMarble) +
+        iNoiseLevelC * noiseMarble
+    );
+    // totalNoise = clamp(totalNoise, 0., 1.);
+    col = mix(
+        vec3(totalNoise),
+        cmap_dream210(totalNoise * iColorStrength),
+        iColorStrength
+    );
+}
+
+// CLOUDS:
+
+vec3 hash31(float p)
+{
+    vec3 p3 = fract(vec3(p) * vec3(.1031, .1030, .0973));
+    p3 += dot(p3, p3.yzx+33.33);
+    return fract((p3.xxy+p3.yzz)*p3.zyx);
+}
+
+const mat3 rot1 = mat3(-0.37, 0.36, 0.85,-0.14,-0.93, 0.34,0.92, 0.01,0.4);
+const mat3 rot2 = mat3(-0.55,-0.39, 0.74, 0.33,-0.91,-0.24,0.77, 0.12,0.63);
+const mat3 rot3 = mat3(-0.71, 0.52,-0.47,-0.08,-0.72,-0.68,-0.7,-0.45,0.56);
+
+float xt95noise(vec3 m);
+float xt95mfnoise3(vec3 m) {
+    // scaled to produce a range like mfnoise3
+    return (
+    0.5333333 * xt95noise(m * rot1)
+    + 0.2666667 * xt95noise(2. * m * rot2)
+    + 0.1333333 * xt95noise(4. * m * rot3)
+    + 0.0666667 * xt95noise(8. * m)
+    ) * 1.62 - 0.005;
+}
+
+float hash(float n)
+{
+    return fract(sin(n)*43758.5453);
+}
+
+float xt95noise(in vec3 x)
+{
+    // match spatial scale of noise(), this seems like a factor of 2.6 .. 3.0:
+    x *= iNoiseScaleXT;
+
+    vec3 p = floor(x);
+    vec3 f = fract(x);
+    f = f*f*(3.0-2.0*f);
+    float n = p.x + p.y*57.0 + 113.0*p.z;
+
+    float res = mix(mix(mix( hash(n+  0.0), hash(n+  1.0),f.x),
+    mix( hash(n+ 57.0), hash(n+ 58.0),f.x),f.y),
+    mix(mix( hash(n+113.0), hash(n+114.0),f.x),
+    mix( hash(n+170.0), hash(n+171.0),f.x),f.y),f.z);
+
+    // also, match value range of output (I measured these values)
+    return 1.24 * res - 0.673;
+}
+
+const mat3 m = mat3(
+    0.00,  0.80,  0.60,
+    -0.80,  0.36, -0.48,
+    -0.60, -0.48,  0.64
+);
+
+float fbmB( vec3 p, int maxOctave)
+{
+    // fbmB() original: just use xt95noise
+    // fbmB() modded: use noise() for the base octave // <--
+    // fbmB() modded: use xt95mfnoise3() for the base octave //
+    float a = 0.5;
+    float b = 2.02;
+    float f = useModdedFBM ? xt95mfnoise3(p) : a * xt95noise(p);
+    for (int i = 0; i < maxOctave - 1; i++) {
+        p = m*p;
+        p *= b;
+        b += (i == 1 ? -0.02 : 0.01);
+        a *= 0.5;
+        f += a*xt95noise( p );
+    }
+    return 0.78 * f + 0.02;
+}
+
+// https://www.shadertoy.com/view/llGcDm
+int hilbert( ivec2 p, int level )
+{
+    int d = 0;
+    for( int k=0; k<level; k++ )
+    {
+        int n = level-k-1;
+        ivec2 r = (p>>n)&1;
+        d += ((3*r.x)^r.y) << (2*n);
+        if (r.y == 0) { if (r.x == 1) { p = (1<<n)-1-p; } p = p.yx; }
+    }
+    return d;
+}
+
+// https://www.shadertoy.com/view/llGcDm
+ivec2 ihilbert( int i, int level )
+{
+    ivec2 p = ivec2(0,0);
+    for( int k=0; k<level; k++ )
+    {
+        ivec2 r = ivec2( i>>1, i^(i>>1) ) & 1;
+        if (r.y==0) { if(r.x==1) { p = (1<<k) - 1 - p; } p = p.yx; }
+        p += r<<k;
+        i >>= 2;
+    }
+    return p;
+}
+
+// knuth's multiplicative hash function (fixed point R1)
+uint kmhf(uint x) {
+    return 0x80000000u + 2654435789u * x;
+}
+
+uint kmhf_inv(uint x) {
+    return (x - 0x80000000u) * 827988741u;
+}
+
+// mapping each pixel to a hilbert curve index, then taking a value from the Roberts R1 quasirandom sequence for it
+uint hilbert_r1_blue_noise(uvec2 p) {
+    #if 1
+    uint x = uint(hilbert( ivec2(p), 17 )) % (1u << 17u);
+    #else
+    //p = p ^ (p >> 1);
+    uint x = pack_morton2x16( p ) % (1u << 17u);
+    //x = x ^ (x >> 1);
+    x = inverse_gray32(x);
+    #endif
+    x = kmhf(x);
+    return x;
+
+    // based on http://extremelearning.com.au/unreasonable-effectiveness-of-quasirandom-sequences/
+    /*
+    const float phi = 2.0/(sqrt(5.0)+1.0);
+    return fract(0.5+phi*float(x));
+    */
+}
+
+// mapping each pixel to a hilbert curve index, then taking a value from the Roberts R1 quasirandom sequence for it
+float hilbert_r1_blue_noisef(uvec2 p) {
+    uint x = hilbert_r1_blue_noise(p);
+    #if 0
+    return float(x >> 24) / 256.0;
+    #else
+    return float(x) / 4294967296.0;
+    #endif
+}
+
+// inverse
+uvec2 hilbert_r1_blue_noise_inv(uint x) {
+    x = kmhf_inv(x);
+    return uvec2(ihilbert(int(x), 17));
+}
+
+vec3 cmap_pastel(float t) {
+    return vec3(0.92, 0.82, 0.68)
+    +t*(vec3(2.25, 0.95, -0.50)
+    +t*(vec3(-24.81, -10.77, -16.68)
+    +t*(vec3(123.32, 35.33, 88.11)
+    +t*(vec3(-289.81, -73.14, -176.72)
+    +t*(vec3(301.16, 79.71, 159.25)
+    +t*(vec3(-112.18, -32.13, -53.50)
+    ))))));
+}
+
+vec3 hsv2rgb(vec3 hsvColor) {
+    hsvColor.x /= 360.;
+    const vec4 K = vec4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
+    vec3 p = abs(fract(hsvColor.xxx + K.xyz) * 6.0 - K.www);
+    return hsvColor.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), hsvColor.y);
+}
+vec3 rgb2hsv(vec3 c) {
+    vec4 K = vec4(0.0, -1.0/3.0, 2.0/3.0, -1.0);
+    vec4 p = mix(vec4(c.bg, K.wz), vec4(c.gb, K.xy), step(c.b, c.g));
+    vec4 q = mix(vec4(p.xyw, c.r), vec4(c.r, p.yzx), step(p.x, c.r));
+
+    float d = q.x - min(q.w, q.y);
+    float e = 1e-10;
+    return vec3(abs(q.z + (q.w - q.y)/(6.0*d + e)), d/(q.x + e), q.x);
+}
+
+const mat3 rgb2yiq = mat3(
+0.299,  0.5959,  0.2215,
+0.587, -0.2746, -0.5227,
+0.114, -0.3213,  0.3112
+);
+
+vec3 rgbToYCh(vec3 rgb) {
+    vec3 yiq = rgb2yiq * rgb;
+    float C = length(yiq.yz);
+    float h = atan(yiq.z, yiq.y);
+    return vec3(yiq.x, C, h);
+}
+vec3 ychToRgb(float Y, float C, float h) {
+    float I = C * cos(h);
+    float Q = C * sin(h);
+    float R = Y + 0.9469 * I + 0.6236 * Q;
+    float G = Y - 0.2748 * I - 0.6357 * Q;
+    float B = Y - 1.1000 * I + 1.7000 * Q;
+    return clamp(vec3(R, G, B), 0.0, 1.0);
+}
+
+float luminance(vec3 color) {
+    return dot(color, vec3(0.299, 0.587, 0.114));
+}
+
+float luminance(vec4 color) {
+    return luminance(color.rgb) * color.a;
+}
+
+float fbm(vec3 p, bool forLight) {
+    p += 1.e4*hash31(iCloudSeed);// + iTime * 0.5 * vec3(1.0, -0.2, -1.0);
+    p *= iNoiseScale;
+    int maxOctave = forLight ? iLightNoiseCount : iCloudNoiseCount;
+    return fbmB(p, maxOctave);
+}
+
+float sdSphere(vec3 p, float radius) {
+    return length(p) - radius;
+}
+
+float scene(vec3 p, bool forLight) {
+    float y = p.y - 0.01 * iCloudYDisplacement + (0.08 * sin(iTime));
+    p.x += 0.1 * iTime;
+    p.y += 0.02 * iTime;
+    float f = fbm(p, forLight);
+    return f - y;
+}
+
+float BeersLaw(float dist, float absorption) {
+    return exp(-dist * absorption);
+}
+
+float lightmarch(vec3 position, vec3 rayDirection) {
+    vec3 lightDirection = normalize(vecSunPosition);
+    float totalDensity = 0.0;
+    // float marchSize = 0.03;
+    float marchSize = 0.01 * iLightLayerDistance;
+
+    for (int step = 0; step < iLightLayerCount; step++) {
+        position += lightDirection * marchSize * float(step);
+
+        float lightSample = scene(position, true);
+        totalDensity += lightSample;
+    }
+
+    float transmittance = BeersLaw(totalDensity, iCloudAbsorptionCoeff);
+    return transmittance;
+}
+
+float HenyeyGreenstein(float g, float mu) {
+    float gg = g * g;
+    return (1.0 / (4.0 * pi))  * ((1.0 - gg) / pow(1.0 + gg - 2.0 * g * mu, 1.5));
+}
+
+//float udQuad( vec3 p, vec3 a, vec3 b, vec3 c, vec3 d )
+//{
+//    vec3 ba = b - a; vec3 pa = p - a;
+//    vec3 cb = c - b; vec3 pb = p - b;
+//    vec3 dc = d - c; vec3 pc = p - c;
+//    vec3 ad = a - d; vec3 pd = p - d;
+//    vec3 nor = cross( ba, ad );
+//
+//    return sqrt(
+//    (sign(dot(cross(ba,nor),pa)) +
+//    sign(dot(cross(cb,nor),pb)) +
+//    sign(dot(cross(dc,nor),pc)) +
+//    sign(dot(cross(ad,nor),pd))<3.0)
+//    ?
+//    min( min( min(
+//    dot2(ba*clamp(dot(ba,pa)/dot2(ba),0.0,1.0)-pa),
+//    dot2(cb*clamp(dot(cb,pb)/dot2(cb),0.0,1.0)-pb) ),
+//    dot2(dc*clamp(dot(dc,pc)/dot2(dc),0.0,1.0)-pc) ),
+//    dot2(ad*clamp(dot(ad,pd)/dot2(ad),0.0,1.0)-pd) )
+//    :
+//    dot(nor,pa)*dot(nor,pa)/dot2(nor) );
+//}
+
+float opExtrusion( in vec3 p, in float sdf, in float h )
+{
+    vec2 w = vec2( sdf, abs(p.z) - h );
+    return min(max(w.x,w.y),0.0) + length(max(w,0.0));
+}
+
+float sdPlane( vec3 p, vec3 n, float h )
+{
+    // n must be normalized
+    return dot(p,n) + h;
+}
+
+vec3 raymarch(vec3 rayOrigin, vec3 rayDirection, float offset) {
+    float depth = 0.0;
+    float marchSize = .01 * iCloudLayerDistance; // * (-rayDirection.z);
+    depth += marchSize + 0.01 * iVariateCloudMarchOffset * offset;
+    vec3 p, pd;
+    vec3 sunDirection = normalize(vecSunPosition);
+    float phase = HenyeyGreenstein(iCloudAnisoScattering, dot(rayDirection, sunDirection));
+
+    float transmittance = 1.;
+    vec3 lightEnergy = c.yyy;
+    vec3 texEnergy = c.yyy;
+
+    for (int i = 0; i < iCloudLayerCount && transmittance > iCloudTransmittanceThreshold; i++) {
+        p = rayOrigin + depth * rayDirection;
+        float density = scene(p, false);
+
+        ///////
+        pd = p - rayOrigin;
+        float d = length(pd - vec3(2.5 * xt95noise(pd + 0.33 * iTime), 0, -3.)) - iFree3;
+        float sphereDensity = max(-d * 0.1, 0.);
+
+        d = sdPlane(pd, c.yyx, iFree1);
+        float planeDensity = smoothstep(0.1 * iFree2, 0., d) * (colFree0.a - 1.);
+        vec4 tex = c.yyyy;
+        if (planeDensity > 0.) {
+            // tex = textureCenteredAt(texMonaSchnoergel, uv * 1.3 + vec2(iVariateCloudMarchFree * 0.1 * offset, 0.4));
+            tex = monaAtlasCenteredAt(atlasLTRB_210blocksy,
+                // uv * 0.9 + vec2(iVariateCloudMarchFree * 0.1 * offset, 0.4)
+                pd.xy / (d * 0.5 + 0.1) / iFree7 + vec2(iFree8, iFree9)
+            );
+            planeDensity *= tex.a;
+            sphereDensity *= (1. - 0.9 * planeDensity);
+            density = max(density, planeDensity);
+            texEnergy += tex.rgb * tex.a;
+        }
+
+        //////
+
+        // We only draw the density if it's greater than 0
+        if (density > 0.0) {
+            float lightTransmittance = lightmarch(p, rayDirection);
+            float luminance = iCloudBaseLuminance + density * phase;
+
+            vec3 color = c.xyx;
+            color = mix(color, colFree0.rgb, planeDensity / (planeDensity + sphereDensity + 0.01));
+            // color = colFree0.rgb;
+            // color = mix(c.xxx, color, (sphereDensity) / density);
+
+            transmittance *= lightTransmittance;
+            lightEnergy += transmittance * luminance * color;
+        }
+
+        depth += marchSize;
+        marchSize += 0.01 * iVariateCloudMarchSize * offset;
+    }
+
+//    return mix(lightEnergy, texEnergy, iFree6);
+    return lightEnergy;
+}
+
+vec3 sunnySkyBackground() {
+    vec3 sunDirection = normalize(vecSunPosition);
+    vec3 rd = normalize(vec3(uv, -iCloudFieldOfView));
+    float sun = clamp(dot(sunDirection, rd), 0.0, 1.0);
+    vec3 color = cmap_pastel(fract(1. - .9 * pow(st.y, iSkyQuetschung)));
+    color += 0.5 * sunColor * pow(sun, iSunExponent);
+    return color;
+}
+
+void cloudImage(out vec3 color, vec2 uvShift, int sampleIndex) {
+    vec3 ro = vec3(0.0, 0.0, 5.0);
+    vec3 rd = normalize(vec3(uv - uvShift, -iCloudFieldOfView));
+
+    float blueNoise = hilbert_r1_blue_noisef(uvec2(uvShift.xy));
+    //texture2D(uBlueNoise, fragCoord.xy / 1024.0).r;
+     float offset = blueNoise + float(sampleIndex % 32) / sqrt(0.5);
+//    float offset = hash12(uvShift) + float(sampleIndex%32) / sqrt(0.5);
+    //    float offset = 0.;
+    // bring to [-0.5, 0.5]
+    offset = fract(offset + 0.5) - 0.5;
+
+    // Cloud
+    color = raymarch(ro, rd, offset);
+}
+
+void mainCloudImage(out vec4 fragColor) {
+    vec3 col = c.yyy;
+    const float gold = 2.4;
+    for (float i = .75; i < iSampleCount; i += 1.) {
+        float x = i / iSampleCount;
+        float p = gold * i;
+        vec2 z =
+            // Pixel size.
+            .5 * texelSize.y
+            // Vogel order.
+            * sqrt(x) * vec2(cos(p), sin(p))
+            // Adjust width for DOF effect.
+            * 1.
+            ;
+        x *= pi * pi;
+        int sampleIndex = int(i);
+        if (doAccumulate) {
+            sampleIndex += iFrame;
+        }
+        vec3 c1;
+        cloudImage(c1, z, sampleIndex);
+        c1 = sunColor * c1;
+        col += c1;
+    }
+    col /= iSampleCount;
+    fragColor.rgb = col;
+    fragColor.a = max3(col);
+    /*
+    // Grain.
+    vec2 uvn = fragCoord.xy/iResolution.xy;
+    fragColor += .01*iGrain * (2. * hash12(1.e4 * uvn) - 1.);
+
+    // Vignette.
+    uvn *=  1. - uvn.yx;
+    fragColor *= pow(uvn.x*uvn.y * 15., iVignette);
+    fragColor = clamp(fragColor, 0., 1.);*/
+}
+
+// GLYPHS:
+
+GlyphDef glyphDef(int row) {
+    GlyphDef def;
+    vec4 data = texelFetch(glyphDefs, ivec2(0, row), 0);
+    def.center = data.xy;
+    def.halfSize = data.zw;
+    data = texelFetch(glyphDefs, ivec2(1, row), 0);
+    def.offset = data.xy;
+    def.advance = data.z;
+    def.relAdvance = data.w;
+    return def;
+}
+
+float median(float r, float g, float b) {
+    return max(min(r, g), min(max(r, g), b));
+}
+
+float sdGlyph(in vec2 uv, int ascii, out vec2 size) {
+    int index = ascii - START_ASCII;
+    if (index < 0 || index >= N_GLYPHS) {
+        return 0.;
+    }
+//    GlyphDef g = glyphDef[index];
+    GlyphDef g = glyphDef(index);
+    size = 4. * aspRatio * g.halfSize;
+    vec2 anchor = uv - aspRatio * g.offset;
+    vec2 texCoord = g.center + clamp(uv2texSt * anchor, -g.halfSize, g.halfSize);
+    vec3 msd = texture(glyphTex, texCoord).rgb;
+
+    // unsure whether this really is the same understanding of SDF
+    // as we know it from everywhere. Tried to get as good as it got.
+    float sdf = 0.5 - median(msd.r, msd.g, msd.b);
+    return sdf;
+}
+
+float glyph(in vec2 uv, int ascii, out vec2 dims) {
+    float sdf = sdGlyph(uv, ascii, dims);
+    return clamp(-sdf/fwidth(sdf) + 0.5, 0., 1.0);
+}
+
+float sdRect(in vec2 uv, in vec2 size)
+{
+    vec2 q = abs(uv)-size;
+    return length(max(q,0.0)) + min(max(q.x,q.y),0.0);
+}
+
+GlyphInstance letterInstance(int row) {
+    GlyphInstance letter;
+    vec4 data = texelFetch(letterInstances, ivec2(0, row), 0);
+    letter.ascii = int(data.x);
+    letter.scale = data.y;
+    letter.pos = data.zw;
+    letter.color = texelFetch(letterInstances, ivec2(1, row), 0);
+    letter.glowColor = texelFetch(letterInstances, ivec2(2, row), 0);
+    letter.glowArgs = texelFetch(letterInstances, ivec2(3, row), 0);
+    data = texelFetch(letterInstances, ivec2(4, row), 0);
+    letter.randAmp = data.xy;
+    letter.randFreq = data.zw;
+    letter.freeArgs = texelFetch(letterInstances, ivec2(5, row), 0);
+    return letter;
+}
+
+void printGlyphInstances(in vec2 uv, inout vec4 col, in vec4 effectColor) {
+    vec2 pos, _unused;
+    float d;
+    for (int t = 0; t < lettersUsed; t++) {
+        GlyphInstance letter = letterInstance(t);
+        pos = letter.scale * (uv - letter.pos);
+        d = glyph(pos, letter.ascii, _unused);
+        d *= d * letter.color.a;
+        col.rgb = mix(col.rgb, effectColor.xyz, d);
+        // TODO: think about possibilities for effects -> here just "overwrite with other color"
+
+        #ifdef VISUALIZE_GLYPH_ANCHORS
+            d = length(vec2(pos.x, pos.y)) - 0.01;
+            d = smoothstep(0.01, 0., d);
+            col.rgb = mix(col.rgb, c.yxy, d);
+        #endif
+    }
+}
+
+void printGlyphInstances(in vec2 uv, inout vec4 col) {
+    vec4 noiseBase = texture(texNoiseBase, st);
+    vec4 baseColor;
+    vec2 pos, _unused;
+    float d, sd;
+    GlyphInstance letter;
+    vec4 sumColor = c.yyyy;
+    vec4 sumGlow = c.yyyy;
+    vec2 randOffset;
+    for (int t = 0; t < lettersUsed; t++) {
+        letter = letterInstance(t);
+        pos = uv - letter.pos;
+        randOffset = perlin2D(pos + letter.randFreq * iTime);
+        pos += letter.randAmp * (2. * randOffset - 1.);
+        // d = glyph(pos, letter.ascii, _unused);
+        sd = sdGlyph(letter.scale * pos, letter.ascii, _unused);
+        d = clamp(-sd/fwidth(sd) + 0.5, 0., 1.0);
+        baseColor = letter.color;
+        baseColor.a *= 1. + letter.freeArgs.x * noiseBase.a;
+        // baseColor = mix(letter.color, noiseBase, letter.freeArgs.x);
+        // baseColor.rgb *= letter.color.a;
+        // d *= d * baseColor.a;
+        sumColor = mix(sumColor, baseColor, d);
+        // sumColor = mix(baseColor, sumColor, smoothstep(0.1, 0., d));
+//        sumColor.rgb = mix(sumColor.rgb, baseColor.rgb, d);
+//        sumColor.a = 1.;
+
+        sd += letter.glowArgs.y;
+        vec4 glow = letter.glowColor * letter.glowArgs.x
+            * exp(-10. * letter.glowArgs.z * sd * sd);
+        glow.rgb = pow(glow.rgb, vec3(letter.glowArgs.w));
+        sumGlow += glow;
+    }
+    col.rgb = mix(
+        mix(col.rgb, sumColor.rgb, sumColor.a),
+        sumGlow.rgb,
+        sumGlow.a
+    );
+    col.a = mix(sumColor.a, 1., sumGlow.a);
+}
+
+/////
+
+vec4 simulateAdvection(sampler2D fieldTexture, float dissipationFactor, bool decayOnlyAlpha) {
+    fluidVelocity = texture(texVelocity, st).xy;
+    vec2 hasMovedTo = st - deltaTime * fluidVelocity * texelSize;
+    vec4 advectedValue = texture(fieldTexture, hasMovedTo);
+    float decay = 1.0 + dissipationFactor * deltaTime;
+    if (decayOnlyAlpha) {
+        advectedValue.a /= decay;
+    } else {
+        advectedValue /= decay;
+    }
+    return advectedValue;
+}
+
+vec3 makeSurplusWhite(vec3 color) {
+    vec3 surplus = max(c.yyy, color - 1.);
+    color = min(color, 1.);
+    color.r += surplus.g + surplus.b;
+    color.g += surplus.r + surplus.b;
+    color.b += surplus.r + surplus.g;
+    return clamp(color, 0., 1.);
+}
+
+float calcSunrays() {
+    vec2 stCursor = st;
+    vec2 cursorDir = st - 0.5;
+    cursorDir *= 1. / iSunraysIterations * iSunraysDensity;
+    float illumination = 1.;
+    float value = texture(texPostSunrays, stCursor).a;
+    for (float i=0.; i < iSunraysIterations; i+=1.) {
+        stCursor -= cursorDir;
+        float cursorVal = texture(texPostSunrays, stCursor).a;
+        value += cursorVal * illumination * iSunraysWeight;
+        illumination *= iSunraysDecay;
+    }
+    value *= iSunraysExposure;
+    return value;
+}
+
+/////
+
+float mask(vec2 st, vec4 limits) {
+    return step(limits.s, st.x) * step(st.x, limits.p)
+         * step(limits.t, st.y) * step(st.y, limits.q);
+}
+
+vec4 maskedTexture(sampler2D sampler, vec2 stTex, vec4 stLimits) {
+    // fix y and then force transparency outside the [stLimits.st, stLimits.pq] range
+    stTex.y = 1. - stTex.y;
+    vec4 color = texture(sampler, stTex);
+    color.a *= mask(stTex, stLimits);
+    return color;
+}
+
+vec4 textureCenteredAt(sampler2D sampler, vec2 uv) {
+    // puts the texture centered at (0,0),
+    // transform as usual uv -> rot * (uv - shift) / scale
+    vec2 texRes = vec2(textureSize(sampler, 0));
+    vec2 aspScale = texRes.y / texRes;
+    return maskedTexture(sampler, uv * aspScale + 0.5, c.yyxx);
+}
+
+vec4 textureToArea(sampler2D sampler, vec2 uv, vec4 rectBLTR) {
+    vec2 stTex = (uv - rectBLTR.st) / (rectBLTR.pq - rectBLTR.st);
+    return maskedTexture(sampler, stTex, c.yyxx);
+}
+
+vec4 textureToArea(sampler2D sampler, vec2 uv, vec4 uvLBRT, vec4 stLTRB) {
+    // to map the part stLTRB in texture coordinates to rectangle uvLBRT on screen
+    vec2 stTex = (uv - uvLBRT.st) / (uvLBRT.pq - uvLBRT.st);
+    // stTex = mix(stLTRB.st, stLTRB.pq, stTex);
+    // <-- stTex = stTex * (stLTRB.pq - stLTRB.st) + stLTRB.st;
+    return maskedTexture(sampler, stTex, stLTRB);
+}
+
+vec4 monaAtlasAt(vec4 stLTRB, vec2 uv, vec4 uvLBRT) {
+    // vec2 stTex = 2. * vec2(aspRatio.x, -1.) * uvScaled;
+    // vec2 stTex = (uvScaled - uvLBRT.st) / (uvLBRT.pq - uvLBRT.st);
+    vec2 targetUV = (uv - uvLBRT.st) / (uvLBRT.pq - uvLBRT.st);
+    vec2 stTex = mix(stLTRB.st, stLTRB.pq, targetUV);
+
+    // stTex = clamp(stTex, stLTRB.xy, stLTRB.zw);
+    // stTex = clamp(stTex, stLTRB.xy, stLTRB.zw);
+    stTex.y = stLTRB.y + stLTRB.w - stTex.y;
+    vec4 color = texture(texMonaAtlas, stTex);
+    color.a *= mask(stTex, stLTRB);
+    return color;
+    // vec2 stTex = (uv - uvLBRT.st) / (uvLBRT.pq - uvLBRT.st);
+    stTex = 0.5 * stTex + 0.5;
+    stTex.y = 1. - stTex.y;
+    color = texture(texMonaAtlas, stTex);
+    color.a *= mask(stTex, stLTRB);
+    return color;
+    // return maskedTexture(sampler, stTex, stLTRB);
+    // return textureToArea(texMonaAtlas, uv, uvLBRT, stLTRB);
+}
+
+vec4 monaAtlasCenteredAt(vec4 stLTRB, vec2 uv) {
+    float stAspRatio = (stLTRB.z - stLTRB.x) / (stLTRB.w - stLTRB.y);
+    vec4 uvLBRT = 0.5 * vec4(-stAspRatio, -1, stAspRatio, 1);
+    return monaAtlasAt(stLTRB, uv, uvLBRT);
+}
+
+vec4 monaAtlasFromEvent(vec4 stLTRB, vec4 eventCoords) {
+    return monaAtlasCenteredAt(
+        stLTRB,
+        eventCoords.z * (uv - eventCoords.xy)
+    ) * eventCoords.w;
+}
+
+vec3 overlay(vec3 src, vec3 dst) {
+    return mix(2.0 * src * dst, 1.0 - 2.0 * (1.0 - src) * (1.0 - dst), step(0.5, dst));
+}
+
+vec3 toneMap(vec3 col) {
+    // const float a = 2.51, b = 0.03, c = 2.43, d = 0.59, e = 0.14;
+    float a = iToneMapA;
+    float b = iToneMapB;
+    float c = iToneMapC;
+    float d = iToneMapD;
+    float e = iToneMapE;
+    vec3 mapped = clamp((col*(a*col + b)) / (col*(c*col + d) + e), 0.0, 1.0);
+    return mix(col, mapped, iToneMapMix);
+}
+
+float spiral(vec2 p, float arms, float speed) {
+    float r = length(p);
+    float a = atan(p.y, p.x);
+    float spiral = fract((a + 3.14) / 6.28 * arms + r * speed - iTime * 0.5);
+    return smoothstep(0.4, 0.6, spiral) * smoothstep(0.0, 0.1, r);
+}
+
+vec2 uvSwirled(vec2 center, float rClean, float rSwirled, float strength) {
+    float r = length(uv - center);
+    float theta = atan(uv.y, uv.x);
+    float ratio = smoothstep(rClean, rSwirled, r);
+    theta += strength * ratio * ratio;
+    return r * vec2(cos(theta), sin(theta));
+}
+
+vec2 stSwirled(vec2 st, float rClean, float rSwirled, float strength) {
+    vec2 st2uv = 2. * st - 1.;
+    return 0.5 * uvSwirled(st2uv, rClean, rSwirled, strength) + 0.5;
+}
+
+void starCaleidoscope(in vec2 uv, in vec2 center, inout vec3 col) {
+    vec2 rand = perlin2D(uv + iTime);
+    vec2 uv0 = uv - center;
+    float r = length(uv0);
+    float phase = beatPhase(iTime);
+    float wholeBeat = floor(beat(iTime));
+    float beatingTime = (wholeBeat + smoothstep(0., 1., phase)) * BEAT_SEC;
+    // two parameters: rotation speed and amount of beatingTime
+    float rotationSpeed = 1. + 11. * exp(-0.14 * iTime);
+    float beatyness = 1. - exp(-0.09 * iTime);
+    float rotation = mix(iTime, beatingTime, beatyness) * rotationSpeed;
+
+    // iCaleidoscopeDivisions ~ 3
+    // iCaleidoscopeCurvature ~ 1
+    // iCaleidoscopeAberration ~ 1
+    // float sign = int(4. * bar) % 2 == 0 ? 1. : -1.;
+    float aberration = iCaleidoscopeAberration
+        + iCaleidoscopeAberration2 * exp(-fract(4. * bar));
+    float theta = atan(uv0.y, uv0.x)
+        + log(iCaleidoscopeCurvature * r + 1.0) * iCaleidoscopeDivisions
+        + rotation;
+    center = 0.9 * vec2(cos(theta), sin(theta)) * r;
+    vec2 rotatedUV;
+    float angle = atan(uv0.y, uv0.x) * 3. + rotation;
+    r = length(uv - center);
+    rotatedUV = vec2(cos(angle), sin(angle)) * r * 0.5 + 0.5
+        + aberration * 0.01;
+    vec4 tex = monaAtlasCenteredAt(atlasLTRB_stars, 0.5 * rotatedUV);
+    col.rb = mix(col.rb, tex.rb, tex.a);
+
+    angle += exp(-r) * (0.06 + 0.1 * rand.x);
+    rotatedUV = vec2(cos(angle), sin(angle)) * r * 0.5 + 0.5
+        + aberration * (-0.01 + 0.01 * sin(0.2 * iTime));
+    tex = monaAtlasCenteredAt(atlasLTRB_stars, 0.5 * rotatedUV);
+    col.rg = mix(col.rg, tex.rg, tex.a);
+
+    angle += exp(-2. * r) * (0.06 + 0.5 * rand.y);
+    rotatedUV = vec2(cos(angle), sin(angle)) * r * 0.5 + 0.5;
+    tex = monaAtlasCenteredAt(atlasLTRB_stars, 0.5 * rotatedUV);
+    col.gb = mix(col.gb, tex.gb, tex.a);
+}
+
+vec2 forcePushedUV(in vec2 uv, in vec2 center, float ringRadius, float border, float forceStrength) {
+    vec2 uv0 = uv - center;
+    float r = length(uv0);
+    if (r > ringRadius - border) {
+        float force = smoothstep(ringRadius, ringRadius + border, r) * forceStrength;
+        float shifted = r + force * (r - ringRadius);
+        uv0 = normalize(uv0) * shifted;
+    }
+    return uv0;
+}
+
+void masterComposition(in vec2 uv) {
+    vec4 accumulus = texture(texAccumulusClouds, st);
+
+    vec4 tex;
+    float luma;
+    vec3 colAdd;
+    vec3 col = fragColor.rgb;
+
+//    uniform vec2 iForceRingCenter; c.yy
+//    uniform float iForceRingRadius; 0.54
+//    uniform float iForceRingBorder; 0.1
+//    uniform float iForceRingStrength; -1.28
+
+    vec2 uv0 = forcePushedUV(0.5 * uv,
+        iForceRingCenter, iForceRingRadius, iForceRingBorder, iForceRingStrength
+    );
+    tex = monaAtlasCenteredAt(atlasLTRB_city, uv0);
+
+
+//    const float introLength = 7.;
+//    float progress = clamp(iTime / introLength, 0., 1.);
+//    // float noise = noiseStack(uv * .25 + progress * 3.);
+//    float noise = length(modulatedPerlin2D(uv * 5., progress * 5.));
+////    fragColor = vec4(vec3(noise), 1.);
+////    return;
+//    float revealThreshold = iFree1; // 0.7 - progress * 0.7;
+//    float luma = luminance(col);
+//    float bloomMask = step(revealThreshold, luma * iFree5 + noise * iFree4);
+//    vec4 texL = monaAtlasCenteredAt(atlasLTRB_city, uv0 + texelL);
+//    vec4 texR = monaAtlasCenteredAt(atlasLTRB_city, uv0 + texelR);
+//    vec4 texU = monaAtlasCenteredAt(atlasLTRB_city, uv0 + texelU);
+//    vec4 texD = monaAtlasCenteredAt(atlasLTRB_city, uv0 + texelD);
+//    vec3 colAdd = texL.rgb * texL.a + texR.rgb * texR.a + texU.rgb * texU.a + texD.rgb * texD.a;
+//    float glow = luminance(colAdd) * 0.25 * progress * progress;
+//    col = tex.rgb * bloomMask + glow;
+//    fragColor.rgb = mix(fragColor.rgb, col, tex.a);
+    //fragColor.rgb = vec3(bloomMask);
+//    fragColor.a = 1.;
+//    return;
+    /*
+    // HSV cycle - a bit lame
+    vec3 hsv = rgb2hsv(tex.rgb);
+    hsv.x += 20. * iTime;
+    hsv.y = 0.6 + 0.4 * hsv.y;
+    hsv.z = 0.5 + 0.5 * hsv.z;
+    col = mix(col, hsv2rgb(hsv), tex.a);
+    */
+    luma = luminance(tex);
+    colAdd = cmap_dream210_shepard(iTime * luma);
+    colAdd = mix(vec3(luma), colAdd, 1.2) + 0.1;
+    colAdd = colAdd / (1.0 + colAdd) * (1. + iFree5);
+    col = mix(col, colAdd, tex.a);
+    // fragColor = vec4(col, 1.);
+    // return;
+
+    // mostly legacy... and not the good kind.
+    vec4 noiseBase = texture(texNoiseBase, st);
+    vec2 rand = perlin2D(uv);
+//    noiseBase = texture(texNoiseBase, stSwirled(st, 0.3 * rand.x, 0.8 * rand.y, iFree4));
+
+    vec3 colSad = col;
+
+    col = sunnySkyBackground() * (1. + iNoiseLevel * noiseBase.rgb);
+    col = mix(col, accumulus.rgb, accumulus.a);
+
+    float swirl = 4. + 0.2 * 4. * BEAT_SEC - 0.2 * max(0., iTime - 7. * BAR_SEC);
+    const float scale = 0.4;
+    tex = monaAtlasCenteredAt(atlasLTRB_buildings, scale * uvSwirled(0.1 * rand, 0.2, .8, swirl) - 0.25 * c.xy);
+    tex.a *= 1. - pow(accumulus.a, 0.1);
+    tex.a *= 0.6;
+    col = mix(col, overlay(col, tex.rgb), tex.a);
+
+    rand = perlin2D(uv + 4.);
+    tex = monaAtlasCenteredAt(atlasLTRB_buildings, scale * uvSwirled(0.1 * rand, 0.2, .8, swirl) + 0.25 * c.xy);
+    col = mix(col, overlay(col, tex.rgb), tex.a);
+
+    col = clamp(col, 0., 1.);
+
+    fluidColor = texture(texColor, st);
+    col = mix(col, fluidColor.rgb, fluidColor.a);
+
+//    tex = monaAtlasCenteredAt(atlasLTRB_210sketchy, uv);
+//    col = mix(col, tex.rgb, tex.a);
+
+    tex = monaAtlasCenteredAt(atlasLTRB_rainbow, 0.29 * (uv - vec2(-0.1, 0.2)));
+      tex.rgb *= noiseBase.r;
+    col = mix(col, tex.rgb, tex.a);
+
+    col = mix(colSad, col, iHappyWorld);
+
+    colAdd = col;
+    vec2 uv2 = vec2(uv.x, uv.y + 0.5 * sin(1.26 * uv.x + 0.1 * iTime));
+    starCaleidoscope(uv2, c.yy, colAdd);
+    col = mix(col, colAdd, iCaleidoscopeOpacity);
+
+    fragColor.rgb = col;
+
+    if (debugOption == 1) {
+        printGlyphInstances(uv, fragColor); // , noiseBase);
+    }
+
+    col = fragColor.rgb;
+    col = toneMap(col);
+    col = pow(col, vec3(1. / iGamma));
+
+    float vignetteShade = dot(st - 0.5, st - 0.5) * iVignetteScale;
+    col *= smoothstep(iVignetteInner, iVignetteOuter, vignetteShade);
+
+    fragColor.rgb = col;
+    fragColor.a = 1.;
+}
+
+float noiseFromDitherTexture() {
+    // textureSize(texPostDither, 0) if we ever take another texture...
+    const vec2 ditherTexSize = vec2(64.);
+    vec2 scale = iResolution / ditherTexSize;
+    float dither = texture(texPostDither, st * scale).r;
+    dither = dither * 2. - 1.;
+    return dither;
+}
+
+// Try Nomenclature:
+// (I skipped the PASS_ but chose to keep the _)
+// _INIT_ = Write new data from different inputs on a texture
+// _PROCESS_ = connected quantities are transformed as a a whole,
+//             maybe with the 2nd word === the target of that pass
+// _CALC_ = A rather pure calculation from another texture, i.e.
+//          where an INIT is from rather few data, and while PROCESS
+//          is often a heavier thing, CALC is the straightaway stuff.
+// _RENDER_ = Write some image data as a final step in its path
+//          (no content transformation of similar fashion follows),
+//          expected to be a bit more complex than _INIT_
+// _POST_ = a PROCESS that works on RENDER results mostly for aesthetics,
+//        or otherwise technologically distinct from the render method.
+//
+// Also, loose grouped, in sections of 10, but just for the fun of it.
+#define _INIT_FLUID_COLOR 1
+#define _INIT_VELOCITY 2
+#define _INIT_PRESSURE_PASS 3
+#define _CALC_CURL_FROM_VELOCITY 4
+#define _PROCESS_VELOCITY_BY_CURL 10
+#define _CALC_DIVERGENCE_FROM_VELOCITY 11
+#define _PROCESS_PRESSURE 12
+#define _PROCESS_GRADIENT_SUBTRACTION 13
+#define _PROCESS_ADVECTION 14
+#define _PROCESS_FLUID_COLOR 19
+#define _POST_BLOOM_PREFILTER 20
+#define _POST_BLOOM_BLUR 21
+#define _POST_SUNRAYS_CALC_MASK 30
+#define _POST_SUNRAYS_CALC 31
+#define _POST_SUNRAYS_BLUR 32
+#define _RENDER_FLUID 40
+//#define _INIT_GLYPH_INSTANCES 88
+#define _RENDER_CLOUDS 60
+#define _RENDER_NOISE_BASE 70
+#define _MASTER_COMPOSE 90
+#define _MASTER_BLOOM_PREFILTER 91
+#define _MASTER_EXTRA_BLUR 92
+#define _MASTER_FINAL_RENDERING 93
+
+#define ENABLE_SUNRAYS 1
+#define ENABLE_SUNRAYS_ON_MASTER 1
+#define ENABLE_BLOOM 1
+#define ENABLE_BLOOM_ON_MASTER 1
+
+#define EVENT_ADD_TEXTURE 1
+#define EVENT_STIR_FLUID 2
+#define EVENT_CLEAR_FLUID 4
+#define EVENT_DRAIN 6
+#define EVENT_DRAW_TEXT 7
+
+vec3 postprocessFluid(inout vec4 color, bool applySunrays, bool applyBloom, float bloomFactor, float sunraysFactor) {
+    const vec3 bg = c.yyy;
+    vec3 col = makeSurplusWhite(color.rgb);
+    col = color.rgb + (1. - color.a) * bg;
+
+    float sunrays = 1.;
+    if (applySunrays) {
+        sunrays = texture(texPostSunrays, st).r;
+        sunrays = mix(1., sunrays, sunraysFactor);
+        col *= sunrays;
+    }
+    if (applyBloom) {
+        vec3 bloom = texture(texPostBloom, st).rgb;
+        bloom *= iBloomIntensity;
+        bloom *= sunrays;
+        if (iBloomDithering > 0.) {
+            bloom += noiseFromDitherTexture() * iBloomDithering / 255.;
+//            const vec2 ditherTexSize = vec2(64.);// textureSize(texPostDither, 0)
+//            vec2 scale = iResolution / ditherTexSize;
+//            float dither = texture(texPostDither, st * scale).r;
+//            dither = dither * 2. - 1.;
+//            bloom += dither * iBloomDithering / 255.;
+        }
+        bloom = pow(max(bloom, c.yyy), vec3(0.4167));
+        bloom = max(1.055 * bloom - 0.055, c.yyy);
+        col += bloom * bloomFactor;
+    }
+    return col;
+}
+
+vec3 bloomPrefilter(float threshold, float kneeWidth, float pregain) {
+    // for now, always takes "texColor" as a source
+    vec3 col = texture(texColor, st).rgb;
+    float knee = threshold * kneeWidth + 1.e-4;
+    vec3 curve = vec3(threshold - knee, knee * 2., 0.25 / knee);
+    float br = pregain * max3(col);
+    float rq = clamp(br - curve.x, 0., curve.y);
+    rq = curve.z * rq * rq;
+    col *= max(rq, br - threshold) / max(br, 1.e-4);
+    return col;
+}
+
+vec4 simple1DGaussBlur(sampler2D texSource) {
+    const float centerWeight = 0.294117;
+    float weight = (1. - centerWeight) * 0.5;
+    return (
+        centerWeight * texture(texSource, st)
+        + weight * texture(texSource, st - 1.333 * texelSize)
+        + weight * texture(texSource, st + 1.333 * texelSize)
+    );
+}
+
+#define SCREEN_BLEND 1
+#define SOFT_LIGHT_BLEND 2
+#define LUMINANCE_AWARE_BLEND 3
+#define PASTEL_DIFFUSION_BLEND 4
+
+vec3 applyBlending(int modeIndex, vec4 baseColor, vec4 blendColor, float amount) {
+    // these are especially nice for mixing a blurred image into its original :)
+    vec3 base = baseColor.rgb * baseColor.a;
+    vec3 blend = blendColor.rgb * blendColor.a * amount;
+    switch (modeIndex) {
+        default:
+            return mix(baseColor, blendColor, amount).rgb;
+        case SCREEN_BLEND:
+            return 1. - (1. - base) * (1. - blend);
+        case SOFT_LIGHT_BLEND:
+            vec3 light = 2.0 * blend * base;
+            vec3 dark = 1.0 - 2.0 * (1.0 - blend) * (1.0 - base);
+            return mix(dark, light, step(0.5, blend));
+        case LUMINANCE_AWARE_BLEND:
+            float lumaOrig = luminance(base);
+            float glowMask = smoothstep(0.3, 0.8, luminance(blend));
+            return base + blend * glowMask * 1.5;
+        case PASTEL_DIFFUSION_BLEND:
+            vec3 pastel = pow(base, vec3(0.8));
+            vec3 glow = blend * 0.6;
+            return mix(pastel, glow, 0.4);
+    }
+}
+
+void finalEndboss() {
+    vec4 blurred = texture(texColor, st);
+    vec4 unblurred = texture(texPostSunrays, st);
+    // <-- we just re-used that sampler2D, it does not contain sunrays here. hopefully.
+
+            // Mixing Methods?
+            // - Linear Blend with e.g. a ratio 1.23 is nice:
+//             fragColor = mix(fragColor, blurred, iFree6);
+            // - Screen Blend
+//            fragColor.rgb = 1. - (1. - unblurred.rgb) * (1. - blurred.rgb);
+//            fragColor.a = mix(unblurred.a, 1., blurred.a);
+
+    // hm. are these broken? check again, simply on the pure RGB (A is already 1):
+
+    vec3 col = applyBlending(iBlurBlendMode, unblurred, blurred, iBlurBlending);
+
+    // better haze:
+    float rHaze = length(uv); // always centered for now
+    const vec3 hazeColor = vec3(0.9, 0.96, 1.);
+    //float hazeAmount = exp(-rHaze * (0.5 - 0.5 * cos(20. * rHaze - 10. * iTime)) * iHazeScale) * iHazeStrength;
+    float hazeAmount = exp(-rHaze * iHazeScale) * iHazeStrength;
+    // * smoothstep(2.52, 2.5, bar);
+    fragColor.rgb = col + hazeColor * hazeAmount;
+    // float beatFlicker = beatPhase(max(iTime - 7. * BAR_SEC, 0.), 4.);
+    fragColor.rgb = postprocessFluid(fragColor,
+        ENABLE_SUNRAYS_ON_MASTER == 1,
+        ENABLE_BLOOM_ON_MASTER == 1,
+        iBloomOnMaster,
+        iSunraysOnMaster
+    );
+    fragColor.a = 1.;
+}
+
+void main() {
+    // "Hello Shadertoy" as time-variable alarm signal (you shouldn't want this.)
+//    vec4 debugColor = vec4(0.5 + 0.5*cos(iTime+uv.xyx+vec3(0,2,4)), 1.);
+//    fragColor = debugColor;
+//    return;
+
+    bar = 0.25 * beat(iTime);
+
+    int colorEvent = int(fluidColorEvent.type);
+    int velocityEvent = int(fluidVelocityEvent.type);
+    int otherEvent = int(fluidOtherEvent.type);
+
+    float d, velL, velR, velU, velD, pL, pR, pU, pD, div;
+    vec4 texL, texR, texU, texD;
+    vec3 col;
+
+    switch (passIndex) {
+        case _RENDER_CLOUDS:
+            sunColor = ychToRgb(vecSunColorYCH.x, vecSunColorYCH.y, vecSunColorYCH.z);
+            mainCloudImage(fragColor);
+            if (doAccumulate && iFrame > 0) {
+                vec4 accumulus = texture(texAccumulusClouds, st);
+                fragColor.rgb = mix(fragColor.rgb, accumulus.rgb, iAccumulateMix);
+            }
+            if (debugOption == 2) {
+                fragColor.a = 1.;
+            }
+            return;
+        case _RENDER_NOISE_BASE:
+            noiseBase(uv, fragColor.rgb);
+            fragColor.a = max3(fragColor.rgb);
+            return;
+
+//        case _INIT_GLYPH_INSTANCES:
+//            fragColor = c.yyyy;
+//            printGlyphInstances(uv, fragColor);
+//            return;
+//
+        case _INIT_FLUID_COLOR: {
+            if (iFrame == 0) {
+                fragColor = c.xxxy;
+                return;
+            }
+            if (colorEvent == EVENT_CLEAR_FLUID) {
+                fragColor = fluidColorEvent.coords;
+                return;
+            }
+            fluidColor = texture(texColor, st);
+            vec4 spawnColor = vec4(0.); // TODO
+            if (colorEvent == EVENT_DRAW_TEXT) {
+                fragColor = c.yyyy;
+                printGlyphInstances(uv, spawnColor);
+            } else if (colorEvent == EVENT_ADD_TEXTURE) {
+                spawnColor = monaAtlasFromEvent(atlasLTRB_210sketchy, fluidColorEvent.coords);
+            }
+            // "Over" Mixing with RGBA each:
+            fragColor.rgb = mix(fluidColor.rgb, spawnColor.rgb, spawnColor.a);
+            fragColor.a = mix(fluidColor.a, 1., spawnColor.a);
+            return;
+        }
+        case _INIT_VELOCITY: {
+            if (velocityEvent == EVENT_CLEAR_FLUID) {
+                fragColor.xy = fluidVelocityEvent.coords.xy;
+                return;
+            }
+            fluidVelocity = texture(texVelocity, st).xy;
+            vec2 deltaVelocity = c.yy;
+            if (velocityEvent == EVENT_DRAIN) {
+                fluidColor = texture(texColor, st);
+                float decay = exp(-(iTime - fluidVelocityEvent.timeStart) * fluidVelocityEvent.args[0]);
+                deltaVelocity = fluidVelocityEvent.coords.xy
+                   // * max3(fluidColor.rgb) * fluidColor.a
+                    * decay;
+            } else if (velocityEvent == EVENT_DRAW_TEXT) {
+                vec4 spawnColor;
+                printGlyphInstances(uv, spawnColor);
+                deltaVelocity += spawnColor.a * (spawnColor.r + spawnColor.g + spawnColor.b);
+            } else if (velocityEvent == EVENT_STIR_FLUID) {
+                deltaVelocity += fluidVelocityEvent.args[3]
+                    * spiral(uv, fluidVelocityEvent.args[0], fluidVelocityEvent.args[1]);
+            } else if (colorEvent == EVENT_ADD_TEXTURE) {
+                vec4 eventCoords = fluidVelocityEvent.coords;
+                vec4 stLTRB = atlasLTRB_210sketchy; // <-- could change with subtype :)
+                // the gradient of the texture should determine the velocity flow
+                vec4 texC = monaAtlasFromEvent(stLTRB, eventCoords);
+                texL = monaAtlasFromEvent(stLTRB, eventCoords + vec4(texelL, 0, 0));
+                texR = monaAtlasFromEvent(stLTRB, eventCoords + vec4(texelR, 0, 0));
+                texU = monaAtlasFromEvent(stLTRB, eventCoords + vec4(texelU, 0, 0));
+                texD = monaAtlasFromEvent(stLTRB, eventCoords + vec4(texelD, 0, 0));
+                float L = luminance(texC.rgb * texC.a);
+                vec2 dL = 0.5 * vec2(
+                    luminance(texR.rgb * texR.a - texL.rgb * texL.a),
+                    luminance(texU.rgb * texU.a - texD.rgb * texD.a)
+                );
+                fluidVelocity.xy = dL * (1. + fluidVelocityEvent.args.x);
+                return;
+                // deltaVelocity = monaAtlasCenteredAt(atlasLTRB_210sketchy, 0.5 * uv).rg;
+            }
+            fragColor.xy = fluidVelocity.xy + deltaVelocity;
+            return;
+        }
+        case _INIT_PRESSURE_PASS:
+            if (velocityEvent == EVENT_CLEAR_FLUID) {
+                fragColor.x = 0.1;
+                return;
+            } else if (velocityEvent == EVENT_STIR_FLUID) {
+                fragColor.x = spiral(uv, fluidVelocityEvent.args[0], fluidVelocityEvent.args[1]);
+                return;
+            }
+            if (otherEvent == EVENT_ADD_TEXTURE) {
+                fragColor.x = monaAtlasCenteredAt(atlasLTRB_210sketchy, 0.5 * uv).a;
+                return;
+            }
+            fragColor.x = iPressure + texture(texPressure, st).x;
+            return;
+        case _CALC_CURL_FROM_VELOCITY:
+            // this just calculates the "curl" (scalar => only red) for the next pass
+            // understand the curl as kind of "orthogonal to the gradient": (x, y) -> (-y, x)
+            velL = +texture(texVelocity, stL).y;
+            velR = +texture(texVelocity, stR).y;
+            velU = -texture(texVelocity, stU).x;
+            velD = -texture(texVelocity, stD).x;
+            fragColor.r = (velR - velL) + (velU - velD);
+            return;
+        case _PROCESS_VELOCITY_BY_CURL:
+            fluidVelocity = texture(texVelocity, st).xy;
+            float curl = texture(texCurl, st).x;
+            float curlL = texture(texCurl, stL).x;
+            float curlR = texture(texCurl, stR).x;
+            float curlU = texture(texCurl, stU).x;
+            float curlD = texture(texCurl, stD).x;
+            vec2 force = vec2(abs(curlU) - abs(curlD), abs(curlR) - abs(curlL));
+            force /= length(force) + 0.0001;
+            float curlStrength = iCurlStrength;
+            if (velocityEvent == EVENT_STIR_FLUID) {
+                curlStrength += fluidVelocityEvent.args[2]
+                    * spiral(uv, fluidVelocityEvent.args[0], fluidVelocityEvent.args[1]);
+            }
+            force *= curlStrength * curl * c.yz;
+            fluidVelocity += force * deltaTime;
+            fragColor.xy = clamp(fluidVelocity, -1000., 1000.);
+            return;
+        case _CALC_DIVERGENCE_FROM_VELOCITY:
+            fluidVelocity = texture(texVelocity, st).xy;
+            // this handles divergence at the borders
+            velL = texture(texVelocity, stL).x;
+            velR = texture(texVelocity, stR).x;
+            velU = texture(texVelocity, stU).y;
+            velD = texture(texVelocity, stD).y;
+            velL = mix(velL, -fluidVelocity.x, step(stL.x, 0.0));
+            velR = mix(velR, -fluidVelocity.x, step(1.0, stR.x));
+            velU = mix(velU, -fluidVelocity.y, step(1.0, stU.y));
+            velD = mix(velD, -fluidVelocity.y, step(stD.y, 0.0));
+            fragColor.r = 0.5 * (velR - velL + velU - velD);
+            return;
+        case _PROCESS_PRESSURE:
+            pL = texture(texPressure, stL).x;
+            pR = texture(texPressure, stR).x;
+            pU = texture(texPressure, stU).x;
+            pD = texture(texPressure, stD).x;
+            div = texture(texDivergence, st).x;
+            float pressure = 0.25 * (pL + pR + pU + pD - div);
+            fragColor.r = pressure;
+            return;
+        case _PROCESS_GRADIENT_SUBTRACTION:
+            fluidVelocity = texture(texVelocity, st).xy;
+            pL = texture(texPressure, stL).x;
+            pR = texture(texPressure, stR).x;
+            pU = texture(texPressure, stU).x;
+            pD = texture(texPressure, stD).x;
+            fluidVelocity.xy -= vec2(pR - pL, pU - pD);
+            fragColor.rg = fluidVelocity;
+            return;
+        case _PROCESS_ADVECTION:
+            float velocityDissipation = iVelocityDissipation;
+            if (velocityEvent == EVENT_CLEAR_FLUID) {
+                velocityDissipation = 99.;
+            }
+            fragColor = simulateAdvection(texVelocity, velocityDissipation, false);
+            return;
+        case _PROCESS_FLUID_COLOR:
+            fragColor = simulateAdvection(texColor, iColorDissipation, true);
+            return;
+#if ENABLE_BLOOM
+        case _POST_BLOOM_PREFILTER:
+            col = bloomPrefilter(iBloomThreshold, iBloomKnee, iBloomPreGain);
+//            float knee = iBloomThreshold * iBloomKnee + 1.e-4;
+//            vec3 curve = vec3(iBloomThreshold - knee, knee * 2., 0.25 / knee);
+//            vec3 col = texture(texColor, st).rgb;
+//            float br = iBloomPreGain * max3(col);
+//            float rq = clamp(br - curve.x, 0., curve.y);
+//            rq = curve.z * rq * rq;
+//            col *= max(rq, br - iBloomThreshold) / max(br, 1.e-4);
+            fragColor = vec4(col, 0.);
+            return;
+        case _MASTER_BLOOM_PREFILTER:
+            col = bloomPrefilter(iMasterBloomThreshold, iMasterBloomKnee, iMasterBloomPreGain);
+            fragColor = vec4(col, 0.);
+            return;
+        case _POST_BLOOM_BLUR:
+            fragColor = 0.25 * (
+                texture(texPostBloom, stL) +
+                texture(texPostBloom, stR) +
+                texture(texPostBloom, stU) +
+                texture(texPostBloom, stD)
+            );
+            return;
+#endif
+#if ENABLE_SUNRAYS
+        case _POST_SUNRAYS_CALC_MASK:
+            fluidColor = texture(texColor, st);
+            float br = max3(fluidColor.rgb);
+            fragColor.a = 1.0 - clamp(br * 20., 0., 0.8);
+            fragColor.rgb = fluidColor.rgb;
+            return;
+        case _POST_SUNRAYS_CALC:
+            fragColor = vec4(calcSunrays(), 0., 0., 1.);
+            return;
+        case _POST_SUNRAYS_BLUR:
+            fragColor = simple1DGaussBlur(texPostSunrays);
+//            const float centerWeight = 0.294117;
+//            float weight = (1. - centerWeight) * 0.5;
+//            fragColor = centerWeight * texture(texPostSunrays, st)
+//                + weight * texture(texPostSunrays, st - 1.333 * texelSize)
+//                + weight * texture(texPostSunrays, st + 1.333 * texelSize);
+            return;
+#endif
+        case _RENDER_FLUID:
+            fluidColor = texture(texColor, st);
+            if (debugOption == 3) {
+                fragColor = debugRedChannel(texCurl, 0.2);
+                return;
+            } else if (debugOption == 2) {
+                fragColor = fluidColor;
+                return;
+            }
+
+            fragColor = fluidColor;
+            /*
+            fragColor.rgb = postprocessFluid(fluidColor,
+                ENABLE_SUNRAYS == 1,
+                ENABLE_BLOOM == 1,
+                1.,
+                1.
+            );
+            fragColor.a = fluidColor.a;
+            */
+            // transform black -> transparent:
+            // fragColor.a = max3(fragColor.rgb);
+
+            if (debugOption == 1) {
+                // DEBUGGING: BLEND ON BLUE
+                fragColor.rgb = fragColor.rgb + (1. - fragColor.a) * c.yyx;
+                fragColor.a = 1.;
+            }
+            return;
+
+        case _MASTER_COMPOSE:
+            masterComposition(uv);
+            return;
+        case _MASTER_EXTRA_BLUR:
+            // intended to be called in each direction subsequentially.
+            fragColor = simple1DGaussBlur(texColor);
+            return;
+        case _MASTER_FINAL_RENDERING:
+            finalEndboss();
+            return;
+    }
+}
+
+/*
+Bars...
+0 - 7: Intro
+    (Event at 2.5)
+    something at 4
+7 - 15: Verse 1 (5 Bars Suspension + 3 Bars Chords)
+15 - 18: Verse 2 (3 Bars Suspension + 1 Bar Chords)
+19 - 23: Verse 3 (2 Bars Suspension + 2 Bar Chords)
+23 - 31: Verse 4 (5 Bars Suspension + 3 Bar Chords)
+31 - 35: Verse 5 (3 Bars Suspension + 1 Bar Chords)
+35 - 39: Verse 6 (2 Bars Suspension + 2 Bar Chords)
+Outro
+*/

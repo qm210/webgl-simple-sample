@@ -1,5 +1,10 @@
-import {compile, createStaticVertexBuffer, initVertices} from "../webgl/setup.js";
-import {evaluateReadData, updateResolution} from "../webgl/helpers.js";
+import {
+    compile,
+    initVertices,
+    createStaticVertexBuffer,
+    updateResolution,
+    evaluateReadData,
+} from "./index.js";
 import {REGEX} from "../glslCode/definitions.js";
 
 const basicVertexShaderSource =

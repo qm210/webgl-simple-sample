@@ -1,6 +1,5 @@
-import {createSmallButton} from "./layout/controls.js";
 import {createPreset, deletePreset, loadPresets} from "./database.js";
-import {createDiv} from "./layout/dom.js";
+import {createDiv, createSmallButton} from "./layout/dom.js";
 
 const ADVANCED = import.meta.env.VITE_MODE_ADVANCED;
 

@@ -1,5 +1,9 @@
-import {compile, createStaticVertexBuffer, initVertices} from "../webgl/setup.js";
-import {createTextureFromImage} from "../webgl/helpers.js";
+import {
+    compile,
+    initVertices,
+    createStaticVertexBuffer,
+    createTextureFromImage,
+} from "./index.js";
 
 import fragmentShaderSource from "../shaders/3a_colorSimplePlayground.glsl";
 import vertexShaderSource from "../shaders/vertex.basic.glsl";

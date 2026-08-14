@@ -1,4 +1,8 @@
-import {compile, createStaticVertexBuffer, initVertices} from "../webgl/setup.js";
+import {
+    compile,
+    initVertices,
+    createStaticVertexBuffer
+} from "./index.js";
 
 import vertexShaderSource from "../shaders/vertex.basic.glsl";
 import fragmentShaderSource from "../shaders/1_firstBasics.glsl";

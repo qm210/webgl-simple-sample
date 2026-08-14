@@ -1,8 +1,9 @@
+import {createTextureFromImage} from "./index.js";
 import {initBasicState} from "./common.js";
+
 import fragmentShaderSource from "../shaders/8a_raymarchingStart.glsl";
 import image0 from "../textures/goofy_floofy.png";
 import image1 from "../textures/hubble_extreme_deep_field.jpg"
-import {createTextureFromImage} from "../webgl/helpers.js";
 
 export default {
     title: "Ray Marching: First Steps",

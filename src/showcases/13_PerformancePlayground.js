@@ -1,6 +1,8 @@
-import {startRenderLoop} from "../webgl/render.js";
-import {createFramebufferWithTexture} from "../webgl/helpers.js";
-import {initBasicState} from "./common.js";
+import {
+    startRenderLoop,
+    createFramebufferWithTexture,
+    initBasicState,
+} from "./index.js";
 import fragmentShaderSource from "../shaders/performancePlayground.glsl";
 
 export default {

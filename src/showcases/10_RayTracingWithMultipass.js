@@ -1,7 +1,9 @@
-import {startRenderLoop} from "../webgl/render.js";
-import {initBasicState} from "./common.js";
+import {
+    initBasicState,
+    createFramebufferWithTexture,
+    updateResolution,
+} from "./index.js";
 import fragmentShaderSource from "../shaders/raytracingWithMultipass.glsl";
-import {createFramebufferWithTexture, updateResolution} from "../webgl/helpers.js";
 
 export default {
     title: "Ray Tracing: First Steps",

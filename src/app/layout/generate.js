@@ -1,4 +1,3 @@
-import {addButton, createInputElements, addFreeRow, createResetAllButton} from "./controls.js";
 import {registerShaderCode} from "./shaderCode.js";
 import {appendButton, appendElement, createDiv, createElement} from "./dom.js";
 import {createScrollStackOn, scrollToFirstInterestingLine} from "../events.js";
@@ -9,6 +8,7 @@ import {updateResolution} from "../../webgl/helpers.js";
 import {addCanvasMouseInteraction} from "../mouse.js";
 import {createClipboardButtons, createPresetSelector, refreshPresets} from "../exchange.js";
 import {initializePresetStore} from "../database.js";
+import {addButton, addFreeRow, createInputElements, createResetAllButton} from "./controls/uniforms.js";
 
 
 const generatePage = (glContext, elements, state, controls) => {
@@ -149,7 +149,7 @@ export const addControlsToPage = (elements, state, controls, glContext) => {
     controls.onRender();
 
     elements.iTime = addFreeRow({
-        parent: elements.controls,
+        parent: elements.controlBar.time.frame,
         label: "iTime",
         id: "iTime",
         valuePrefix: "=",
@@ -179,13 +179,13 @@ export const addControlsToPage = (elements, state, controls, glContext) => {
     }
     if (elements.toggles.length > 0) {
         elements.toggleButtons = addFreeRow({
-            parent: elements.controls,
+            parent: elements.controlBar.main,
             label: "",
             content: elements.toggles,
         });
     }
     elements.customData = addFreeRow({
-        parent: elements.controls,
+        parent: elements.controlBar.main,
     });
 
     controls.uniforms ??= [];
@@ -200,7 +200,7 @@ export const addControlsToPage = (elements, state, controls, glContext) => {
             // <-- skip overwriting one defined per default (i.e. iTime)
             elements[control.name] =
                 addFreeRow({
-                    parent: elements.controls,
+                    parent: elements.uniformControls,
                     label: control.name,
                     id: control.name,
                     content: createDiv("=", "value-label"),
@@ -215,7 +215,7 @@ export const addControlsToPage = (elements, state, controls, glContext) => {
             });
             elements[control.name] =
                 addFreeRow({
-                    parent: elements.controls,
+                    parent: elements.uniformControls,
                     label: "",
                     id: control.name,
                     content: elements.controlButtons[control.name]
@@ -224,7 +224,7 @@ export const addControlsToPage = (elements, state, controls, glContext) => {
         }
         else if (control.type === "separator" || control.separator) {
             addFreeRow({
-                parent: elements.controls,
+                parent: elements.uniformControls,
                 content: createDiv(control.separator ?? control.title, "separator"),
                 isSeparator: true,
             });
@@ -239,18 +239,18 @@ export const addControlsToPage = (elements, state, controls, glContext) => {
         if (!input) {
             continue;
         }
-        elements.controls.appendChild(input.name);
-        elements.controls.appendChild(input.value);
+        elements.uniformControls.appendChild(input.name);
+        elements.uniformControls.appendChild(input.value);
         if (control.boolean) {
-            elements.controls.appendChild(input.control);
-            elements.controls.appendChild(input.description);
+            elements.uniformControls.appendChild(input.control);
+            elements.uniformControls.appendChild(input.description);
         } else {
-            elements.controls.appendChild(input.min);
-            elements.controls.appendChild(input.control);
-            elements.controls.appendChild(input.max);
+            elements.uniformControls.appendChild(input.min);
+            elements.uniformControls.appendChild(input.control);
+            elements.uniformControls.appendChild(input.max);
         }
         if (input.reset) {
-            elements.controls.appendChild(input.reset);
+            elements.uniformControls.appendChild(input.reset);
         }
         elements.uniforms[control.name] = input;
     }

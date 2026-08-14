@@ -1,12 +1,15 @@
-import {initBasicState, startRenderLoop} from "./common.js";
-import {createTextureFromImage} from "../webgl/helpers/textures.js";
+import {
+    initBasicState,
+    startRenderLoop,
+    createTextureFromImage,
+} from "./index.js";
+import {createUboForArray} from "../webgl/helpers/advancedBuffers.js";
+import {createGlyphDef, toAscii} from "../app/algorithms.js";
 
 import vertexShaderSource from "../shaders/vertex.fonts.glsl"
 import fragmentShaderSource from "../shaders/fonts.proofofconcept.glsl";
 import spiceSaleMsdfPng from "../textures/dream210/SpicySale.msdf.png";
 import spiceSaleMsdfJson from "../textures/dream210/SpicySale.msdf.json";
-import {createUboForArray} from "../webgl/helpers/advancedBuffers.js";
-import {createGlyphDef, toAscii} from "../app/algorithms.js";
 
 export default {
     title: "What about Fonts?",

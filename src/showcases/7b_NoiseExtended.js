@@ -1,7 +1,6 @@
-import {startRenderLoop} from "../app/playback.js";
+import {initBasicState, readPixelsAndEvaluate} from "./common.js";
 
 import fragmentShaderSource from "../shaders/noisePlaygroundExtended.glsl";
-import {initBasicState, readPixelsAndEvaluate} from "./common.js";
 
 export default {
     title: "Noise Playground Extended",

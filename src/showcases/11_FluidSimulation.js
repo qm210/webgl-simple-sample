@@ -1,10 +1,11 @@
-import {startRenderLoop} from "../webgl/render.js";
 import {
     createFramebufferWithTexture,
-    createPingPongFramebuffersWithTexture, createTextureFromImage, halfFloatOptions, resolutionScaled,
-    updateResolution
-} from "../webgl/helpers.js";
-import {initBasicState} from "./common.js";
+    createPingPongFramebuffersWithTexture,
+    createTextureFromImage, halfFloatOptions, resolutionScaled,
+    updateResolution,
+    initBasicState
+} from "./index.js";
+import {} from "./common.js";
 
 import vertexShaderSource from "../shaders/vertex.basicWithDifferentials.glsl"
 import fragmentShaderSource from "../shaders/fluidPlayground.glsl";
